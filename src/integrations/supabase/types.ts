@@ -46,42 +46,93 @@ export type Database = {
           },
         ]
       }
+      google_sheets_config: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          last_sync_at: string | null
+          spreadsheet_id: string
+          spreadsheet_name: string | null
+          sync_message: string | null
+          sync_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_sync_at?: string | null
+          spreadsheet_id: string
+          spreadsheet_name?: string | null
+          sync_message?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_sync_at?: string | null
+          spreadsheet_id?: string
+          spreadsheet_name?: string | null
+          sync_message?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       metrics: {
         Row: {
           calls: number
+          cancellation_entries: number | null
+          cancellation_value: number | null
+          cancellations: number | null
           closer_id: string
           created_at: string
           entries: number
+          entries_trend: number | null
           id: string
           period_end: string
           period_start: string
           revenue: number
+          revenue_trend: number | null
           sales: number
           source: string | null
           updated_at: string
         }
         Insert: {
           calls?: number
+          cancellation_entries?: number | null
+          cancellation_value?: number | null
+          cancellations?: number | null
           closer_id: string
           created_at?: string
           entries?: number
+          entries_trend?: number | null
           id?: string
           period_end: string
           period_start: string
           revenue?: number
+          revenue_trend?: number | null
           sales?: number
           source?: string | null
           updated_at?: string
         }
         Update: {
           calls?: number
+          cancellation_entries?: number | null
+          cancellation_value?: number | null
+          cancellations?: number | null
           closer_id?: string
           created_at?: string
           entries?: number
+          entries_trend?: number | null
           id?: string
           period_end?: string
           period_start?: string
           revenue?: number
+          revenue_trend?: number | null
           sales?: number
           source?: string | null
           updated_at?: string
