@@ -1,5 +1,5 @@
-import React from 'react';
-import { Menu, User, Bell, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Menu, User, Bell, RefreshCw, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -12,13 +12,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { MetricsDialog } from './MetricsDialog';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { user, role, signOut } = useAuth();
+  const { user, role, signOut, isAdmin, isManager } = useAuth();
+  const [metricsDialogOpen, setMetricsDialogOpen] = useState(false);
+  
+  const canAddMetrics = isAdmin || isManager;
 
   const getRoleLabel = (role: string | null) => {
     switch (role) {
@@ -72,6 +76,14 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         {/* Right side */}
         <div className="flex items-center gap-3">
+          {/* Add Metric button */}
+          {canAddMetrics && (
+            <Button size="sm" className="hidden sm:flex gap-2" onClick={() => setMetricsDialogOpen(true)}>
+              <Plus size={16} />
+              <span>Nova Métrica</span>
+            </Button>
+          )}
+
           {/* Sync button */}
           <Button variant="outline" size="sm" className="hidden sm:flex gap-2">
             <RefreshCw size={16} />
@@ -124,6 +136,12 @@ export function Header({ onMenuClick }: HeaderProps) {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Metrics Dialog */}
+      <MetricsDialog 
+        open={metricsDialogOpen} 
+        onOpenChange={setMetricsDialogOpen} 
+      />
     </header>
   );
 }
