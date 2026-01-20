@@ -57,6 +57,32 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Squad colors
+        eagles: {
+          DEFAULT: "hsl(var(--eagles))",
+          light: "hsl(var(--eagles-light))",
+        },
+        alcateia: {
+          DEFAULT: "hsl(var(--alcateia))",
+          light: "hsl(var(--alcateia-light))",
+        },
+        sharks: {
+          DEFAULT: "hsl(var(--sharks))",
+          light: "hsl(var(--sharks-light))",
+        },
+        // Semantic colors
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

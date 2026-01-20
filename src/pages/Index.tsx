@@ -5,6 +5,7 @@ import { Header } from '@/components/dashboard/Header';
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { SquadPage } from '@/components/dashboard/SquadPage';
 import { AdminPanel } from '@/components/dashboard/AdminPanel';
+import { Loader2 } from 'lucide-react';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -14,7 +15,10 @@ const Index = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
       </div>
     );
   }
@@ -33,16 +37,20 @@ const Index = () => {
         return <AdminPanel />;
       case 'sdrs':
         return (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold text-foreground mb-4">Módulo SDRs</h2>
-            <p className="text-muted-foreground">Em desenvolvimento...</p>
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-2">Módulo SDRs</h2>
+              <p className="text-muted-foreground">Em desenvolvimento...</p>
+            </div>
           </div>
         );
       case 'reports':
         return (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold text-foreground mb-4">Relatórios</h2>
-            <p className="text-muted-foreground">Em desenvolvimento...</p>
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-2">Relatórios</h2>
+              <p className="text-muted-foreground">Em desenvolvimento...</p>
+            </div>
           </div>
         );
       default:
@@ -51,7 +59,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -59,10 +67,10 @@ const Index = () => {
         onModuleChange={setActiveModule}
       />
       
-      <div className="flex-1 flex flex-col md:ml-64">
+      <div className="md:pl-64 min-h-screen flex flex-col">
         <Header onMenuClick={() => setSidebarOpen(true)} />
         
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 md:p-6 lg:p-8">
           {renderContent()}
         </main>
       </div>
