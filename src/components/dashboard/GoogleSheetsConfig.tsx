@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileSpreadsheet, CheckCircle2, XCircle, RefreshCw, Unlink, HelpCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,24 +8,37 @@ import {
   useGoogleSheetsConfig, 
   useSaveGoogleSheetsConfig, 
   useDisconnectGoogleSheets,
-  useSyncGoogleSheets 
+  useSyncGoogleSheets,
+  useSaveRowMapping,
+  DEFAULT_ROW_MAPPING,
+  type RowMapping
 } from '@/hooks/useGoogleSheetsConfig';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { RowMappingConfig } from './RowMappingConfig';
 
 export function GoogleSheetsConfig() {
   const [spreadsheetId, setSpreadsheetId] = useState('');
   const [showHelp, setShowHelp] = useState(false);
+  const [rowMapping, setRowMapping] = useState<RowMapping>(DEFAULT_ROW_MAPPING);
 
   const { data: config, isLoading } = useGoogleSheetsConfig();
   const saveConfig = useSaveGoogleSheetsConfig();
   const disconnect = useDisconnectGoogleSheets();
   const sync = useSyncGoogleSheets();
+  const saveRowMapping = useSaveRowMapping();
 
   const isConnected = !!config?.spreadsheet_id;
+
+  // Load row mapping from config when it changes
+  useEffect(() => {
+    if (config?.row_mapping) {
+      setRowMapping(config.row_mapping);
+    }
+  }, [config?.row_mapping]);
 
   const handleConnect = () => {
     if (!spreadsheetId.trim()) {
@@ -41,6 +54,12 @@ export function GoogleSheetsConfig() {
 
   const handleSync = () => {
     sync.mutate();
+  };
+
+  const handleSaveRowMapping = () => {
+    if (config?.id) {
+      saveRowMapping.mutate({ configId: config.id, rowMapping });
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -165,6 +184,14 @@ export function GoogleSheetsConfig() {
                 </p>
               </div>
             </div>
+
+            {/* Row Mapping Configuration */}
+            <RowMappingConfig
+              mapping={rowMapping}
+              onChange={setRowMapping}
+              onSave={handleSaveRowMapping}
+              isSaving={saveRowMapping.isPending}
+            />
 
             <div className="flex gap-3">
               <Button 

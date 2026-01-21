@@ -18,8 +18,8 @@ interface SheetData {
   cancellationEntries: number;
 }
 
-// Row mapping based on project memory
-const ROW_MAPPING = {
+// Default row mapping (can be overridden by config)
+const DEFAULT_ROW_MAPPING = {
   calls: 7,
   revenue: 10,
   entries: 11,
@@ -30,6 +30,18 @@ const ROW_MAPPING = {
   cancellationValue: 16,
   cancellationEntries: 17,
 };
+
+interface RowMapping {
+  calls: number;
+  revenue: number;
+  entries: number;
+  revenueTrend: number;
+  entriesTrend: number;
+  sales: number;
+  cancellations: number;
+  cancellationValue: number;
+  cancellationEntries: number;
+}
 
 // Extract spreadsheet ID from URL or return as-is if already an ID
 function extractSpreadsheetId(input: string): string {
@@ -131,6 +143,12 @@ Deno.serve(async (req) => {
     // Extract the spreadsheet ID from URL if needed
     const spreadsheetId = extractSpreadsheetId(config.spreadsheet_id);
     console.log('Syncing spreadsheet ID:', spreadsheetId);
+
+    // Get row mapping from config or use defaults
+    const rowMapping: RowMapping = config.row_mapping 
+      ? { ...DEFAULT_ROW_MAPPING, ...config.row_mapping }
+      : DEFAULT_ROW_MAPPING;
+    console.log('Using row mapping:', rowMapping);
 
     // Get spreadsheet metadata (list of sheets/tabs)
     const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${GOOGLE_API_KEY}`;
@@ -237,15 +255,15 @@ Deno.serve(async (req) => {
 
         const metrics: SheetData = {
           closerName: sheetName.trim(),
-          calls: Math.round(getValue(ROW_MAPPING.calls)),
-          sales: Math.round(getValue(ROW_MAPPING.sales)),
-          revenue: getValue(ROW_MAPPING.revenue),
-          entries: getValue(ROW_MAPPING.entries),
-          revenueTrend: getValue(ROW_MAPPING.revenueTrend),
-          entriesTrend: getValue(ROW_MAPPING.entriesTrend),
-          cancellations: Math.round(getValue(ROW_MAPPING.cancellations)),
-          cancellationValue: getValue(ROW_MAPPING.cancellationValue),
-          cancellationEntries: getValue(ROW_MAPPING.cancellationEntries),
+          calls: Math.round(getValue(rowMapping.calls)),
+          sales: Math.round(getValue(rowMapping.sales)),
+          revenue: getValue(rowMapping.revenue),
+          entries: getValue(rowMapping.entries),
+          revenueTrend: getValue(rowMapping.revenueTrend),
+          entriesTrend: getValue(rowMapping.entriesTrend),
+          cancellations: Math.round(getValue(rowMapping.cancellations)),
+          cancellationValue: getValue(rowMapping.cancellationValue),
+          cancellationEntries: getValue(rowMapping.cancellationEntries),
         };
 
         console.log(`Metrics for ${sheetName}:`, metrics);

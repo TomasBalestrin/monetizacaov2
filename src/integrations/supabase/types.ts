@@ -52,6 +52,7 @@ export type Database = {
           created_by: string | null
           id: string
           last_sync_at: string | null
+          row_mapping: Json | null
           spreadsheet_id: string
           spreadsheet_name: string | null
           sync_message: string | null
@@ -63,6 +64,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           last_sync_at?: string | null
+          row_mapping?: Json | null
           spreadsheet_id: string
           spreadsheet_name?: string | null
           sync_message?: string | null
@@ -74,6 +76,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           last_sync_at?: string | null
+          row_mapping?: Json | null
           spreadsheet_id?: string
           spreadsheet_name?: string | null
           sync_message?: string | null

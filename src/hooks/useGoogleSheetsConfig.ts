@@ -2,6 +2,30 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export interface RowMapping {
+  calls: number;
+  revenue: number;
+  entries: number;
+  revenueTrend: number;
+  entriesTrend: number;
+  sales: number;
+  cancellations: number;
+  cancellationValue: number;
+  cancellationEntries: number;
+}
+
+export const DEFAULT_ROW_MAPPING: RowMapping = {
+  calls: 7,
+  revenue: 10,
+  entries: 11,
+  revenueTrend: 12,
+  entriesTrend: 13,
+  sales: 14,
+  cancellations: 15,
+  cancellationValue: 16,
+  cancellationEntries: 17,
+};
+
 interface GoogleSheetsConfig {
   id: string;
   spreadsheet_id: string;
@@ -12,6 +36,7 @@ interface GoogleSheetsConfig {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  row_mapping: RowMapping | null;
 }
 
 export function useGoogleSheetsConfig() {
@@ -25,7 +50,13 @@ export function useGoogleSheetsConfig() {
         .maybeSingle();
 
       if (error) throw error;
-      return data as GoogleSheetsConfig | null;
+      if (!data) return null;
+      
+      // Parse row_mapping from JSON
+      return {
+        ...data,
+        row_mapping: data.row_mapping as unknown as RowMapping | null
+      } as GoogleSheetsConfig;
     },
   });
 }
@@ -79,6 +110,35 @@ export function useSaveGoogleSheetsConfig() {
   });
 }
 
+export function useSaveRowMapping() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ configId, rowMapping }: { configId: string; rowMapping: RowMapping }) => {
+      const { data, error } = await supabase
+        .from('google_sheets_config')
+        .update({ 
+          row_mapping: rowMapping as any,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', configId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-config'] });
+      toast.success('Mapeamento salvo com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Error saving row mapping:', error);
+      toast.error('Erro ao salvar mapeamento');
+    },
+  });
+}
+
 export function useDisconnectGoogleSheets() {
   const queryClient = useQueryClient();
 
@@ -107,7 +167,6 @@ export function useSyncGoogleSheets() {
 
   return useMutation({
     mutationFn: async () => {
-      // TODO: Call the sync-google-sheets edge function when implemented
       const { data, error } = await supabase.functions.invoke('sync-google-sheets');
       
       if (error) throw error;
