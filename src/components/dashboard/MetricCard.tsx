@@ -7,6 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Progress } from '@/components/ui/progress';
 
 interface MetricCardProps {
   title: string;
@@ -14,8 +15,10 @@ interface MetricCardProps {
   trend?: number;
   icon?: LucideIcon;
   large?: boolean;
+  compact?: boolean;
   isCurrency?: boolean;
   isPercentage?: boolean;
+  showProgress?: boolean;
   className?: string;
   variant?: 'default' | 'eagles' | 'alcateia' | 'sharks' | 'success' | 'warning';
 }
@@ -26,8 +29,10 @@ export function MetricCard({
   trend,
   icon: Icon,
   large = false,
+  compact = false,
   isCurrency = false,
   isPercentage = false,
+  showProgress = false,
   className,
   variant = 'default',
 }: MetricCardProps) {
@@ -67,20 +72,80 @@ export function MetricCard({
     }
   };
 
+  const getProgressColor = () => {
+    switch (variant) {
+      case 'eagles':
+        return 'bg-eagles';
+      case 'alcateia':
+        return 'bg-alcateia';
+      case 'sharks':
+        return 'bg-sharks';
+      case 'success':
+        return 'bg-success';
+      case 'warning':
+        return 'bg-warning';
+      default:
+        return 'bg-primary';
+    }
+  };
+
   const displayValue = formatValue(true);
   const fullValue = formatValue(false);
   const needsTooltip = isCurrency && typeof value === 'number' && value >= 1000;
+  const progressValue = isPercentage && typeof value === 'number' ? Math.min(value, 100) : 0;
 
   const valueElement = (
     <h3
       className={cn(
         'font-bold text-card-foreground',
-        large ? 'text-2xl sm:text-3xl md:text-4xl' : 'text-lg sm:text-xl md:text-2xl'
+        large ? 'text-2xl sm:text-3xl md:text-4xl' : compact ? 'text-lg sm:text-xl' : 'text-lg sm:text-xl md:text-2xl'
       )}
     >
       {displayValue}
     </h3>
   );
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          'p-3 sm:p-4 rounded-xl bg-card/60 border border-border/40 transition-all duration-200 hover:bg-card/80',
+          className
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <p className="text-muted-foreground text-xs font-medium">{title}</p>
+          {Icon && (
+            <div className={cn('p-1.5 rounded-lg shrink-0', getIconBackground())}>
+              <Icon size={14} />
+            </div>
+          )}
+        </div>
+        {needsTooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {valueElement}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="font-semibold">
+              {fullValue}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          valueElement
+        )}
+        {showProgress && isPercentage && (
+          <div className="mt-2">
+            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-500', getProgressColor())}
+                style={{ width: `${progressValue}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <Card
@@ -105,6 +170,16 @@ export function MetricCard({
               </Tooltip>
             ) : (
               valueElement
+            )}
+            {showProgress && isPercentage && (
+              <div className="mt-3">
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn('h-full rounded-full transition-all duration-500', getProgressColor())}
+                    style={{ width: `${progressValue}%` }}
+                  />
+                </div>
+              </div>
             )}
             {trend !== undefined && (
               <div
