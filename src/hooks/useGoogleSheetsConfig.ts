@@ -3,27 +3,29 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface RowMapping {
+  column: string;
   calls: number;
+  sales: number;
   revenue: number;
   entries: number;
   revenueTrend: number;
   entriesTrend: number;
-  sales: number;
   cancellations: number;
   cancellationValue: number;
   cancellationEntries: number;
 }
 
 export const DEFAULT_ROW_MAPPING: RowMapping = {
-  calls: 7,
-  revenue: 10,
-  entries: 11,
-  revenueTrend: 12,
-  entriesTrend: 13,
-  sales: 14,
-  cancellations: 15,
-  cancellationValue: 16,
-  cancellationEntries: 17,
+  column: 'G',              // Coluna SEMANAL por padrão
+  calls: 7,                 // Calls Realizadas
+  sales: 8,                 // Vendas Fechadas
+  revenue: 10,              // Valor Total
+  entries: 11,              // Valor Entrada
+  revenueTrend: 12,         // Tendência Valor Total
+  entriesTrend: 13,         // Tendência Valor Entrada
+  cancellations: 14,        // Numero de cancelamento
+  cancellationValue: 16,    // Valor de venda Cancelamento
+  cancellationEntries: 17,  // Valor total de entrada Can
 };
 
 interface GoogleSheetsConfig {

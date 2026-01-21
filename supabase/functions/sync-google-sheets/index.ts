@@ -20,24 +20,26 @@ interface SheetData {
 
 // Default row mapping (can be overridden by config)
 const DEFAULT_ROW_MAPPING = {
-  calls: 7,
-  revenue: 10,
-  entries: 11,
-  revenueTrend: 12,
-  entriesTrend: 13,
-  sales: 14,
-  cancellations: 15,
-  cancellationValue: 16,
-  cancellationEntries: 17,
+  column: 'G',              // Coluna SEMANAL por padrão
+  calls: 7,                 // Calls Realizadas
+  sales: 8,                 // Vendas Fechadas
+  revenue: 10,              // Valor Total
+  entries: 11,              // Valor Entrada
+  revenueTrend: 12,         // Tendência Valor Total
+  entriesTrend: 13,         // Tendência Valor Entrada
+  cancellations: 14,        // Numero de cancelamento
+  cancellationValue: 16,    // Valor de venda Cancelamento
+  cancellationEntries: 17,  // Valor total de entrada Can
 };
 
 interface RowMapping {
+  column: string;
   calls: number;
+  sales: number;
   revenue: number;
   entries: number;
   revenueTrend: number;
   entriesTrend: number;
-  sales: number;
   cancellations: number;
   cancellationValue: number;
   cancellationEntries: number;
@@ -224,8 +226,8 @@ Deno.serve(async (req) => {
       console.log(`Processing sheet: ${sheetName}`);
 
       try {
-        // Fetch data from this sheet (columns A and B, rows 1-20)
-        const range = `'${sheetName}'!A1:B20`;
+        // Fetch data from this sheet (columns A to G, rows 1-20)
+        const range = `'${sheetName}'!A1:G20`;
         const dataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?key=${GOOGLE_API_KEY}`;
         const dataResponse = await fetch(dataUrl);
         
@@ -238,12 +240,17 @@ Deno.serve(async (req) => {
         const sheetData = await dataResponse.json();
         const values = sheetData.values || [];
 
-        // Extract metrics from specific rows
+        // Get column index from mapping (A=0, B=1, ..., G=6)
+        const columnLetter = rowMapping.column || 'G';
+        const columnIndex = columnLetter.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+        console.log(`Reading from column ${columnLetter} (index ${columnIndex})`);
+
+        // Extract metrics from specific rows and configured column
         const getValue = (row: number): number => {
           if (row <= 0 || row > values.length) return 0;
           const rowData = values[row - 1];
-          if (!rowData || rowData.length < 2) return 0;
-          const value = rowData[1]; // Column B
+          if (!rowData || rowData.length <= columnIndex) return 0;
+          const value = rowData[columnIndex]; // Configured column
           if (typeof value === 'number') return value;
           if (typeof value === 'string') {
             // Remove currency formatting and parse

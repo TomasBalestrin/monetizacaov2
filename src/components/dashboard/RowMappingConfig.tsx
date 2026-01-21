@@ -1,5 +1,5 @@
-import React from 'react';
-import { Settings2, Save, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings, Loader2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,18 +8,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-
-interface RowMapping {
-  calls: number;
-  revenue: number;
-  entries: number;
-  revenueTrend: number;
-  entriesTrend: number;
-  sales: number;
-  cancellations: number;
-  cancellationValue: number;
-  cancellationEntries: number;
-}
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { type RowMapping } from '@/hooks/useGoogleSheetsConfig';
 
 interface RowMappingConfigProps {
   mapping: RowMapping;
@@ -28,86 +24,121 @@ interface RowMappingConfigProps {
   isSaving: boolean;
 }
 
-const METRIC_LABELS: { key: keyof RowMapping; label: string; description: string }[] = [
-  { key: 'calls', label: 'Ligações', description: 'Número de ligações realizadas' },
-  { key: 'sales', label: 'Vendas', description: 'Quantidade de vendas' },
-  { key: 'revenue', label: 'Faturamento', description: 'Valor total do faturamento' },
-  { key: 'entries', label: 'Entradas', description: 'Valor de entradas' },
-  { key: 'revenueTrend', label: 'Tendência Faturamento', description: 'Variação do faturamento' },
-  { key: 'entriesTrend', label: 'Tendência Entradas', description: 'Variação das entradas' },
-  { key: 'cancellations', label: 'Cancelamentos', description: 'Quantidade de cancelamentos' },
-  { key: 'cancellationValue', label: 'Valor Cancelamentos', description: 'Valor dos cancelamentos' },
+const METRIC_LABELS: { key: keyof Omit<RowMapping, 'column'>; label: string; description: string }[] = [
+  { key: 'calls', label: 'Calls Realizadas', description: 'Número de ligações' },
+  { key: 'sales', label: 'Vendas Fechadas', description: 'Quantidade de vendas' },
+  { key: 'revenue', label: 'Valor Total', description: 'Faturamento total' },
+  { key: 'entries', label: 'Valor Entrada', description: 'Valor de entrada' },
+  { key: 'revenueTrend', label: 'Tendência Valor Total', description: 'Tendência do faturamento' },
+  { key: 'entriesTrend', label: 'Tendência Valor Entrada', description: 'Tendência das entradas' },
+  { key: 'cancellations', label: 'Nº Cancelamentos', description: 'Quantidade de cancelamentos' },
+  { key: 'cancellationValue', label: 'Valor Cancelamento', description: 'Valor das vendas canceladas' },
   { key: 'cancellationEntries', label: 'Entradas Canceladas', description: 'Valor de entradas canceladas' },
 ];
 
-export function RowMappingConfig({ mapping, onChange, onSave, isSaving }: RowMappingConfigProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
+const COLUMN_OPTIONS = [
+  { value: 'B', label: 'B - Segunda' },
+  { value: 'C', label: 'C - Terça' },
+  { value: 'D', label: 'D - Quarta' },
+  { value: 'E', label: 'E - Quinta' },
+  { value: 'F', label: 'F - Sexta' },
+  { value: 'G', label: 'G - SEMANAL (Totais)' },
+];
 
-  const handleChange = (key: keyof RowMapping, value: string) => {
+export function RowMappingConfig({ mapping, onChange, onSave, isSaving }: RowMappingConfigProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleRowChange = (key: keyof Omit<RowMapping, 'column'>, value: string) => {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue > 0) {
       onChange({ ...mapping, [key]: numValue });
     }
   };
 
+  const handleColumnChange = (value: string) => {
+    onChange({ ...mapping, column: value });
+  };
+
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border border-border rounded-lg">
       <CollapsibleTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-foreground">
-          <Settings2 className="h-4 w-4 mr-2" />
-          Configurar Mapeamento de Linhas
+        <Button 
+          variant="ghost" 
+          className="w-full justify-between p-4 h-auto hover:bg-muted/50"
+        >
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Configuração de Mapeamento</span>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {isOpen ? 'Fechar' : 'Abrir'}
+          </span>
         </Button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-4">
-        <div className="bg-muted/50 rounded-lg p-4 space-y-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">Mapeamento de Campos</p>
-            <p className="text-xs text-muted-foreground">
-              Configure qual linha da planilha corresponde a cada métrica. Os valores são lidos da coluna B.
-            </p>
-          </div>
+      
+      <CollapsibleContent className="px-4 pb-4 space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Configure qual coluna e linha da planilha corresponde a cada métrica.
+        </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Column selector */}
+        <div className="space-y-2 p-3 bg-muted/30 rounded-lg">
+          <Label className="text-sm font-medium">Coluna para leitura</Label>
+          <Select value={mapping.column} onValueChange={handleColumnChange}>
+            <SelectTrigger className="w-full bg-background">
+              <SelectValue placeholder="Selecione a coluna" />
+            </SelectTrigger>
+            <SelectContent>
+              {COLUMN_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Selecione a coluna G para ler os totais semanais.
+          </p>
+        </div>
+
+        {/* Row mapping grid */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Mapeamento de Linhas</Label>
+          <div className="grid grid-cols-2 gap-3">
             {METRIC_LABELS.map(({ key, label, description }) => (
-              <div key={key} className="space-y-1.5">
-                <Label htmlFor={`row-${key}`} className="text-xs font-medium">
+              <div key={key} className="space-y-1">
+                <Label htmlFor={key} className="text-xs text-muted-foreground" title={description}>
                   {label}
                 </Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-12">Linha</span>
-                  <Input
-                    id={`row-${key}`}
-                    type="number"
-                    min={1}
-                    value={mapping[key]}
-                    onChange={(e) => handleChange(key, e.target.value)}
-                    className="h-8 bg-background border-border text-sm"
-                    title={description}
-                  />
-                </div>
+                <Input
+                  id={key}
+                  type="number"
+                  min="1"
+                  value={mapping[key]}
+                  onChange={(e) => handleRowChange(key, e.target.value)}
+                  className="bg-background h-9"
+                />
               </div>
             ))}
           </div>
-
-          <div className="pt-3 border-t border-border">
-            <Button 
-              onClick={onSave} 
-              disabled={isSaving}
-              size="sm"
-              className="w-full"
-            >
-              {isSaving ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
-              ) : (
-                <><Save className="h-4 w-4 mr-2" /> Salvar Mapeamento</>
-              )}
-            </Button>
-          </div>
-
-          <p className="text-xs text-amber-400">
-            ⚠️ Após salvar, sincronize novamente para aplicar as alterações.
-          </p>
         </div>
+
+        <Button 
+          onClick={onSave} 
+          disabled={isSaving}
+          className="w-full"
+          size="sm"
+        >
+          {isSaving ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
+          ) : (
+            <><Save className="h-4 w-4 mr-2" /> Salvar Mapeamento</>
+          )}
+        </Button>
+
+        <p className="text-xs text-amber-400">
+          ⚠️ Após salvar, sincronize novamente para aplicar as alterações.
+        </p>
       </CollapsibleContent>
     </Collapsible>
   );

@@ -23,7 +23,7 @@ import { RowMappingConfig } from './RowMappingConfig';
 export function GoogleSheetsConfig() {
   const [spreadsheetId, setSpreadsheetId] = useState('');
   const [showHelp, setShowHelp] = useState(false);
-  const [rowMapping, setRowMapping] = useState<RowMapping>(DEFAULT_ROW_MAPPING);
+  const [rowMapping, setRowMapping] = useState<RowMapping>({ ...DEFAULT_ROW_MAPPING });
 
   const { data: config, isLoading } = useGoogleSheetsConfig();
   const saveConfig = useSaveGoogleSheetsConfig();
@@ -188,7 +188,7 @@ export function GoogleSheetsConfig() {
             {/* Row Mapping Configuration */}
             <RowMappingConfig
               mapping={rowMapping}
-              onChange={setRowMapping}
+              onChange={(newMapping) => setRowMapping(newMapping)}
               onSave={handleSaveRowMapping}
               isSaving={saveRowMapping.isPending}
             />
