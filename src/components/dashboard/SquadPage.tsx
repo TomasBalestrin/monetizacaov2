@@ -71,9 +71,22 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
       {closers.length > 0 ? (
         <div className="space-y-6">
           {closers.map(({ closer, metrics }) => (
-            <div key={closer.id}>
-              <h3 className="text-xl font-semibold text-white mb-3">Closer {closer.name}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div key={closer.id} className="p-5 rounded-xl bg-card/50 border border-border/50">
+              {/* Header com nome do closer destacado */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <span className="text-lg font-bold text-primary">
+                    {closer.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">{closer.name}</h3>
+                  <p className="text-xs text-muted-foreground">Closer</p>
+                </div>
+              </div>
+              
+              {/* Métricas do closer */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                 <MetricCard title="Calls Realizadas" value={metrics.calls} icon={Phone} />
                 <MetricCard title="Número de Vendas" value={metrics.sales} icon={Target} />
                 <MetricCard
