@@ -265,18 +265,78 @@ Deno.serve(async (req) => {
     const metadata = await metadataResponse.json();
     const sheets = metadata.sheets || [];
     
-    // Filter out template/instruction sheets
-    const closerSheets = sheets.filter((sheet: { properties: { title: string } }) => {
-      const title = sheet.properties.title.toLowerCase();
-      return !title.includes('template') && 
-             !title.includes('instruc') && 
-             !title.includes('modelo') &&
-             !title.includes('exemplo') &&
-             !title.includes('dashboard') &&
-             !title.includes('resumo');
-    });
+    // Fetch existing closers from database
+    const { data: existingClosers, error: closersError } = await adminClient
+      .from('closers')
+      .select('id, name, squad_id');
+    
+    if (closersError) {
+      console.error('Error fetching closers:', closersError);
+      await adminClient
+        .from('google_sheets_config')
+        .update({ sync_status: 'error', sync_message: 'Erro ao buscar closers' })
+        .eq('id', configData.id);
+      
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch closers' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log(`Found ${existingClosers?.length || 0} closers in database:`, existingClosers?.map(c => c.name));
+    
+    // Create a map of lowercase names to closer records for case-insensitive matching
+    const closerMap = new Map<string, { id: string; name: string; squad_id: string }>();
+    for (const closer of existingClosers || []) {
+      closerMap.set(closer.name.toLowerCase().trim(), closer);
+    }
+    
+    // Filter sheets to only include those matching existing closers
+    // Explicitly ignore: totals, SDRs, templates, etc.
+    const validSheets: { sheetName: string; closer: { id: string; name: string; squad_id: string } }[] = [];
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.properties.title;
+      const sheetNameLower = sheetName.toLowerCase().trim();
+      
+      // Skip tabs that are NOT individual closers
+      if (sheetNameLower.includes('total')) {
+        console.log(`Skipping sheet "${sheetName}" - contains "total"`);
+        continue;
+      }
+      if (sheetNameLower.includes('squad')) {
+        console.log(`Skipping sheet "${sheetName}" - contains "squad"`);
+        continue;
+      }
+      if (sheetNameLower.includes('sdr')) {
+        console.log(`Skipping sheet "${sheetName}" - contains "sdr"`);
+        continue;
+      }
+      if (sheetNameLower.includes('template') || sheetNameLower.includes('modelo')) {
+        console.log(`Skipping sheet "${sheetName}" - is a template`);
+        continue;
+      }
+      if (sheetNameLower.includes('dashboard') || sheetNameLower.includes('resumo')) {
+        console.log(`Skipping sheet "${sheetName}" - is a dashboard/summary`);
+        continue;
+      }
+      if (sheetNameLower.includes('ascen')) {
+        console.log(`Skipping sheet "${sheetName}" - is ascensão/cs`);
+        continue;
+      }
+      
+      // Try to match with existing closer (case-insensitive)
+      const matchedCloser = closerMap.get(sheetNameLower);
+      
+      if (matchedCloser) {
+        console.log(`Sheet "${sheetName}" matched to closer "${matchedCloser.name}"`);
+        validSheets.push({ sheetName, closer: matchedCloser });
+      } else {
+        console.log(`Sheet "${sheetName}" has no matching closer in database - skipping`);
+      }
+    }
 
-    console.log(`Found ${closerSheets.length} closer sheets`);
+    console.log(`Processing ${validSheets.length} sheets with matching closers`);
 
     const allMetrics: SheetData[] = [];
     const columnIndex = blockConfig.column.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
@@ -284,11 +344,10 @@ Deno.serve(async (req) => {
     // Expand range to cover all blocks
     const maxRow = blockConfig.firstBlockStartRow + (blockConfig.numberOfBlocks * blockConfig.blockOffset) + 5;
     
-    for (const sheet of closerSheets) {
-      const sheetName = sheet.properties.title;
+    for (const { sheetName, closer } of validSheets) {
       const range = `'${sheetName}'!A1:G${maxRow}`;
       
-      console.log(`Fetching data from: ${sheetName}, range: ${range}`);
+      console.log(`Fetching data from: ${sheetName} (closer: ${closer.name}), range: ${range}`);
       
       const dataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?key=${googleApiKey}`;
       const dataResponse = await fetch(dataUrl);
@@ -324,9 +383,7 @@ Deno.serve(async (req) => {
         };
         
         // Date is located 1 row BEFORE the indicator block
-        // For block starting at row 5, date is at row 4 (index 3)
-        // For block starting at row 18, date is at row 17 (index 16)
-        const dateRowIndex = blockStartRow - 1 - 1; // -1 for row before block, -1 for 0-index
+        const dateRowIndex = blockStartRow - 1 - 1;
         let periodDates = (dateRowIndex >= 0 && dateRowIndex < values.length)
           ? extractDateFromRow(values[dateRowIndex], columnIndex) 
           : null;
@@ -338,7 +395,7 @@ Deno.serve(async (req) => {
         }
         
         const metrics: SheetData = {
-          closerName: sheetName,
+          closerName: closer.name, // Use the database closer name, not the sheet name
           weekNumber,
           periodStart: periodDates.start,
           periodEnd: periodDates.end,
@@ -355,61 +412,35 @@ Deno.serve(async (req) => {
         
         // Only add if there's actual data
         if (metrics.calls > 0 || metrics.sales > 0 || metrics.revenue > 0) {
-          allMetrics.push(metrics);
-          console.log(`Week ${weekNumber} data for ${sheetName}:`, metrics);
+          allMetrics.push({ ...metrics, closerId: closer.id } as SheetData & { closerId: string });
+          console.log(`Week ${weekNumber} data for ${closer.name}:`, metrics);
         } else {
-          console.log(`Skipping week ${weekNumber} for ${sheetName} - no data`);
+          console.log(`Skipping week ${weekNumber} for ${closer.name} - no data`);
         }
       }
     }
 
     console.log(`Total metrics to save: ${allMetrics.length}`);
 
-    // Save metrics to database
+    // Save metrics to database - closers are already matched, no need to create
     let savedCount = 0;
     let errorCount = 0;
 
     for (const metric of allMetrics) {
-      // Find or create closer
-      let { data: closer } = await adminClient
-        .from('closers')
-        .select('id, squad_id')
-        .eq('name', metric.closerName)
-        .maybeSingle();
-
-      if (!closer) {
-        // Get first squad as default
-        const { data: defaultSquad } = await adminClient
-          .from('squads')
-          .select('id')
-          .limit(1)
-          .single();
-
-        if (!defaultSquad) {
-          console.error('No squad found to assign closer');
-          errorCount++;
-          continue;
-        }
-
-        const { data: newCloser, error: createError } = await adminClient
-          .from('closers')
-          .insert({ name: metric.closerName, squad_id: defaultSquad.id })
-          .select('id, squad_id')
-          .single();
-
-        if (createError) {
-          console.error(`Failed to create closer ${metric.closerName}:`, createError);
-          errorCount++;
-          continue;
-        }
-        closer = newCloser;
+      // Get the closer ID from our earlier matching
+      const matchedCloser = closerMap.get(metric.closerName.toLowerCase().trim());
+      
+      if (!matchedCloser) {
+        console.error(`No closer found for ${metric.closerName}`);
+        errorCount++;
+        continue;
       }
 
       // Upsert metrics
       const { error: metricsError } = await adminClient
         .from('metrics')
         .upsert({
-          closer_id: closer.id,
+          closer_id: matchedCloser.id,
           period_start: metric.periodStart,
           period_end: metric.periodEnd,
           calls: metric.calls,
@@ -453,7 +484,7 @@ Deno.serve(async (req) => {
         success: true, 
         message: statusMessage,
         details: {
-          sheetsProcessed: closerSheets.length,
+          sheetsProcessed: validSheets.length,
           metricsFound: allMetrics.length,
           metricsSaved: savedCount,
           errors: errorCount,
