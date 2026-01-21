@@ -2,6 +2,11 @@ import React from 'react';
 import { LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface MetricCardProps {
   title: string;
@@ -26,9 +31,15 @@ export function MetricCard({
   className,
   variant = 'default',
 }: MetricCardProps) {
-  const formatValue = () => {
+  const formatValue = (compact = true) => {
     if (typeof value === 'number') {
       if (isCurrency) {
+        if (compact && value >= 1000000) {
+          return `R$ ${(value / 1000000).toFixed(1).replace('.', ',')}M`;
+        }
+        if (compact && value >= 1000) {
+          return `R$ ${(value / 1000).toFixed(1).replace('.', ',')} mil`;
+        }
         return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
       if (isPercentage) {
@@ -56,6 +67,21 @@ export function MetricCard({
     }
   };
 
+  const displayValue = formatValue(true);
+  const fullValue = formatValue(false);
+  const needsTooltip = isCurrency && typeof value === 'number' && value >= 1000;
+
+  const valueElement = (
+    <h3
+      className={cn(
+        'font-bold text-card-foreground',
+        large ? 'text-2xl sm:text-3xl md:text-4xl' : 'text-lg sm:text-xl md:text-2xl'
+      )}
+    >
+      {displayValue}
+    </h3>
+  );
+
   return (
     <Card
       className={cn(
@@ -64,40 +90,44 @@ export function MetricCard({
         className
       )}
     >
-      <CardContent className={cn('p-6', large && 'p-8')}>
-        <div className="flex items-start justify-between">
+      <CardContent className={cn('p-4 sm:p-6', large && 'p-6 sm:p-8')}>
+        <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-muted-foreground text-sm font-medium mb-2 truncate">{title}</p>
-            <h3
-              className={cn(
-                'font-bold text-card-foreground truncate',
-                large ? 'text-3xl md:text-4xl' : 'text-2xl md:text-3xl'
-              )}
-            >
-              {formatValue()}
-            </h3>
+            <p className="text-muted-foreground text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">{title}</p>
+            {needsTooltip ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {valueElement}
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="font-semibold">
+                  {fullValue}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              valueElement
+            )}
             {trend !== undefined && (
               <div
                 className={cn(
-                  'flex items-center mt-3 text-sm font-medium',
+                  'flex items-center mt-2 sm:mt-3 text-xs sm:text-sm font-medium',
                   trend >= 0 ? 'text-success' : 'text-destructive'
                 )}
               >
                 {trend >= 0 ? (
-                  <TrendingUp size={16} className="mr-1.5 shrink-0" />
+                  <TrendingUp size={14} className="mr-1 shrink-0" />
                 ) : (
-                  <TrendingDown size={16} className="mr-1.5 shrink-0" />
+                  <TrendingDown size={14} className="mr-1 shrink-0" />
                 )}
                 <span>
                   {trend >= 0 ? '+' : ''}
-                  {trend.toFixed(1)}% vs. período anterior
+                  {trend.toFixed(1)}%
                 </span>
               </div>
             )}
           </div>
           {Icon && (
-            <div className={cn('p-3 rounded-xl shrink-0 ml-4', getIconBackground())}>
-              <Icon size={large ? 28 : 24} />
+            <div className={cn('p-2 sm:p-3 rounded-xl shrink-0', getIconBackground())}>
+              <Icon size={large ? 24 : 20} className="sm:w-6 sm:h-6" />
             </div>
           )}
         </div>
