@@ -33,15 +33,17 @@ const COLUMN_OPTIONS = [
 ];
 
 const METRIC_LABELS: { key: keyof MetricOffsets; label: string; description: string }[] = [
-  { key: 'calls', label: 'Calls Realizadas', description: 'Linha relativa dentro do bloco' },
-  { key: 'sales', label: 'Vendas Fechadas', description: 'Linha relativa dentro do bloco' },
-  { key: 'revenue', label: 'Valor Total', description: 'Linha relativa dentro do bloco' },
-  { key: 'entries', label: 'Valor Entrada', description: 'Linha relativa dentro do bloco' },
-  { key: 'revenueTrend', label: 'Tendência Valor Total', description: 'Linha relativa dentro do bloco' },
-  { key: 'entriesTrend', label: 'Tendência Entrada', description: 'Linha relativa dentro do bloco' },
-  { key: 'cancellations', label: 'Nº Cancelamentos', description: 'Linha relativa dentro do bloco' },
-  { key: 'cancellationValue', label: 'Valor Cancelamento', description: 'Linha relativa dentro do bloco' },
-  { key: 'cancellationEntries', label: 'Entrada Cancelamento', description: 'Linha relativa dentro do bloco' },
+  { key: 'calls', label: 'Calls Realizadas', description: 'Offset 0' },
+  { key: 'sales', label: 'Vendas Fechadas', description: 'Offset 1' },
+  // Taxa de Conversão é calculado (offset 2) - não importar
+  { key: 'revenue', label: 'Valor Total', description: 'Offset 3' },
+  { key: 'entries', label: 'Valor Entrada', description: 'Offset 4' },
+  { key: 'revenueTrend', label: 'Tendência Valor Total', description: 'Offset 5' },
+  { key: 'entriesTrend', label: 'Tendência Entrada', description: 'Offset 6' },
+  { key: 'cancellations', label: 'Nº Cancelamentos', description: 'Offset 7' },
+  // % de Cancelamento é calculado (offset 8) - não importar
+  { key: 'cancellationValue', label: 'Valor Cancelamento', description: 'Offset 9' },
+  { key: 'cancellationEntries', label: 'Entrada Cancelamento', description: 'Offset 10' },
 ];
 
 interface WeekBlockConfigProps {
@@ -80,8 +82,9 @@ export function WeekBlockConfigComponent({ config, onChange, onSave, isSaving }:
     const blocks = [];
     for (let i = 0; i < config.numberOfBlocks; i++) {
       const startRow = config.firstBlockStartRow + (i * config.blockOffset);
-      const endRow = startRow + config.blockOffset - 1;
-      blocks.push({ week: i + 1, startRow, endRow });
+      const endRow = startRow + 10; // 11 indicadores (offset 0-10)
+      const dateRow = startRow - 1; // Data é 1 linha antes do bloco
+      blocks.push({ week: i + 1, startRow, endRow, dateRow });
     }
     return blocks;
   };
@@ -202,11 +205,14 @@ export function WeekBlockConfigComponent({ config, onChange, onSave, isSaving }:
               <div key={block.week} className="flex items-center gap-2 text-xs">
                 <span className="text-primary">✓</span>
                 <span className="text-muted-foreground">
-                  Semana {block.week}: Linhas {block.startRow}-{block.endRow}
+                  Semana {block.week}: Data linha {block.dateRow} | Indicadores linhas {block.startRow}-{block.endRow}
                 </span>
               </div>
             ))}
           </div>
+          <p className="text-xs text-muted-foreground mt-3 italic">
+            Taxa de Conversão (offset 2) e % de Cancelamento (offset 8) são calculados automaticamente
+          </p>
         </div>
 
         {/* Metric Offsets */}

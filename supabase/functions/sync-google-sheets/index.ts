@@ -43,21 +43,21 @@ interface SheetData {
 }
 
 const DEFAULT_CONFIG: WeekBlockConfig = {
-  firstBlockStartRow: 3,
-  blockOffset: 16,
-  numberOfBlocks: 4,
-  dateRow: 1,
+  firstBlockStartRow: 5,    // Indicadores começam na linha 5
+  blockOffset: 13,          // 13 linhas entre cada bloco (5→18→31→44)
+  numberOfBlocks: 4,        // 4 semanas por aba
+  dateRow: 1,               // Data está 1 linha antes do bloco
   column: 'G',
   metrics: {
-    calls: 2,
-    sales: 3,
-    revenue: 5,
-    entries: 6,
-    revenueTrend: 7,
-    entriesTrend: 8,
-    cancellations: 9,
-    cancellationValue: 11,
-    cancellationEntries: 12,
+    calls: 0,               // Offset 0 - Calls Realizadas
+    sales: 1,               // Offset 1 - Vendas Fechadas
+    revenue: 3,             // Offset 3 - Valor Total (pula Taxa de Conversão)
+    entries: 4,             // Offset 4 - Valor Entrada
+    revenueTrend: 5,        // Offset 5 - Tendência Valor Total
+    entriesTrend: 6,        // Offset 6 - Tendência Valor Entrada
+    cancellations: 7,       // Offset 7 - Número de Cancelamento
+    cancellationValue: 9,   // Offset 9 - Valor de venda Cancelamento
+    cancellationEntries: 10 // Offset 10 - Valor total de entrada Can
   }
 };
 
@@ -314,17 +314,20 @@ Deno.serve(async (req) => {
         console.log(`Processing week ${weekNumber} starting at row ${blockStartRow}`);
         
         // Helper to get value from a relative position within the block
+        // relativeRow is a 0-based offset from blockStartRow
         const getBlockValue = (relativeRow: number): number => {
-          const absoluteRow = blockStartRow + relativeRow - 1; // Convert to 0-indexed
-          if (absoluteRow >= values.length) return 0;
+          const absoluteRow = blockStartRow + relativeRow - 1; // Convert to 0-indexed array position
+          if (absoluteRow < 0 || absoluteRow >= values.length) return 0;
           const rowData = values[absoluteRow];
           if (!rowData || columnIndex >= rowData.length) return 0;
           return parseNumericValue(rowData[columnIndex]);
         };
         
-        // Try to extract dates from the block
-        const dateRowIndex = blockStartRow + blockConfig.dateRow - 1; // 0-indexed
-        let periodDates = dateRowIndex < values.length 
+        // Date is located 1 row BEFORE the indicator block
+        // For block starting at row 5, date is at row 4 (index 3)
+        // For block starting at row 18, date is at row 17 (index 16)
+        const dateRowIndex = blockStartRow - 1 - 1; // -1 for row before block, -1 for 0-index
+        let periodDates = (dateRowIndex >= 0 && dateRowIndex < values.length)
           ? extractDateFromRow(values[dateRowIndex], columnIndex) 
           : null;
         

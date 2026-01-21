@@ -30,21 +30,21 @@ export interface WeekBlockConfig {
 }
 
 export const DEFAULT_WEEK_BLOCK_CONFIG: WeekBlockConfig = {
-  firstBlockStartRow: 3,
-  blockOffset: 16,
-  numberOfBlocks: 4,
-  dateRow: 1,
+  firstBlockStartRow: 5,    // Indicadores começam na linha 5
+  blockOffset: 13,          // 13 linhas entre cada bloco (5→18→31→44)
+  numberOfBlocks: 4,        // 4 semanas por aba
+  dateRow: 1,               // Data está 1 linha antes do bloco (linha 4 para bloco 1)
   column: 'G',
   metrics: {
-    calls: 2,
-    sales: 3,
-    revenue: 5,
-    entries: 6,
-    revenueTrend: 7,
-    entriesTrend: 8,
-    cancellations: 9,
-    cancellationValue: 11,
-    cancellationEntries: 12,
+    calls: 0,               // Linha 5 (offset 0) - Calls Realizadas
+    sales: 1,               // Linha 6 (offset 1) - Vendas Fechadas
+    revenue: 3,             // Linha 8 (offset 3) - Valor Total (pula Taxa de Conversão)
+    entries: 4,             // Linha 9 (offset 4) - Valor Entrada
+    revenueTrend: 5,        // Linha 10 (offset 5) - Tendência Valor Total
+    entriesTrend: 6,        // Linha 11 (offset 6) - Tendência Valor Entrada
+    cancellations: 7,       // Linha 12 (offset 7) - Número de Cancelamento
+    cancellationValue: 9,   // Linha 14 (offset 9) - Valor de venda Cancelamento
+    cancellationEntries: 10 // Linha 15 (offset 10) - Valor total de entrada Can
   }
 };
 
