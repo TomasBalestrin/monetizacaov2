@@ -32,6 +32,7 @@ interface FunnelBlock {
   sdr: string;
   type: string;
   startCol: number;
+  dataCol: number;  // Coluna onde está "Data" para este bloco
 }
 
 interface RawMetric {
@@ -103,8 +104,8 @@ function parseDate(value: string): string | null {
   return null;
 }
 
-// Find funnel blocks by scanning the title row
-function findFunnelBlocks(titleRow: string[]): FunnelBlock[] {
+// Find funnel blocks by scanning the title row and header row
+function findFunnelBlocks(titleRow: string[], headerRow: string[]): FunnelBlock[] {
   const blocks: FunnelBlock[] = [];
   
   for (let col = 0; col < titleRow.length; col++) {
@@ -117,13 +118,24 @@ function findFunnelBlocks(titleRow: string[]): FunnelBlock[] {
     );
     
     if (mapping) {
+      // Encontrar a coluna "Data" procurando para trás no headerRow
+      let dataCol = col > 0 ? col - 1 : 0; // Fallback: 1 coluna antes
+      for (let searchCol = col - 1; searchCol >= 0 && searchCol >= col - 3; searchCol--) {
+        const headerValue = headerRow[searchCol]?.toString().trim().toLowerCase();
+        if (headerValue === 'data') {
+          dataCol = searchCol;
+          break;
+        }
+      }
+      
       blocks.push({
         funnel: title,
         sdr: mapping.sdr,
         type: mapping.type,
         startCol: col,
+        dataCol: dataCol,
       });
-      console.log(`Found funnel "${title}" at column ${col} -> SDR: ${mapping.sdr}`);
+      console.log(`Found funnel "${title}" at col ${col}, dataCol=${dataCol} -> SDR: ${mapping.sdr}`);
     } else {
       console.log(`Unknown funnel title at column ${col}: "${title}"`);
     }
@@ -242,17 +254,17 @@ Deno.serve(async (req) => {
     const titleRow = rows[1] || [];
     console.log(`Title row (row 2): ${titleRow.slice(0, 30).join(' | ')}...`);
 
-    // Find funnel blocks
-    const funnelBlocks = findFunnelBlocks(titleRow);
+    // Row 3 (index 2) contains headers
+    const headerRow = rows[2] || [];
+    console.log(`Header row (row 3): ${headerRow.slice(0, 30).join(' | ')}...`);
+
+    // Find funnel blocks using both title and header rows
+    const funnelBlocks = findFunnelBlocks(titleRow, headerRow);
     console.log(`Found ${funnelBlocks.length} funnel blocks`);
 
     if (funnelBlocks.length === 0) {
       throw new Error('No matching funnel blocks found in the sheet. Check funnel names in row 2.');
     }
-
-    // Row 3 (index 2) contains headers - verify structure
-    const headerRow = rows[2] || [];
-    console.log(`Header row (row 3): ${headerRow.slice(0, 20).join(' | ')}...`);
 
     // Process data rows (starting from row 4, index 3)
     const rawMetrics: RawMetric[] = [];
@@ -264,11 +276,8 @@ Deno.serve(async (req) => {
       for (const block of funnelBlocks) {
         const titleCol = block.startCol;
         
-        // A coluna "Data" está 1 posição ANTES do título do funil
-        // Título está em col N, Data está em col N-1 (exceto para primeiro bloco)
-        const dataCol = titleCol > 0 ? titleCol - 1 : 0;
-        
-        const dateValue = row[dataCol]?.toString().trim() || '';
+        // Usar dataCol encontrado dinamicamente (procura "Data" no headerRow)
+        const dateValue = row[block.dataCol]?.toString().trim() || '';
         const parsedDate = parseDate(dateValue);
         
         if (!parsedDate) continue; // Skip rows without valid date (Total, empty, etc.)
@@ -289,9 +298,9 @@ Deno.serve(async (req) => {
           // +7 é % Conv (skip)
         };
 
-        // Debug log para as primeiras linhas
+        // Debug log para as primeiras linhas de CADA bloco
         if (rowIndex < 6) {
-          console.log(`Row ${rowIndex}, ${block.funnel}: Date=${dateValue}(${parsedDate}), Act=${metric.activated}, Sched=${metric.scheduled}, Att=${metric.attended}, Sales=${metric.sales}`);
+          console.log(`Row ${rowIndex}, ${block.funnel} (dataCol=${block.dataCol}): Date=${dateValue}(${parsedDate}), Act=${metric.activated}, Sched=${metric.scheduled}, Att=${metric.attended}, Sales=${metric.sales}`);
         }
 
         rawMetrics.push(metric);
