@@ -176,10 +176,12 @@ export function SDRSheetsConfig({ variant = 'prominent' }: SDRSheetsConfigProps)
                   <p><strong>1.</strong> Abra sua planilha no Google Sheets</p>
                   <p><strong>2.</strong> Vá em Arquivo → Compartilhar → Publicar na Web</p>
                   <p><strong>3.</strong> Cole a URL ou ID da planilha acima</p>
-                  <p><strong>4.</strong> Cada aba da planilha deve ter o nome do SDR</p>
                   <p className="pt-2 border-t border-border">
-                    <strong>Estrutura esperada:</strong> Data, Ativados, Agendado, % Agendamento, 
-                    Agendado no dia, Realizado, % Comp, Vendas, % Conv
+                    <strong>Aba esperada:</strong> "Indicadores Funis" com funis horizontais
+                  </p>
+                  <p>
+                    <strong>Funis mapeados:</strong> Teste, MPM, Mentoria júlia, Implementação Ia, 
+                    Implementação IA, 50 Script, SS Júlia, SS Cleiton, Orgânico
                   </p>
                 </CollapsibleContent>
               </Collapsible>
