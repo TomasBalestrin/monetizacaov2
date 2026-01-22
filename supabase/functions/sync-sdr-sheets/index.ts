@@ -105,8 +105,20 @@ function parseDate(value: string): string | null {
 }
 
 // Find funnel blocks by scanning the title row and header row
-function findFunnelBlocks(titleRow: string[], headerRow: string[]): FunnelBlock[] {
+// IMPORTANTE: Todos os funis compartilham a MESMA coluna de Data (coluna do primeiro bloco)
+function findFunnelBlocks(titleRow: string[], headerRow: string[]): { blocks: FunnelBlock[], sharedDataCol: number } {
   const blocks: FunnelBlock[] = [];
+  
+  // Encontrar a coluna "Data" compartilhada (deve estar nas primeiras colunas)
+  let sharedDataCol = 0;
+  for (let col = 0; col < Math.min(headerRow.length, 10); col++) {
+    const headerValue = headerRow[col]?.toString().trim().toLowerCase();
+    if (headerValue === 'data') {
+      sharedDataCol = col;
+      console.log(`Shared Data column found at column ${col}`);
+      break;
+    }
+  }
   
   for (let col = 0; col < titleRow.length; col++) {
     const title = titleRow[col]?.toString().trim();
@@ -118,30 +130,20 @@ function findFunnelBlocks(titleRow: string[], headerRow: string[]): FunnelBlock[
     );
     
     if (mapping) {
-      // Encontrar a coluna "Data" procurando para trás no headerRow
-      let dataCol = col > 0 ? col - 1 : 0; // Fallback: 1 coluna antes
-      for (let searchCol = col - 1; searchCol >= 0 && searchCol >= col - 3; searchCol--) {
-        const headerValue = headerRow[searchCol]?.toString().trim().toLowerCase();
-        if (headerValue === 'data') {
-          dataCol = searchCol;
-          break;
-        }
-      }
-      
       blocks.push({
         funnel: title,
         sdr: mapping.sdr,
         type: mapping.type,
         startCol: col,
-        dataCol: dataCol,
+        dataCol: sharedDataCol, // Todos usam a mesma coluna de Data
       });
-      console.log(`Found funnel "${title}" at col ${col}, dataCol=${dataCol} -> SDR: ${mapping.sdr}`);
+      console.log(`Found funnel "${title}" at col ${col} -> SDR: ${mapping.sdr}`);
     } else {
       console.log(`Unknown funnel title at column ${col}: "${title}"`);
     }
   }
   
-  return blocks;
+  return { blocks, sharedDataCol };
 }
 
 // Aggregate metrics by SDR and date
@@ -259,8 +261,8 @@ Deno.serve(async (req) => {
     console.log(`Header row (row 3): ${headerRow.slice(0, 30).join(' | ')}...`);
 
     // Find funnel blocks using both title and header rows
-    const funnelBlocks = findFunnelBlocks(titleRow, headerRow);
-    console.log(`Found ${funnelBlocks.length} funnel blocks`);
+    const { blocks: funnelBlocks, sharedDataCol } = findFunnelBlocks(titleRow, headerRow);
+    console.log(`Found ${funnelBlocks.length} funnel blocks, using shared Data column at ${sharedDataCol}`);
 
     if (funnelBlocks.length === 0) {
       throw new Error('No matching funnel blocks found in the sheet. Check funnel names in row 2.');
@@ -286,47 +288,38 @@ Deno.serve(async (req) => {
       // Log para linhas vazias
       if (!row || row.length === 0) {
         emptyRows++;
-        if (emptyRows <= 5) {
-          console.log(`Row ${rowIndex + 1}: EMPTY ROW (count: ${emptyRows})`);
+        continue;
+      }
+      
+      // Ler a data da coluna compartilhada UMA VEZ por linha
+      const dateValue = row[sharedDataCol]?.toString().trim() || '';
+      
+      // Verificar se é uma linha de header repetida (contém "Data")
+      if (dateValue.toLowerCase() === 'data') {
+        headerRowsFound++;
+        console.log(`Row ${rowIndex + 1}: HEADER ROW FOUND (${headerRowsFound}x) - new vertical block`);
+        continue;
+      }
+      
+      const parsedDate = parseDate(dateValue);
+      
+      // Log para primeiras linhas de debug
+      if (rowIndex < 8) {
+        const status = parsedDate ? 'valid' : (dateValue === '' ? 'empty' : `skip:${dateValue}`);
+        console.log(`Row ${rowIndex + 1}: Date="${dateValue}" -> ${status}`);
+      }
+      
+      // Se não tem data válida, pular toda a linha
+      if (!parsedDate) {
+        if (dateValue && dateValue.toLowerCase() !== 'total') {
+          rowsSkipped++;
         }
         continue;
       }
       
-      // Verificar se é uma linha de header repetida (contém "Data" na primeira coluna de data)
-      const firstDataValue = row[firstBlock.dataCol]?.toString().trim().toLowerCase() || '';
-      if (firstDataValue === 'data') {
-        headerRowsFound++;
-        console.log(`Row ${rowIndex + 1}: HEADER ROW FOUND (${headerRowsFound}x) - indicates new vertical block`);
-        continue;
-      }
-
-      let rowHasData = false;
-      
+      // Processar TODOS os blocos com a mesma data
       for (const block of funnelBlocks) {
         const titleCol = block.startCol;
-        
-        // Usar dataCol encontrado dinamicamente (procura "Data" no headerRow)
-        const dateValue = row[block.dataCol]?.toString().trim() || '';
-        const parsedDate = parseDate(dateValue);
-        
-        // Log detalhado para primeiras linhas de cada padrão
-        if (rowIndex < 10 || (rowIndex >= 10 && rowIndex < 15 && block === firstBlock)) {
-          const skipReason = !parsedDate ? 
-            (dateValue === '' ? 'empty' : dateValue.toLowerCase() === 'total' ? 'total' : `invalid:${dateValue}`) : 
-            'valid';
-          if (block === firstBlock) {
-            console.log(`Row ${rowIndex + 1}, Col ${block.dataCol}: "${dateValue}" -> ${skipReason}`);
-          }
-        }
-        
-        if (!parsedDate) {
-          if (block === firstBlock && dateValue && dateValue.toLowerCase() !== 'total') {
-            rowsSkipped++;
-          }
-          continue;
-        }
-
-        rowHasData = true;
 
         // Offsets relativos ao título do funil:
         // título(0)=Ativados, +1=Agendado, +2=% Agend, +3=Agend dia, +4=Realizado, +5=% Comp, +6=Vendas, +7=% Conv
@@ -347,9 +340,7 @@ Deno.serve(async (req) => {
         rawMetrics.push(metric);
       }
       
-      if (rowHasData) {
-        rowsProcessed++;
-      }
+      rowsProcessed++;
     }
 
     console.log(`\n=== ROW PROCESSING SUMMARY ===`);
