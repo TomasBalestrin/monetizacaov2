@@ -115,7 +115,11 @@ function isHoliday(date: Date, holidays: Date[]): boolean {
 }
 
 /**
- * Calcula dias úteis (segunda a sexta, excluindo feriados) entre duas datas
+ * Calcula dias úteis entre duas datas
+ * - Segunda a Sexta: 1 dia
+ * - Sábado: 0.5 dia (meio expediente)
+ * - Domingo: 0 dia
+ * - Feriados: 0 dia
  */
 export function getWorkingDaysBetween(start: Date, end: Date): number {
   let count = 0;
@@ -130,13 +134,27 @@ export function getWorkingDaysBetween(start: Date, end: Date): number {
   
   while (current <= endDate) {
     const dayOfWeek = current.getDay();
-    // 0 = domingo, 6 = sábado
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      // Verifica se não é feriado
-      if (!isHoliday(current, holidays)) {
-        count++;
-      }
+    
+    // Domingo (0) não conta
+    if (dayOfWeek === 0) {
+      current.setDate(current.getDate() + 1);
+      continue;
     }
+    
+    // Verifica se é feriado (não conta)
+    if (isHoliday(current, holidays)) {
+      current.setDate(current.getDate() + 1);
+      continue;
+    }
+    
+    // Sábado (6) conta como 0.5
+    if (dayOfWeek === 6) {
+      count += 0.5;
+    } else {
+      // Segunda a Sexta conta como 1
+      count += 1;
+    }
+    
     current.setDate(current.getDate() + 1);
   }
   return count;
