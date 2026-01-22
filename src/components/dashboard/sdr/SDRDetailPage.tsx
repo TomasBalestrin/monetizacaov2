@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PeriodFilter } from '@/components/dashboard/PeriodFilter';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { SDRMetricCard } from './SDRMetricCard';
-import { SDRChart } from './SDRChart';
+import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
 import { SDRDataTable } from './SDRDataTable';
 import { useSDRs, useSDRMetrics, useSDRFunnels, type SDRAggregatedMetrics, type SDRMetric } from '@/hooks/useSdrMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -324,7 +324,7 @@ export function SDRDetailPage({
         {isLoadingMetrics ? (
           <ChartSkeleton height={350} />
         ) : (
-          <SDRChart metrics={displayMetrics || []} />
+          <SDRWeeklyComparisonChart metrics={displayMetrics || []} />
         )}
 
         {/* Data Table */}
