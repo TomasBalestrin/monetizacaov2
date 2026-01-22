@@ -62,6 +62,12 @@
     --warning-foreground: 0 0% 100%;
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
+    
+    /* Chart colors - Vibrant palette */
+    --chart-activated: 217 91% 60%;
+    --chart-scheduled: 152 69% 45%;
+    --chart-attended: 38 92% 50%;
+    --chart-sales: 270 70% 60%;
   }
 
   .dark {

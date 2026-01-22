@@ -8,11 +8,11 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  Cell,
+  LabelList,
 } from 'recharts';
 import { format, startOfWeek, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
 import type { SDRMetric } from '@/hooks/useSdrMetrics';
 import { cn } from '@/lib/utils';
 
@@ -75,12 +75,13 @@ function calculateChange(current: number, previous: number): number | null {
   return ((current - previous) / previous) * 100;
 }
 
-function ChangeIndicator({ value, label }: { value: number | null; label: string }) {
+function ChangeIndicator({ value, label, color }: { value: number | null; label: string; color: string }) {
   if (value === null) {
     return (
-      <div className="flex items-center gap-1 text-muted-foreground">
-        <Minus className="h-3 w-3" />
-        <span className="text-xs">{label}: --</span>
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/50">
+        <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="text-xs text-muted-foreground">--</span>
       </div>
     );
   }
@@ -92,19 +93,55 @@ function ChangeIndicator({ value, label }: { value: number | null; label: string
   return (
     <div
       className={cn(
-        "flex items-center gap-1",
+        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all",
+        isPositive && "bg-green-500/10",
+        isNeutral && "bg-muted/50",
+        !isPositive && !isNeutral && "bg-red-500/10"
+      )}
+    >
+      <div 
+        className="w-2 h-2 rounded-full" 
+        style={{ backgroundColor: color }}
+      />
+      <span className="text-xs font-medium text-foreground">{label}</span>
+      <Icon 
+        className={cn(
+          "h-3.5 w-3.5",
+          isPositive && "text-green-500",
+          isNeutral && "text-muted-foreground",
+          !isPositive && !isNeutral && "text-red-500"
+        )} 
+      />
+      <span className={cn(
+        "text-xs font-bold",
         isPositive && "text-green-500",
         isNeutral && "text-muted-foreground",
         !isPositive && !isNeutral && "text-red-500"
-      )}
-    >
-      <Icon className="h-3 w-3" />
-      <span className="text-xs">
-        {label}: {isPositive ? '+' : ''}{value.toFixed(0)}%
+      )}>
+        {isPositive ? '+' : ''}{value.toFixed(0)}%
       </span>
     </div>
   );
 }
+
+// Custom label renderer for bar values
+const renderCustomLabel = (props: any) => {
+  const { x, y, width, value } = props;
+  if (!value || value === 0) return null;
+  
+  return (
+    <text 
+      x={x + width / 2} 
+      y={y - 6} 
+      fill="hsl(var(--foreground))" 
+      textAnchor="middle" 
+      fontSize={10}
+      fontWeight={600}
+    >
+      {value}
+    </text>
+  );
+};
 
 export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartProps) {
   const weeklyData = useMemo(() => groupMetricsByWeek(metrics), [metrics]);
@@ -133,39 +170,66 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
     };
   }, [weeklyData]);
 
+  // Vibrant color palette
+  const chartColors = {
+    activated: 'hsl(217, 91%, 60%)',
+    scheduled: 'hsl(152, 69%, 45%)',
+    attended: 'hsl(38, 92%, 50%)',
+    sales: 'hsl(270, 70%, 60%)',
+  };
+
   if (weeklyData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[350px] bg-card rounded-xl border border-border">
+      <div className="flex flex-col items-center justify-center h-[350px] bg-card rounded-xl border border-border gap-3">
+        <BarChart3 className="h-12 w-12 text-muted-foreground/50" />
         <p className="text-muted-foreground">Nenhum dado disponível para o período</p>
       </div>
     );
   }
 
-  const chartColors = {
-    activated: 'hsl(var(--chart-1))',
-    scheduled: 'hsl(var(--chart-2))',
-    attended: 'hsl(var(--chart-3))',
-    sales: 'hsl(var(--chart-4))',
-  };
-
   return (
-    <div className="p-4 bg-card rounded-xl border border-border space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">Comparativo Semanal</h3>
+    <div className="p-5 bg-card rounded-xl border border-border space-y-5">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <BarChart3 className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground">Comparativo Semanal</h3>
+          </div>
+        </div>
         
         {/* Week-over-week comparison indicators */}
         {comparison.previous && (
-          <div className="flex flex-wrap gap-3 text-xs">
-            <ChangeIndicator value={comparison.changes.activated} label="Ativados" />
-            <ChangeIndicator value={comparison.changes.scheduled} label="Agendados" />
-            <ChangeIndicator value={comparison.changes.attended} label="Realizados" />
-            <ChangeIndicator value={comparison.changes.sales} label="Vendas" />
+          <div className="flex flex-wrap gap-2">
+            <ChangeIndicator value={comparison.changes.activated} label="Ativados" color={chartColors.activated} />
+            <ChangeIndicator value={comparison.changes.scheduled} label="Agendados" color={chartColors.scheduled} />
+            <ChangeIndicator value={comparison.changes.attended} label="Realizados" color={chartColors.attended} />
+            <ChangeIndicator value={comparison.changes.sales} label="Vendas" color={chartColors.sales} />
           </div>
         )}
       </div>
 
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={weeklyData} barCategoryGap="20%">
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart data={weeklyData} barCategoryGap="15%" barGap={2}>
+          <defs>
+            <linearGradient id="gradientActivated" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={chartColors.activated} stopOpacity={1} />
+              <stop offset="100%" stopColor={chartColors.activated} stopOpacity={0.7} />
+            </linearGradient>
+            <linearGradient id="gradientScheduled" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={chartColors.scheduled} stopOpacity={1} />
+              <stop offset="100%" stopColor={chartColors.scheduled} stopOpacity={0.7} />
+            </linearGradient>
+            <linearGradient id="gradientAttended" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={chartColors.attended} stopOpacity={1} />
+              <stop offset="100%" stopColor={chartColors.attended} stopOpacity={0.7} />
+            </linearGradient>
+            <linearGradient id="gradientSales" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={chartColors.sales} stopOpacity={1} />
+              <stop offset="100%" stopColor={chartColors.sales} stopOpacity={0.7} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis
             dataKey="weekLabel"
@@ -177,45 +241,61 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickLine={false}
+            width={40}
           />
           <Tooltip
             cursor={{ fill: 'hsl(var(--muted) / 0.3)' }}
             contentStyle={{
               backgroundColor: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              boxShadow: '0 10px 40px -10px hsl(var(--foreground) / 0.1)',
             }}
-            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
-            itemStyle={{ color: 'hsl(var(--foreground))' }}
+            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, marginBottom: '8px' }}
+            itemStyle={{ color: 'hsl(var(--foreground))', padding: '2px 0' }}
           />
           <Legend
             iconType="circle"
-            wrapperStyle={{ paddingTop: '16px' }}
+            wrapperStyle={{ paddingTop: '20px' }}
+            formatter={(value) => (
+              <span style={{ color: 'hsl(var(--foreground))', fontSize: '12px', fontWeight: 500 }}>
+                {value}
+              </span>
+            )}
           />
           <Bar
             dataKey="activated"
             name="Ativados"
-            fill={chartColors.activated}
-            radius={[4, 4, 0, 0]}
-          />
+            fill="url(#gradientActivated)"
+            radius={[6, 6, 0, 0]}
+          >
+            <LabelList dataKey="activated" content={renderCustomLabel} />
+          </Bar>
           <Bar
             dataKey="scheduled"
             name="Agendados"
-            fill={chartColors.scheduled}
-            radius={[4, 4, 0, 0]}
-          />
+            fill="url(#gradientScheduled)"
+            radius={[6, 6, 0, 0]}
+          >
+            <LabelList dataKey="scheduled" content={renderCustomLabel} />
+          </Bar>
           <Bar
             dataKey="attended"
             name="Realizados"
-            fill={chartColors.attended}
-            radius={[4, 4, 0, 0]}
-          />
+            fill="url(#gradientAttended)"
+            radius={[6, 6, 0, 0]}
+          >
+            <LabelList dataKey="attended" content={renderCustomLabel} />
+          </Bar>
           <Bar
             dataKey="sales"
             name="Vendas"
-            fill={chartColors.sales}
-            radius={[4, 4, 0, 0]}
-          />
+            fill="url(#gradientSales)"
+            radius={[6, 6, 0, 0]}
+          >
+            <LabelList dataKey="sales" content={renderCustomLabel} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

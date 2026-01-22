@@ -272,51 +272,64 @@ export function SDRDetailPage({
           </p>
         )}
 
-        {/* Metrics */}
+        {/* Metrics - Hierarchical Grid */}
         {isLoadingMetrics ? (
           <MetricCardSkeletonGrid count={7} />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-            <SDRMetricCard
-              title="Ativados"
-              value={aggregatedMetrics?.totalActivated || 0}
-              icon={Users}
-            />
-            <SDRMetricCard
-              title="Agendados"
-              value={aggregatedMetrics?.totalScheduled || 0}
-              icon={Calendar}
-            />
-            <SDRMetricCard
-              title="% Agendamento"
-              value={aggregatedMetrics?.avgScheduledRate || 0}
-              isPercentage
-              showProgress
-              icon={TrendingUp}
-            />
-            <SDRMetricCard
-              title="Agend. no dia"
-              value={aggregatedMetrics?.totalScheduledSameDay || 0}
-              icon={UserCheck}
-            />
-            <SDRMetricCard
-              title="Realizados"
-              value={aggregatedMetrics?.totalAttended || 0}
-              icon={UserCheck}
-            />
-            <SDRMetricCard
-              title="% Comparec."
-              value={aggregatedMetrics?.avgAttendanceRate || 0}
-              isPercentage
-              showProgress
-              icon={TrendingUp}
-            />
-            <SDRMetricCard
-              title="Vendas"
-              value={aggregatedMetrics?.totalSales || 0}
-              icon={ShoppingCart}
-              variant="highlight"
-            />
+          <div className="space-y-4">
+            {/* Primary Metrics Row - Large Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <SDRMetricCard
+                title="Ativados"
+                value={aggregatedMetrics?.totalActivated || 0}
+                icon={Users}
+                size="large"
+              />
+              <SDRMetricCard
+                title="Agendados"
+                value={aggregatedMetrics?.totalScheduled || 0}
+                icon={Calendar}
+                size="large"
+              />
+              <SDRMetricCard
+                title="% Agendamento"
+                value={aggregatedMetrics?.avgScheduledRate || 0}
+                isPercentage
+                showProgress
+                icon={TrendingUp}
+                size="large"
+                variant={aggregatedMetrics?.avgScheduledRate && aggregatedMetrics.avgScheduledRate >= 25 ? 'success' : 'warning'}
+              />
+              <SDRMetricCard
+                title="Vendas"
+                value={aggregatedMetrics?.totalSales || 0}
+                icon={ShoppingCart}
+                variant="highlight"
+                size="featured"
+              />
+            </div>
+            
+            {/* Secondary Metrics Row - Regular Cards */}
+            <div className="grid grid-cols-3 gap-4">
+              <SDRMetricCard
+                title="Agend. no dia"
+                value={aggregatedMetrics?.totalScheduledSameDay || 0}
+                icon={UserCheck}
+              />
+              <SDRMetricCard
+                title="Realizados"
+                value={aggregatedMetrics?.totalAttended || 0}
+                icon={UserCheck}
+              />
+              <SDRMetricCard
+                title="% Comparec."
+                value={aggregatedMetrics?.avgAttendanceRate || 0}
+                isPercentage
+                showProgress
+                icon={TrendingUp}
+                variant={aggregatedMetrics?.avgAttendanceRate && aggregatedMetrics.avgAttendanceRate >= 50 ? 'success' : 'warning'}
+              />
+            </div>
           </div>
         )}
 
