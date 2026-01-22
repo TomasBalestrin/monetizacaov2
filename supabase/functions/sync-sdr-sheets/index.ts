@@ -25,6 +25,26 @@ const FUNNEL_MAPPING = [
   { funnel: 'Organico Cleiton', sdr: 'Nathali', type: 'sdr' },
 ];
 
+// Offsets de colunas por tipo de funil (relativo à coluna do título)
+// SDR normal: Ativados(0), Agendado(1), %Agend(2), AgendDia(3), Realizado(4), %Comp(5), Vendas(6), %Conv(7)
+// Social Selling: Ativados(0), Respostas(1), Agendado(2), %Agend(3), AgendDia(4), Realizado(5), %Comp(6), Vendas(7), %Conv(8)
+const COLUMN_OFFSETS = {
+  sdr: {
+    activated: 0,
+    scheduled: 1,
+    scheduled_same_day: 3,
+    attended: 4,
+    sales: 6,
+  },
+  social_selling: {
+    activated: 0,
+    scheduled: 2,      // +1 devido à coluna "Respostas"
+    scheduled_same_day: 4,
+    attended: 5,
+    sales: 7,
+  },
+};
+
 const SHEET_NAME = 'Indicadores Funis';
 
 interface FunnelBlock {
@@ -67,16 +87,17 @@ function parsePercentage(value: string): number {
   return isNaN(num) ? 0 : num;
 }
 
-// Parse numeric values
+// Parse numeric values - garantir inteiros para evitar erros de tipo no banco
 function parseNumber(value: unknown): number {
-  if (typeof value === 'number') return value;
+  if (typeof value === 'number') return Math.round(value);
   if (typeof value === 'string') {
     if (value.includes('#DIV') || value.includes('#REF') || value.includes('#N/A')) {
       return 0;
     }
-    const cleaned = value.replace(',', '.').trim();
+    // Remover % se existir e limpar formato
+    const cleaned = value.replace('%', '').replace(',', '.').trim();
     const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
+    return isNaN(num) ? 0 : Math.round(num);
   }
   return 0;
 }
@@ -320,21 +341,19 @@ Deno.serve(async (req) => {
       // Processar TODOS os blocos com a mesma data
       for (const block of funnelBlocks) {
         const titleCol = block.startCol;
+        
+        // Usar offsets corretos baseado no tipo do funil
+        const offsets = COLUMN_OFFSETS[block.type as keyof typeof COLUMN_OFFSETS] || COLUMN_OFFSETS.sdr;
 
-        // Offsets relativos ao título do funil:
-        // título(0)=Ativados, +1=Agendado, +2=% Agend, +3=Agend dia, +4=Realizado, +5=% Comp, +6=Vendas, +7=% Conv
         const metric: RawMetric = {
           sdr: block.sdr,
           type: block.type,
           date: parsedDate,
-          activated: parseNumber(row[titleCol]),      // Ativados está na coluna do título
-          scheduled: parseNumber(row[titleCol + 1]),   // Agendado
-          // +2 é % Agendamento (skip)
-          scheduled_same_day: parseNumber(row[titleCol + 3]), // Agendado no dia
-          attended: parseNumber(row[titleCol + 4]),    // Realizado
-          // +5 é % Comp (skip)
-          sales: parseNumber(row[titleCol + 6]),       // Vendas
-          // +7 é % Conv (skip)
+          activated: parseNumber(row[titleCol + offsets.activated]),
+          scheduled: parseNumber(row[titleCol + offsets.scheduled]),
+          scheduled_same_day: parseNumber(row[titleCol + offsets.scheduled_same_day]),
+          attended: parseNumber(row[titleCol + offsets.attended]),
+          sales: parseNumber(row[titleCol + offsets.sales]),
         };
 
         rawMetrics.push(metric);
