@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Phone, Users, Loader2, UserCheck, Calendar, TrendingUp, ShoppingCart } from 'lucide-react';
+import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart } from 'lucide-react';
 import { PeriodFilter } from '@/components/dashboard/PeriodFilter';
 import { SDRTypeToggle, SDRType } from './SDRTypeToggle';
 import { SDRMetricCard } from './SDRMetricCard';
 import { SDRCard } from './SDRCard';
 import { SDRDetailPage } from './SDRDetailPage';
+import { SDRSheetsConfig } from './SDRSheetsConfig';
 import { useSDRTotalMetrics, useSDRsWithMetrics } from '@/hooks/useSdrMetrics';
+import { useSDRSheetsConfig } from '@/hooks/useSDRSheetsConfig';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function SDRDashboard() {
@@ -29,6 +31,9 @@ export function SDRDashboard() {
     periodStart,
     periodEnd
   );
+
+  const { data: sheetsConfig, isLoading: isLoadingConfig } = useSDRSheetsConfig();
+  const isConnected = !!sheetsConfig?.spreadsheet_id;
 
   const handlePeriodChange = (start: string | undefined, end: string | undefined) => {
     setPeriodStart(start);
@@ -56,7 +61,8 @@ export function SDRDashboard() {
     );
   }
 
-  const isLoading = isLoadingTotal || isLoadingSDRs;
+  const isLoading = isLoadingTotal || isLoadingSDRs || isLoadingConfig;
+  const hasData = sdrsWithMetrics && sdrsWithMetrics.length > 0;
 
   return (
     <div className="space-y-6">
@@ -84,6 +90,11 @@ export function SDRDashboard() {
         </div>
       </div>
 
+      {/* Sheets Configuration - compact when connected, prominent when not */}
+      {!isLoading && (
+        <SDRSheetsConfig variant={isConnected && hasData ? 'compact' : 'prominent'} />
+      )}
+
       {/* Consolidated Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {isLoading ? (
@@ -110,8 +121,8 @@ export function SDRDashboard() {
               icon={TrendingUp}
             />
             <SDRMetricCard
-              title="Confirmados"
-              value={totalMetrics?.totalConfirmed || 0}
+              title="Agend. no dia"
+              value={totalMetrics?.totalScheduledSameDay || 0}
               icon={UserCheck}
             />
             <SDRMetricCard
@@ -165,8 +176,9 @@ export function SDRDashboard() {
               Nenhum {sdrType === 'sdr' ? 'SDR' : 'Social Selling'} cadastrado
             </h3>
             <p className="text-muted-foreground text-center max-w-md">
-              Adicione {sdrType === 'sdr' ? 'SDRs' : 'profissionais de Social Selling'} através
-              da sincronização do Google Sheets no painel administrativo.
+              {isConnected 
+                ? 'Clique em "Sincronizar" acima para importar os dados da planilha.'
+                : 'Conecte uma planilha do Google Sheets acima para importar os dados.'}
             </p>
           </div>
         )}

@@ -197,7 +197,6 @@ export type Database = {
           activated: number
           attendance_rate: number
           attended: number
-          confirmed: number
           conversion_rate: number
           created_at: string
           date: string
@@ -205,6 +204,7 @@ export type Database = {
           sales: number
           scheduled: number
           scheduled_rate: number
+          scheduled_same_day: number
           sdr_id: string
           source: string | null
           updated_at: string
@@ -213,7 +213,6 @@ export type Database = {
           activated?: number
           attendance_rate?: number
           attended?: number
-          confirmed?: number
           conversion_rate?: number
           created_at?: string
           date: string
@@ -221,6 +220,7 @@ export type Database = {
           sales?: number
           scheduled?: number
           scheduled_rate?: number
+          scheduled_same_day?: number
           sdr_id: string
           source?: string | null
           updated_at?: string
@@ -229,7 +229,6 @@ export type Database = {
           activated?: number
           attendance_rate?: number
           attended?: number
-          confirmed?: number
           conversion_rate?: number
           created_at?: string
           date?: string
@@ -237,6 +236,7 @@ export type Database = {
           sales?: number
           scheduled?: number
           scheduled_rate?: number
+          scheduled_same_day?: number
           sdr_id?: string
           source?: string | null
           updated_at?: string
@@ -250,6 +250,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sdr_sheets_config: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          last_sync_at: string | null
+          row_mapping: Json | null
+          spreadsheet_id: string
+          spreadsheet_name: string | null
+          sync_message: string | null
+          sync_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_sync_at?: string | null
+          row_mapping?: Json | null
+          spreadsheet_id: string
+          spreadsheet_name?: string | null
+          sync_message?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_sync_at?: string | null
+          row_mapping?: Json | null
+          spreadsheet_id?: string
+          spreadsheet_name?: string | null
+          sync_message?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       sdrs: {
         Row: {

@@ -23,7 +23,7 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
       totalActivated: 0,
       totalScheduled: 0,
       avgScheduledRate: 0,
-      totalConfirmed: 0,
+      totalScheduledSameDay: 0,
       totalAttended: 0,
       avgAttendanceRate: 0,
       totalSales: 0,
@@ -33,19 +33,19 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
 
   const totalActivated = metrics.reduce((sum, m) => sum + (m.activated || 0), 0);
   const totalScheduled = metrics.reduce((sum, m) => sum + (m.scheduled || 0), 0);
-  const totalConfirmed = metrics.reduce((sum, m) => sum + (m.confirmed || 0), 0);
+  const totalScheduledSameDay = metrics.reduce((sum, m) => sum + (m.scheduled_same_day || 0), 0);
   const totalAttended = metrics.reduce((sum, m) => sum + (m.attended || 0), 0);
   const totalSales = metrics.reduce((sum, m) => sum + (m.sales || 0), 0);
 
   const avgScheduledRate = totalActivated > 0 ? (totalScheduled / totalActivated) * 100 : 0;
-  const avgAttendanceRate = totalConfirmed > 0 ? (totalAttended / totalConfirmed) * 100 : 0;
+  const avgAttendanceRate = totalScheduledSameDay > 0 ? (totalAttended / totalScheduledSameDay) * 100 : 0;
   const avgConversionRate = totalAttended > 0 ? (totalSales / totalAttended) * 100 : 0;
 
   return {
     totalActivated,
     totalScheduled,
     avgScheduledRate,
-    totalConfirmed,
+    totalScheduledSameDay,
     totalAttended,
     avgAttendanceRate,
     totalSales,
@@ -140,8 +140,8 @@ export function SDRDetailPage({
               icon={TrendingUp}
             />
             <SDRMetricCard
-              title="Confirmados"
-              value={aggregatedMetrics?.totalConfirmed || 0}
+              title="Agend. no dia"
+              value={aggregatedMetrics?.totalScheduledSameDay || 0}
               icon={UserCheck}
             />
             <SDRMetricCard

@@ -42,7 +42,7 @@ export function SDRDataTable({ metrics }: SDRDataTableProps) {
               <TableHead className="text-xs font-semibold text-right">Ativados</TableHead>
               <TableHead className="text-xs font-semibold text-right">Agendados</TableHead>
               <TableHead className="text-xs font-semibold text-right">% Agend.</TableHead>
-              <TableHead className="text-xs font-semibold text-right">Confirmados</TableHead>
+              <TableHead className="text-xs font-semibold text-right">Agend. dia</TableHead>
               <TableHead className="text-xs font-semibold text-right">Realizados</TableHead>
               <TableHead className="text-xs font-semibold text-right">% Comp.</TableHead>
               <TableHead className="text-xs font-semibold text-right">Vendas</TableHead>
@@ -62,11 +62,11 @@ export function SDRDataTable({ metrics }: SDRDataTableProps) {
                     ? ((metric.scheduled / metric.activated) * 100).toFixed(1)
                     : '0.0'}%
                 </TableCell>
-                <TableCell className="text-right">{metric.confirmed}</TableCell>
+                <TableCell className="text-right">{metric.scheduled_same_day}</TableCell>
                 <TableCell className="text-right">{metric.attended}</TableCell>
                 <TableCell className="text-right">
-                  {metric.confirmed > 0
-                    ? ((metric.attended / metric.confirmed) * 100).toFixed(1)
+                  {metric.scheduled_same_day > 0
+                    ? ((metric.attended / metric.scheduled_same_day) * 100).toFixed(1)
                     : '0.0'}%
                 </TableCell>
                 <TableCell className="text-right font-semibold text-primary">
