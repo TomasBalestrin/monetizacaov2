@@ -6,6 +6,7 @@ import { Header } from '@/components/dashboard/Header';
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { SquadPage } from '@/components/dashboard/SquadPage';
 import { AdminPanel } from '@/components/dashboard/AdminPanel';
+import { SDRDashboard } from '@/components/dashboard/sdr';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -46,14 +47,7 @@ const Index = () => {
       case 'admin':
         return <AdminPanel />;
       case 'sdrs':
-        return (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Módulo SDRs</h2>
-              <p className="text-muted-foreground">Em desenvolvimento...</p>
-            </div>
-          </div>
-        );
+        return <SDRDashboard />;
       case 'reports':
         return (
           <div className="flex items-center justify-center min-h-[60vh]">

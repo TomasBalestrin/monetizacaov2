@@ -192,6 +192,89 @@ export type Database = {
         }
         Relationships: []
       }
+      sdr_metrics: {
+        Row: {
+          activated: number
+          attendance_rate: number
+          attended: number
+          confirmed: number
+          conversion_rate: number
+          created_at: string
+          date: string
+          id: string
+          sales: number
+          scheduled: number
+          scheduled_rate: number
+          sdr_id: string
+          source: string | null
+          updated_at: string
+        }
+        Insert: {
+          activated?: number
+          attendance_rate?: number
+          attended?: number
+          confirmed?: number
+          conversion_rate?: number
+          created_at?: string
+          date: string
+          id?: string
+          sales?: number
+          scheduled?: number
+          scheduled_rate?: number
+          sdr_id: string
+          source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activated?: number
+          attendance_rate?: number
+          attended?: number
+          confirmed?: number
+          conversion_rate?: number
+          created_at?: string
+          date?: string
+          id?: string
+          sales?: number
+          scheduled?: number
+          scheduled_rate?: number
+          sdr_id?: string
+          source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_metrics_sdr_id_fkey"
+            columns: ["sdr_id"]
+            isOneToOne: false
+            referencedRelation: "sdrs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdrs: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       squads: {
         Row: {
           created_at: string
