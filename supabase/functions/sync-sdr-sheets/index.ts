@@ -5,20 +5,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Mapeamento de funis para SDRs
+// Mapeamento de funis para SDRs (nomes exatos da planilha)
 const FUNNEL_MAPPING = [
   { funnel: 'Teste', sdr: 'Jaque', type: 'sdr' },
   { funnel: 'MPM', sdr: 'Jaque', type: 'sdr' },
-  { funnel: 'Mentoria júlia', sdr: 'Clara', type: 'social_selling' },
+  { funnel: 'Mentoria Julia', sdr: 'Clara', type: 'social_selling' },
   { funnel: 'Mentoria julia', sdr: 'Clara', type: 'social_selling' },
-  { funnel: 'Implementação Ia', sdr: 'Dienifer', type: 'sdr' },
-  { funnel: 'Implementação IA', sdr: 'Carlos', type: 'sdr' },
+  { funnel: 'Mentoria júlia', sdr: 'Clara', type: 'social_selling' },
+  { funnel: 'Implementação Dienifer', sdr: 'Dienifer', type: 'sdr' },
+  { funnel: 'Implementacao Dienifer', sdr: 'Dienifer', type: 'sdr' },
+  { funnel: 'Implementação Carlos', sdr: 'Carlos', type: 'sdr' },
+  { funnel: 'Implementacao Carlos', sdr: 'Carlos', type: 'sdr' },
+  { funnel: '50 Scripts', sdr: 'Nathali', type: 'sdr' },
   { funnel: '50 Script', sdr: 'Nathali', type: 'sdr' },
-  { funnel: 'SS Júlia', sdr: 'Clara', type: 'social_selling' },
   { funnel: 'SS Julia', sdr: 'Clara', type: 'social_selling' },
+  { funnel: 'SS Júlia', sdr: 'Clara', type: 'social_selling' },
   { funnel: 'SS Cleiton', sdr: 'Thalita', type: 'social_selling' },
-  { funnel: 'Orgânico', sdr: 'Nathali', type: 'sdr' },
-  { funnel: 'Organico', sdr: 'Nathali', type: 'sdr' },
+  { funnel: 'Orgânico Cleiton', sdr: 'Nathali', type: 'sdr' },
+  { funnel: 'Organico Cleiton', sdr: 'Nathali', type: 'sdr' },
 ];
 
 const SHEET_NAME = 'Indicadores Funis';
@@ -258,28 +262,37 @@ Deno.serve(async (req) => {
       if (!row || row.length === 0) continue;
 
       for (const block of funnelBlocks) {
-        const col = block.startCol;
+        const titleCol = block.startCol;
         
-        // Column offsets within each block:
-        // 0: Data, 1: Ativados, 2: Agendado, 3: % Agend, 4: Agend dia, 5: Realizado, 6: % Comp, 7: Vendas, 8: % Conv
-        const dateValue = row[col]?.toString().trim() || '';
+        // A coluna "Data" está 1 posição ANTES do título do funil
+        // Título está em col N, Data está em col N-1 (exceto para primeiro bloco)
+        const dataCol = titleCol > 0 ? titleCol - 1 : 0;
+        
+        const dateValue = row[dataCol]?.toString().trim() || '';
         const parsedDate = parseDate(dateValue);
         
         if (!parsedDate) continue; // Skip rows without valid date (Total, empty, etc.)
 
+        // Offsets relativos ao título do funil:
+        // título(0)=Ativados, +1=Agendado, +2=% Agend, +3=Agend dia, +4=Realizado, +5=% Comp, +6=Vendas, +7=% Conv
         const metric: RawMetric = {
           sdr: block.sdr,
           type: block.type,
           date: parsedDate,
-          activated: parseNumber(row[col + 1]),
-          scheduled: parseNumber(row[col + 2]),
-          // Column 3 is % Agendamento (skip - we'll recalculate)
-          scheduled_same_day: parseNumber(row[col + 4]),
-          attended: parseNumber(row[col + 5]),
-          // Column 6 is % Comp (skip - we'll recalculate)
-          sales: parseNumber(row[col + 7]),
-          // Column 8 is % Conv (skip - we'll recalculate)
+          activated: parseNumber(row[titleCol]),      // Ativados está na coluna do título
+          scheduled: parseNumber(row[titleCol + 1]),   // Agendado
+          // +2 é % Agendamento (skip)
+          scheduled_same_day: parseNumber(row[titleCol + 3]), // Agendado no dia
+          attended: parseNumber(row[titleCol + 4]),    // Realizado
+          // +5 é % Comp (skip)
+          sales: parseNumber(row[titleCol + 6]),       // Vendas
+          // +7 é % Conv (skip)
         };
+
+        // Debug log para as primeiras linhas
+        if (rowIndex < 6) {
+          console.log(`Row ${rowIndex}, ${block.funnel}: Date=${dateValue}(${parsedDate}), Act=${metric.activated}, Sched=${metric.scheduled}, Att=${metric.attended}, Sales=${metric.sales}`);
+        }
 
         rawMetrics.push(metric);
       }
