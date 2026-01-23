@@ -3,12 +3,17 @@ import { Phone, Target, TrendingUp, DollarSign, Users, Loader2 } from 'lucide-re
 import { MetricCard } from './MetricCard';
 import { PeriodFilter } from './PeriodFilter';
 import { useSquadMetrics } from '@/hooks/useMetrics';
+import { useRealtimeMetrics, useRealtimeSyncStatus } from '@/hooks/useRealtimeMetrics';
 
 interface SquadPageProps {
   squadSlug: string;
 }
 
 export function SquadPage({ squadSlug }: SquadPageProps) {
+  // Enable realtime subscriptions for automatic updates
+  useRealtimeMetrics();
+  useRealtimeSyncStatus();
+  
   const [periodStart, setPeriodStart] = useState<string | undefined>();
   const [periodEnd, setPeriodEnd] = useState<string | undefined>();
   const { squadMetrics, isLoading, error } = useSquadMetrics(periodStart, periodEnd);

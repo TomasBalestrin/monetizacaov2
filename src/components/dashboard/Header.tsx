@@ -13,6 +13,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { MetricsDialog } from './MetricsDialog';
+import { useSyncGoogleSheets } from '@/hooks/useGoogleSheetsConfig';
+import { useSyncSDRSheets } from '@/hooks/useSDRSheetsConfig';
+import { toast } from 'sonner';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -22,7 +25,22 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { user, role, signOut, isAdmin, isManager } = useAuth();
   const [metricsDialogOpen, setMetricsDialogOpen] = useState(false);
   
+  const syncSheets = useSyncGoogleSheets();
+  const syncSDR = useSyncSDRSheets();
+  const isSyncing = syncSheets.isPending || syncSDR.isPending;
+  
   const canAddMetrics = isAdmin || isManager;
+
+  const handleSync = async () => {
+    try {
+      await Promise.all([
+        syncSheets.mutateAsync(),
+        syncSDR.mutateAsync(),
+      ]);
+    } catch (error) {
+      toast.error('Erro ao sincronizar dados');
+    }
+  };
 
   const getRoleLabel = (role: string | null) => {
     switch (role) {
@@ -85,9 +103,15 @@ export function Header({ onMenuClick }: HeaderProps) {
           )}
 
           {/* Sync button */}
-          <Button variant="outline" size="sm" className="hidden sm:flex gap-2">
-            <RefreshCw size={16} />
-            <span>Sincronizar</span>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="hidden sm:flex gap-2"
+            onClick={handleSync}
+            disabled={isSyncing}
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar'}</span>
           </Button>
 
           {/* Notifications */}
