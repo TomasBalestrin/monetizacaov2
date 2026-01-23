@@ -11,6 +11,7 @@ import { CloserWeeklyComparisonChart } from './CloserWeeklyComparisonChart';
 import { CloserDataTable } from './CloserDataTable';
 import { useClosers, useCloserMetrics, type CloserMetricRecord } from '@/hooks/useMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
+import { useRealtimeMetrics, useRealtimeSyncStatus } from '@/hooks/useRealtimeMetrics';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
 
@@ -73,6 +74,10 @@ export function CloserDetailPage({
 }: CloserDetailPageProps) {
   const queryClient = useQueryClient();
   const [, setSearchParams] = useSearchParams();
+  
+  // Enable realtime subscriptions for automatic data refresh
+  useRealtimeMetrics();
+  useRealtimeSyncStatus();
   
   const { data: closers } = useClosers();
   const { data: metrics, isLoading: isLoadingMetrics } = useCloserMetrics(

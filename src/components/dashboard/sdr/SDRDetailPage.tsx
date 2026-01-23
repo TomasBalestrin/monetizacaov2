@@ -12,6 +12,7 @@ import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
 import { SDRDataTable } from './SDRDataTable';
 import { useSDRs, useSDRMetrics, useSDRFunnels, type SDRAggregatedMetrics, type SDRMetric } from '@/hooks/useSdrMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
+import { useRealtimeSDRMetrics, useRealtimeSyncStatus } from '@/hooks/useRealtimeMetrics';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
 
@@ -99,6 +100,10 @@ export function SDRDetailPage({
   const queryClient = useQueryClient();
   const [, setSearchParams] = useSearchParams();
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
+  
+  // Enable realtime subscriptions for automatic data refresh
+  useRealtimeSDRMetrics();
+  useRealtimeSyncStatus();
   
   const { data: sdrs } = useSDRs();
   const { data: funnels, isLoading: isLoadingFunnels } = useSDRFunnels(sdrId);

@@ -288,6 +288,12 @@ Deno.serve(async (req) => {
       
       if (!parsedDate) continue;
       
+      // Skip future dates to avoid zero-value records
+      const today = new Date().toISOString().split('T')[0];
+      if (parsedDate > today) {
+        continue;
+      }
+      
       for (const block of funnelBlocks) {
         const titleCol = block.startCol;
         const offsets = COLUMN_OFFSETS[block.type as keyof typeof COLUMN_OFFSETS] || COLUMN_OFFSETS.sdr;

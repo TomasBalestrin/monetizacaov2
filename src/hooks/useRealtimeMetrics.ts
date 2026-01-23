@@ -19,6 +19,10 @@ export function useRealtimeMetrics() {
           console.log('Metrics table changed:', payload.eventType);
           // Invalidate all metrics-related queries
           queryClient.invalidateQueries({ queryKey: ['metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['closer-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['squad-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['squads'] });
+          queryClient.invalidateQueries({ queryKey: ['closers'] });
         }
       )
       .subscribe((status) => {
