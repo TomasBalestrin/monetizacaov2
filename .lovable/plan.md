@@ -1,102 +1,249 @@
 
-# Plano: Corrigir Sincronização de Sharks e Alcateia
+# Plano: Sincronização Individual por Squad
 
-## Diagnóstico Definitivo
+## Visão Geral
 
-Os logs da Edge Function revelam o problema:
+Reorganizar a arquitetura de sincronização para permitir que cada Squad (Eagles, Alcateia, Sharks) tenha sua própria configuração de planilha e botão de sincronização individual. A coluna de dados será atualizada de G para **H** (Total da Semana).
 
-| Closer | Aba Encontrada | Resultado |
-|--------|----------------|-----------|
-| **Hannah** (Eagles) | HANNAH | ✅ calls=9, sales=3, revenue=117997 |
-| **Carlos** (Eagles) | CARLOS | ✅ calls=13, sales=3, revenue=38394 |
-| **Leandro** (Sharks) | TOTAL SQUAD LEANDRO. | ❌ calls=0, sales=0, revenue=0 |
-| **Isis** (Alcateia) | ISIS | ❌ calls=0, sales=0, revenue=0 |
-| **Gisele** (Alcateia) | GISELE | ❌ calls=0, sales=0, revenue=0 |
-| **Tainara** (Alcateia) | TAINARA | ❌ calls=0, sales=0, revenue=0 |
+## Arquitetura Proposta
 
-**Conclusão**: A Edge Function encontra as abas corretamente, mas lê **células vazias** porque as abas Alcateia/Sharks têm:
-1. **Estrutura diferente** - métricas em posições diferentes (colunas ou linhas)
-2. **Coluna diferente** - usando coluna B-F ao invés de G
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                     ANTES (Global)                              │
+├─────────────────────────────────────────────────────────────────┤
+│  google_sheets_config (1 registro global)                       │
+│         ↓                                                       │
+│  sync-google-sheets → Sincroniza TODOS os closers              │
+└─────────────────────────────────────────────────────────────────┘
 
-## Causa Raiz
-
-A configuração atual assume que **TODAS as abas** usam:
-- Coluna G (SEMANAL)
-- Primeira linha de dados: 5
-- Offset entre blocos: 13
-
-Mas as abas Alcateia/Sharks podem usar posições diferentes.
-
-## Soluções Propostas
-
-### Solução 1: Adicionar Log de Debug para Identificar Estrutura (Recomendado Primeiro)
-
-Modificar a Edge Function para mostrar os valores das primeiras linhas de cada aba, permitindo identificar onde estão os dados reais.
-
-```typescript
-// Adicionar antes do loop de blocos
-console.log(`[${closer.name}] First 20 rows of column ${blockConfig.column}:`, 
-  values.slice(0, 20).map((row, i) => `Row ${i+1}: ${row[columnIndex] || 'empty'}`));
+┌─────────────────────────────────────────────────────────────────┐
+│                     DEPOIS (Por Squad)                          │
+├─────────────────────────────────────────────────────────────────┤
+│  squad_sheets_config (1 registro por squad)                     │
+│     - Eagles: spreadsheet_id, column: H, row_mapping            │
+│     - Alcateia: spreadsheet_id, column: H, row_mapping          │
+│     - Sharks: spreadsheet_id, column: H, row_mapping            │
+│         ↓                                                       │
+│  sync-squad-sheets?squad=eagles → Sincroniza só Eagles         │
+│  sync-squad-sheets?squad=alcateia → Sincroniza só Alcateia     │
+│  sync-squad-sheets?squad=sharks → Sincroniza só Sharks         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Solução 2: Configuração por Squad/Aba
+## Alterações Necessárias
 
-Se os Squads usam estruturas diferentes, criar suporte para configuração individual:
+### 1. Banco de Dados - Nova Tabela
 
-| Squad | Coluna | Primeira Linha | Offset |
-|-------|--------|----------------|--------|
-| Eagles | G | 5 | 13 |
-| Alcateia | ? | ? | ? |
-| Sharks | ? | ? | ? |
+Criar tabela `squad_sheets_config` para configurações por squad:
 
-### Solução 3: Auto-Detecção de Estrutura
+```sql
+CREATE TABLE squad_sheets_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  squad_id UUID NOT NULL REFERENCES squads(id) ON DELETE CASCADE,
+  spreadsheet_id TEXT NOT NULL,
+  spreadsheet_name TEXT,
+  row_mapping JSONB DEFAULT '{"column": "H", "firstBlockStartRow": 5, "blockOffset": 13, "numberOfBlocks": 4}',
+  last_sync_at TIMESTAMPTZ,
+  sync_status TEXT DEFAULT 'pending',
+  sync_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(squad_id)
+);
 
-Implementar lógica que detecta automaticamente onde estão os dados em cada aba, procurando por padrões conhecidos.
+-- RLS policies
+ALTER TABLE squad_sheets_config ENABLE ROW LEVEL SECURITY;
 
-## Plano de Implementação
+CREATE POLICY "Admins and managers can manage squad sheets config"
+  ON squad_sheets_config FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles 
+      WHERE user_id = auth.uid() 
+      AND role IN ('admin', 'manager')
+    )
+  );
+```
 
-### Fase 1: Diagnóstico (Implementar Agora)
+### 2. Edge Function - sync-squad-sheets
 
-Adicionar logs detalhados para visualizar os dados brutos de cada aba:
+Criar nova Edge Function que sincroniza um squad específico:
+
+| Parâmetro | Descrição |
+|-----------|-----------|
+| `squad` | Slug do squad (eagles, alcateia, sharks) |
+
+**Fluxo:**
+1. Recebe o slug do squad via query param ou body
+2. Busca configuração específica do squad em `squad_sheets_config`
+3. Busca apenas os closers daquele squad
+4. Processa apenas as abas correspondentes aos closers do squad
+5. Salva métricas e atualiza status do squad
+
+### 3. Frontend - Hook useSquadSheetsConfig
 
 ```typescript
-// Mostrar conteúdo bruto das células para debug
-for (const { sheetName, closer } of validSheets) {
-  // ... código existente ...
-  
-  // DEBUG: Mostrar primeiras linhas da coluna configurada
-  const debugRows = values.slice(0, 25).map((row, idx) => {
-    const colValue = row[columnIndex] || '';
-    return `Row ${idx + 1}: "${colValue}"`;
+// src/hooks/useSquadSheetsConfig.ts
+
+export function useSquadSheetsConfig(squadSlug: string) {
+  return useQuery({
+    queryKey: ['squad-sheets-config', squadSlug],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('squad_sheets_config')
+        .select('*, squads!inner(slug)')
+        .eq('squads.slug', squadSlug)
+        .maybeSingle();
+      // ...
+    },
   });
-  console.log(`[DEBUG ${closer.name}] Column ${blockConfig.column} content:`, debugRows.join(' | '));
+}
+
+export function useSyncSquadSheets(squadSlug: string) {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-squad-sheets', {
+        body: { squad: squadSlug }
+      });
+      // ...
+    },
+  });
 }
 ```
 
-### Fase 2: Correção
+### 4. Frontend - Componente SquadSheetsConfig
 
-Após identificar a estrutura correta de Alcateia/Sharks, uma das opções:
+Componente para configurar e sincronizar planilha do squad:
 
-1. **Ajustar a planilha** - padronizar todas as abas para usar mesma estrutura
-2. **Configuração por squad** - permitir configurações diferentes por squad
-3. **Auto-detecção** - detectar automaticamente a estrutura
+```typescript
+// src/components/dashboard/SquadSheetsConfig.tsx
 
-## Arquivos a Modificar
+interface SquadSheetsConfigProps {
+  squadSlug: string;
+  variant?: 'prominent' | 'compact';
+}
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/sync-google-sheets/index.ts` | Adicionar logs de debug para visualizar conteúdo bruto das células |
+export function SquadSheetsConfig({ squadSlug, variant = 'compact' }: SquadSheetsConfigProps) {
+  // Renderiza UI para conectar planilha
+  // Botão de sincronização
+  // Status da última sincronização
+}
+```
 
-## Próximos Passos
+### 5. SquadPage - Integração
 
-1. Implementar logs de debug
-2. Executar sincronização
-3. Analisar logs para identificar estrutura real de Alcateia/Sharks
-4. Implementar correção apropriada baseada nos dados reais
+Adicionar o componente de configuração e botão de sincronização na página do squad:
 
-## Resultado Esperado
+```typescript
+// src/components/dashboard/SquadPage.tsx
 
-Com os logs de debug, poderemos ver exatamente o conteúdo das células e identificar:
-- Se os dados estão em outra coluna
-- Se os dados começam em outra linha
-- Se a estrutura de blocos é diferente
+export function SquadPage({ squadSlug }: SquadPageProps) {
+  return (
+    <div className="space-y-8">
+      {/* Header com título e botão de sync */}
+      <div className="flex items-center justify-between">
+        <h1>Squad {squad.name}</h1>
+        <SquadSyncButton squadSlug={squadSlug} />
+      </div>
+      
+      {/* Configuração da planilha (se não conectada) */}
+      <SquadSheetsConfig squadSlug={squadSlug} variant="compact" />
+      
+      {/* Resto do conteúdo */}
+    </div>
+  );
+}
+```
+
+## Arquivos a Criar/Modificar
+
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| **Migração SQL** | Criar | Tabela `squad_sheets_config` com RLS |
+| `supabase/functions/sync-squad-sheets/index.ts` | Criar | Edge Function para sync por squad |
+| `src/hooks/useSquadSheetsConfig.ts` | Criar | Hook para gerenciar config por squad |
+| `src/components/dashboard/SquadSheetsConfig.tsx` | Criar | UI de configuração por squad |
+| `src/components/dashboard/SquadSyncButton.tsx` | Criar | Botão de sync compacto |
+| `src/components/dashboard/SquadPage.tsx` | Modificar | Integrar componentes de sync |
+| `supabase/config.toml` | Modificar | Adicionar nova Edge Function |
+
+## Configuração Padrão (Coluna H)
+
+Todas as configurações usarão por padrão:
+
+```json
+{
+  "column": "H",
+  "firstBlockStartRow": 5,
+  "blockOffset": 13,
+  "numberOfBlocks": 4,
+  "dateRow": 1,
+  "metrics": {
+    "calls": 0,
+    "sales": 1,
+    "revenue": 3,
+    "entries": 4,
+    "revenueTrend": 5,
+    "entriesTrend": 6,
+    "cancellations": 7,
+    "cancellationValue": 9,
+    "cancellationEntries": 10
+  }
+}
+```
+
+## Interface do Usuário
+
+### Página do Squad (ex: Eagles)
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  Squad Eagles                          [🔄 Sincronizar] [⚙️]   │
+├─────────────────────────────────────────────────────────────────┤
+│  📊 Planilha conectada • Última sync: 23/01 15:30 ✅            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐                       │
+│  │ Valor de Venda  │  │ Valor Entrada   │                       │
+│  │ R$ 156.391      │  │ R$ 45.200       │                       │
+│  └─────────────────┘  └─────────────────┘                       │
+│                                                                 │
+│  Closers:                                                       │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐                         │
+│  │ Deyvid   │ │ Carlos   │ │ Hannah   │                         │
+│  └──────────┘ └──────────┘ └──────────┘                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Quando Não Conectado
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  Squad Alcateia                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  📄 Conectar Google Sheets                                      │
+│                                                                 │
+│  Cole o ID ou URL da planilha do Squad Alcateia                 │
+│  ┌────────────────────────────────┐ [Conectar]                  │
+│  │ https://docs.google.com/...   │                              │
+│  └────────────────────────────────┘                             │
+│                                                                 │
+│  [?] Como configurar?                                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Nenhum dado disponível. Conecte uma planilha para começar.     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Benefícios
+
+1. **Flexibilidade**: Cada squad pode ter sua própria planilha ou aba
+2. **Independência**: Sincronização de um squad não afeta os outros
+3. **Debugging**: Logs específicos por squad facilitam identificar problemas
+4. **Escalabilidade**: Fácil adicionar novos squads no futuro
+5. **Coluna H**: Dados do total semanal corretos
+
+## Migração de Dados
+
+O código da Edge Function existente (`sync-google-sheets`) será mantido para compatibilidade com o cron job, mas o Dashboard global será atualizado para usar a nova arquitetura quando disponível.
