@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.sync-sdr-sheets]
 verify_jwt = false
+
+[functions.sync-squad-sheets]
+verify_jwt = false

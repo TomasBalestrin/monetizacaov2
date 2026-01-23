@@ -317,6 +317,53 @@ export type Database = {
         }
         Relationships: []
       }
+      squad_sheets_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_sync_at: string | null
+          row_mapping: Json | null
+          spreadsheet_id: string
+          spreadsheet_name: string | null
+          squad_id: string
+          sync_message: string | null
+          sync_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          row_mapping?: Json | null
+          spreadsheet_id: string
+          spreadsheet_name?: string | null
+          squad_id: string
+          sync_message?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          row_mapping?: Json | null
+          spreadsheet_id?: string
+          spreadsheet_name?: string | null
+          squad_id?: string
+          sync_message?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_sheets_config_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: true
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       squads: {
         Row: {
           created_at: string

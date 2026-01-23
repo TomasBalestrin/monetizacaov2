@@ -7,6 +7,8 @@ import { useSquadMetrics } from '@/hooks/useMetrics';
 import { useRealtimeMetrics, useRealtimeSyncStatus } from '@/hooks/useRealtimeMetrics';
 import { CloserDetailPage } from './closer/CloserDetailPage';
 import { CloserCard } from './closer/CloserCard';
+import { SquadSheetsConfig } from './SquadSheetsConfig';
+import { SquadSyncButton } from './SquadSyncButton';
 
 interface SquadPageProps {
   squadSlug: string;
@@ -78,13 +80,19 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Squad {squad.name}</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold text-foreground">Squad {squad.name}</h1>
+          <SquadSyncButton squadSlug={squadSlug} />
+        </div>
         <PeriodFilter
           periodStart={periodStart}
           periodEnd={periodEnd}
           onPeriodChange={handlePeriodChange}
         />
       </div>
+
+      {/* Squad-specific sheets configuration */}
+      <SquadSheetsConfig squadSlug={squadSlug} squadName={squad.name} variant="compact" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
