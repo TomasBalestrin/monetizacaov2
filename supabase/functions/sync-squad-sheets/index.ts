@@ -43,9 +43,11 @@ interface SheetData {
 }
 
 // Default config uses column H for weekly totals
+// Block structure: Week 1 starts at row 5, Week 2 at row 17, Week 3 at row 29, etc.
+// Offset of 12 accounts for: 10 data rows + 2 header rows between blocks
 const DEFAULT_CONFIG: WeekBlockConfig = {
   firstBlockStartRow: 5,
-  blockOffset: 13,
+  blockOffset: 12, // Changed from 13 to 12 to match actual sheet structure
   numberOfBlocks: 4,
   dateRow: 1,
   column: 'H',
@@ -424,6 +426,12 @@ Deno.serve(async (req) => {
           return parseNumericValue(rowData[columnIndex]);
         };
         
+        // Debug: Log exact row positions being read for each metric
+        console.log(`[sync-squad-sheets] ${closer.name} Week ${weekNumber} block starts at row ${blockStartRow}:`);
+        console.log(`  Calls (offset ${blockConfig.metrics.calls}): row ${blockStartRow + blockConfig.metrics.calls} = ${getBlockValue(blockConfig.metrics.calls)}`);
+        console.log(`  Sales (offset ${blockConfig.metrics.sales}): row ${blockStartRow + blockConfig.metrics.sales} = ${getBlockValue(blockConfig.metrics.sales)}`);
+        console.log(`  Revenue (offset ${blockConfig.metrics.revenue}): row ${blockStartRow + blockConfig.metrics.revenue} = ${getBlockValue(blockConfig.metrics.revenue)}`);
+        
         const dateRowIndex = blockStartRow - 1 - 1;
         let periodDates = (dateRowIndex >= 0 && dateRowIndex < values.length)
           ? extractDateFromRow(values[dateRowIndex], columnIndex) 
@@ -449,7 +457,7 @@ Deno.serve(async (req) => {
           cancellationEntries: getBlockValue(blockConfig.metrics.cancellationEntries),
         };
         
-        console.log(`[sync-squad-sheets] ${closer.name} Week ${weekNumber}: calls=${metrics.calls}, sales=${metrics.sales}, revenue=${metrics.revenue}`);
+        console.log(`[sync-squad-sheets] ${closer.name} Week ${weekNumber} FINAL: calls=${metrics.calls}, sales=${metrics.sales}, revenue=${metrics.revenue}`);
         
         allMetrics.push(metrics);
       }
