@@ -25,7 +25,30 @@ export interface Metric {
   revenue: number;
   entries: number;
   source: string;
+  revenue_trend?: number;
+  entries_trend?: number;
+  cancellations?: number;
+  cancellation_value?: number;
+  cancellation_entries?: number;
   closer?: Closer;
+}
+
+// Individual closer metric record with all fields
+export interface CloserMetricRecord {
+  id: string;
+  closer_id: string;
+  period_start: string;
+  period_end: string;
+  calls: number;
+  sales: number;
+  revenue: number;
+  entries: number;
+  source: string;
+  revenue_trend: number;
+  entries_trend: number;
+  cancellations: number;
+  cancellation_value: number;
+  cancellation_entries: number;
 }
 
 export interface SquadMetrics {
@@ -107,6 +130,32 @@ export function useMetrics(periodStart?: string, periodEnd?: string) {
       if (error) throw error;
       return data as Metric[];
     },
+  });
+}
+
+// Hook for fetching individual closer metrics
+export function useCloserMetrics(closerId: string, periodStart?: string, periodEnd?: string) {
+  return useQuery({
+    queryKey: ['closer-metrics', closerId, periodStart, periodEnd],
+    queryFn: async () => {
+      let query = supabase
+        .from('metrics')
+        .select('*')
+        .eq('closer_id', closerId)
+        .order('period_start', { ascending: true });
+      
+      if (periodStart) {
+        query = query.gte('period_start', periodStart);
+      }
+      if (periodEnd) {
+        query = query.lte('period_end', periodEnd);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as CloserMetricRecord[];
+    },
+    enabled: !!closerId,
   });
 }
 
