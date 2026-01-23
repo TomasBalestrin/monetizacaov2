@@ -81,6 +81,24 @@ function normalizeConfig(rawConfig: unknown): WeekBlockConfig {
   
   // New format: has 'metrics' nested object
   if ('metrics' in config && typeof config.metrics === 'object') {
+    const metricsObj = config.metrics as Record<string, number>;
+    
+    // Check if the metrics have invalid values (offsets > 10 indicate absolute rows, not relative offsets)
+    const hasInvalidOffsets = Object.values(metricsObj).some(v => typeof v === 'number' && v > 10);
+    
+    if (hasInvalidOffsets) {
+      console.log('Detected invalid metric offsets (>10), using DEFAULT metrics. Preserving block config.');
+      return {
+        ...DEFAULT_CONFIG,
+        firstBlockStartRow: (config.firstBlockStartRow as number) || DEFAULT_CONFIG.firstBlockStartRow,
+        blockOffset: (config.blockOffset as number) || DEFAULT_CONFIG.blockOffset,
+        numberOfBlocks: (config.numberOfBlocks as number) || DEFAULT_CONFIG.numberOfBlocks,
+        dateRow: (config.dateRow as number) ?? DEFAULT_CONFIG.dateRow,
+        column: (config.column as string) || DEFAULT_CONFIG.column,
+        metrics: { ...DEFAULT_CONFIG.metrics },
+      };
+    }
+    
     console.log('Using new structured config format');
     return {
       ...DEFAULT_CONFIG,
@@ -91,7 +109,7 @@ function normalizeConfig(rawConfig: unknown): WeekBlockConfig {
       column: (config.column as string) || DEFAULT_CONFIG.column,
       metrics: {
         ...DEFAULT_CONFIG.metrics,
-        ...(config.metrics as Record<string, number>),
+        ...metricsObj,
       }
     };
   }
@@ -101,6 +119,23 @@ function normalizeConfig(rawConfig: unknown): WeekBlockConfig {
   const hasLegacyMetrics = 'calls' in config || 'sales' in config || 'revenue' in config;
   
   if (hasLegacyMetrics) {
+    // Check if legacy values are invalid (absolute rows instead of relative offsets)
+    const legacyValues = [
+      config.calls as number,
+      config.sales as number,
+      config.revenue as number,
+    ].filter(v => typeof v === 'number');
+    
+    const hasInvalidLegacyOffsets = legacyValues.some(v => v > 10);
+    
+    if (hasInvalidLegacyOffsets) {
+      console.log('Detected invalid legacy config with absolute row values (>10), using DEFAULTS');
+      return {
+        ...DEFAULT_CONFIG,
+        column: (config.column as string) || DEFAULT_CONFIG.column,
+      };
+    }
+    
     console.log('Detected legacy flat config format, converting to new format');
     return {
       ...DEFAULT_CONFIG,
