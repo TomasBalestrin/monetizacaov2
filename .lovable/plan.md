@@ -1,242 +1,116 @@
 
 
-# Plano: Adicionar Edição e Exclusão de Métricas
+# Plano: Corrigir Mapeamento do Funil "Mentoria Julia"
 
-## Objetivo
+## Diagnóstico
 
-Implementar funcionalidade completa de CRUD (Create, Read, Update, Delete) nas métricas, permitindo editar e excluir registros diretamente nas tabelas de dados do closer e da squad.
+O funil **"Mentoria Julia"** na planilha possui uma estrutura diferente dos outros funis:
 
-## Análise da Situação Atual
+### Estrutura atual do funil na planilha:
+| Offset | Coluna | Campo |
+|--------|--------|-------|
+| 0 | T | Agendado |
+| 1 | U | Realizado |
+| 2 | V | % Comp (calculado) |
+| 3 | W | Vendas |
+| 4 | X | % Conv (calculado) |
 
-### O que já existe:
-| Componente | Criar | Editar | Excluir |
-|------------|-------|--------|---------|
-| `MetricsTable.tsx` (Admin) | ✅ | ✅ | ✅ |
-| `CloserDataTable.tsx` | ❌ | ❌ | ❌ |
-| `SquadMetricsDialog.tsx` | ✅ | ❌ | ❌ |
+### Problema
+O código atual classifica "Mentoria Julia" como `social_selling`, que espera:
+- Offset 0: Ativados
+- Offset 2: Agendados
+- Offset 5: Realizado
+- Offset 7: Vendas
 
-### Hooks disponíveis:
-- `useCreateMetric()` ✅
-- `useUpdateMetric()` ✅
-- `useDeleteMetric()` ✅
+Como a planilha **não tem coluna Ativados** e começa direto em "Agendado", todos os valores estão sendo lidos das colunas erradas.
 
-## Solução Proposta
+## Solução
 
-### 1. Atualizar `SquadMetricsDialog` para suportar edição
+Criar um novo tipo de mapeamento específico para funis sem coluna "Ativados" (como "Mentoria Julia"):
 
-Modificar o componente para aceitar uma métrica existente e alternar entre modo de criação e edição.
+### 1. Adicionar novo tipo de offset `mentoria`
 
-```text
-┌──────────────────────────────────────────────────┐
-│  [Adicionar/Editar] Métrica Manual               │
-├──────────────────────────────────────────────────┤
-│  (formulário preenchido com dados existentes)    │
-│                                                  │
-│         [ Cancelar ]  [ Atualizar/Adicionar ]    │
-└──────────────────────────────────────────────────┘
+```typescript
+const COLUMN_OFFSETS = {
+  sdr: {
+    activated: 0,
+    scheduled: 1,
+    scheduled_same_day: 3,
+    attended: 4,
+    sales: 6,
+  },
+  social_selling: {
+    activated: 0,
+    scheduled: 2,
+    scheduled_same_day: 4,
+    attended: 5,
+    sales: 7,
+  },
+  mentoria: {  // NOVO - Funis sem "Ativados"
+    activated: null,  // Não existe
+    scheduled: 0,     // Coluna inicial
+    scheduled_same_day: null, // Não existe
+    attended: 1,      // +1 do scheduled
+    sales: 3,         // +3 do scheduled
+  },
+};
 ```
 
-### 2. Atualizar `SquadMetricsForm` para modo de edição
+### 2. Atualizar FUNNEL_MAPPING para usar o novo tipo
 
-- Aceitar prop `defaultMetric?: CloserMetricRecord`
-- Preencher o formulário com valores existentes
-- Alterar texto do botão para "Atualizar Métrica"
-- Calcular o tipo de período automaticamente baseado nas datas
-
-### 3. Adicionar ações na `CloserDataTable`
-
-Adicionar coluna de ações com menu dropdown:
-
-```text
-| Período    | Calls | Vendas | ... | Ações |
-|------------|-------|--------|-----|-------|
-| 13/01-19/01|   25  |    4   | ... |  ⋮   |
-                                      ├─ ✏️ Editar
-                                      └─ 🗑️ Excluir
+```typescript
+const FUNNEL_MAPPING = [
+  // ... outros funis ...
+  { funnel: 'Mentoria Julia', sdr: 'Clara', type: 'mentoria' },
+  { funnel: 'Mentoria julia', sdr: 'Clara', type: 'mentoria' },
+  { funnel: 'Mentoria júlia', sdr: 'Clara', type: 'mentoria' },
+  // ... outros funis ...
+];
 ```
 
-### 4. Criar Dialog de Confirmação de Exclusão
+### 3. Atualizar lógica de parsing para tratar offsets nulos
 
-Reutilizar o pattern do `AlertDialog` já existente no `MetricsTable`.
+```typescript
+// No loop de extração de métricas
+const offsets = COLUMN_OFFSETS[block.type as keyof typeof COLUMN_OFFSETS] || COLUMN_OFFSETS.sdr;
 
-## Estrutura de Arquivos
+const metric: RawMetric = {
+  sdr: block.sdr,
+  type: block.type,
+  funnel: block.funnel,
+  date: parsedDate,
+  activated: offsets.activated !== null 
+    ? parseNumber(row[titleCol + offsets.activated]) 
+    : 0,
+  scheduled: parseNumber(row[titleCol + offsets.scheduled]),
+  scheduled_same_day: offsets.scheduled_same_day !== null 
+    ? parseNumber(row[titleCol + offsets.scheduled_same_day]) 
+    : 0,
+  attended: parseNumber(row[titleCol + offsets.attended]),
+  sales: parseNumber(row[titleCol + offsets.sales]),
+};
+```
+
+## Arquivo a Modificar
 
 | Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| `src/components/dashboard/SquadMetricsDialog.tsx` | Modificar | Suportar edição de métrica existente |
-| `src/components/dashboard/SquadMetricsForm.tsx` | Modificar | Aceitar valores default e modo edição |
-| `src/components/dashboard/closer/CloserDataTable.tsx` | Modificar | Adicionar coluna de ações (editar/excluir) |
-| `src/hooks/useMetrics.ts` | Modificar | Atualizar `useUpdateMetric` para invalidar `closer-metrics` |
-
-## Detalhes de Implementação
-
-### SquadMetricsDialog - Suporte a Edição
-
-```typescript
-interface SquadMetricsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  squadSlug: string;
-  defaultCloserId?: string;
-  metric?: CloserMetricRecord; // Nova prop para edição
-}
-
-// No handleSubmit
-if (metric?.id) {
-  await updateMetric.mutateAsync({ id: metric.id, ...payload });
-} else {
-  await createMetric.mutateAsync(payload);
-}
-```
-
-### SquadMetricsForm - Valores Default
-
-```typescript
-interface SquadMetricsFormProps {
-  squadId: string;
-  defaultCloserId?: string;
-  defaultMetric?: CloserMetricRecord; // Dados para edição
-  onSubmit: (...) => Promise<void>;
-  isLoading?: boolean;
-  submitLabel?: string; // "Adicionar" ou "Atualizar"
-}
-
-// Detectar tipo de período baseado nas datas
-function detectPeriodType(start: Date, end: Date): PeriodType {
-  const daysDiff = differenceInDays(end, start);
-  if (daysDiff === 0) return 'day';
-  if (daysDiff <= 7) return 'week';
-  return 'month';
-}
-```
-
-### CloserDataTable - Coluna de Ações
-
-```typescript
-interface CloserDataTableProps {
-  metrics: CloserMetricRecord[];
-  squadSlug: string; // Necessário para o dialog de edição
-  onEditMetric?: (metric: CloserMetricRecord) => void;
-  onDeleteMetric?: (metricId: string) => void;
-}
-
-// Nova coluna no header
-<TableHead className="w-[50px]"></TableHead>
-
-// Célula com dropdown
-<TableCell>
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="icon">
-        <MoreHorizontal className="h-4 w-4" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuItem onClick={() => onEditMetric?.(metric)}>
-        <Edit className="mr-2 h-4 w-4" />
-        Editar
-      </DropdownMenuItem>
-      <DropdownMenuItem 
-        className="text-destructive"
-        onClick={() => onDeleteMetric?.(metric.id)}
-      >
-        <Trash2 className="mr-2 h-4 w-4" />
-        Excluir
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-</TableCell>
-```
-
-### CloserDetailPage - Integração
-
-```typescript
-// Estados para controle
-const [editingMetric, setEditingMetric] = useState<CloserMetricRecord>();
-const [deletingMetricId, setDeletingMetricId] = useState<string | null>();
-
-// Hooks
-const deleteMetric = useDeleteMetric();
-
-// Render
-<CloserDataTable 
-  metrics={metrics}
-  squadSlug={squadSlug}
-  onEditMetric={setEditingMetric}
-  onDeleteMetric={setDeletingMetricId}
-/>
-
-{/* Edit Dialog */}
-<SquadMetricsDialog
-  open={!!editingMetric}
-  onOpenChange={(open) => !open && setEditingMetric(undefined)}
-  squadSlug={squadSlug}
-  defaultCloserId={closerId}
-  metric={editingMetric}
-/>
-
-{/* Delete Confirmation */}
-<AlertDialog open={!!deletingMetricId}>
-  ...
-</AlertDialog>
-```
-
-### useMetrics - Invalidar Queries Corretamente
-
-```typescript
-export function useUpdateMetric() {
-  // ...
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['metrics'] });
-    queryClient.invalidateQueries({ queryKey: ['closer-metrics'] }); // Adicionar
-    queryClient.invalidateQueries({ queryKey: ['squad-metrics'] }); // Adicionar
-    // ...
-  },
-}
-
-export function useDeleteMetric() {
-  // ...
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['metrics'] });
-    queryClient.invalidateQueries({ queryKey: ['closer-metrics'] }); // Adicionar
-    queryClient.invalidateQueries({ queryKey: ['squad-metrics'] }); // Adicionar
-    // ...
-  },
-}
-```
-
-## Fluxo de Edição
-
-```text
-1. Usuário clica no menu "⋮" na tabela de dados
-2. Seleciona "Editar"
-3. Dialog abre com dados preenchidos
-4. Sistema detecta tipo de período (dia/semana/mês) automaticamente
-5. Usuário modifica campos desejados
-6. Submit → useUpdateMetric
-7. React Query invalida caches
-8. UI atualiza automaticamente
-```
-
-## Fluxo de Exclusão
-
-```text
-1. Usuário clica no menu "⋮" na tabela de dados
-2. Seleciona "Excluir"
-3. AlertDialog de confirmação aparece
-4. Usuário confirma
-5. useDeleteMetric → Supabase
-6. Toast de sucesso
-7. React Query invalida caches
-8. Linha some da tabela
-```
+| `supabase/functions/sync-sdr-sheets/index.ts` | Modificar | Adicionar tipo `mentoria` no COLUMN_OFFSETS, atualizar FUNNEL_MAPPING, e ajustar lógica de parsing |
 
 ## Resultado Esperado
 
-1. Menu de ações (⋮) visível em cada linha da tabela de dados do closer
-2. Opção "Editar" abre dialog com dados preenchidos
-3. Opção "Excluir" mostra confirmação antes de remover
-4. Formulário de edição detecta automaticamente o tipo de período
-5. UI atualiza em tempo real após alterações
-6. Toasts informativos para ações realizadas
+Após a correção:
+1. O funil "Mentoria Julia" será processado com os offsets corretos
+2. Os dados da Clara neste funil mostrarão:
+   - **Activated = 0** (sempre, pois não existe na planilha)
+   - **Scheduled = valor da coluna T** (ex: 4)
+   - **Scheduled Same Day = 0** (não existe)
+   - **Attended = valor da coluna U** (ex: 2)
+   - **Sales = valor da coluna W** (ex: 0)
+
+## Validação
+
+Após deploy, sincronizar novamente e verificar:
+- Consultar `sdr_metrics` onde `funnel = 'Mentoria Julia'`
+- Comparar valores com a planilha para confirmar que estão corretos
 
