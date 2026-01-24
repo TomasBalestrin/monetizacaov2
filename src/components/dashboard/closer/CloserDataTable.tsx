@@ -1,7 +1,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TableIcon } from 'lucide-react';
+import { TableIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -10,11 +10,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import type { CloserMetricRecord } from '@/hooks/useMetrics';
 import { cn } from '@/lib/utils';
 
 interface CloserDataTableProps {
   metrics: CloserMetricRecord[];
+  onEditMetric?: (metric: CloserMetricRecord) => void;
+  onDeleteMetric?: (metricId: string) => void;
 }
 
 function getConversionColor(value: number): string {
@@ -33,7 +42,9 @@ function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export function CloserDataTable({ metrics }: CloserDataTableProps) {
+export function CloserDataTable({ metrics, onEditMetric, onDeleteMetric }: CloserDataTableProps) {
+  const hasActions = onEditMetric || onDeleteMetric;
+
   if (metrics.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-32 bg-card rounded-xl border border-border gap-2">
@@ -71,6 +82,9 @@ export function CloserDataTable({ metrics }: CloserDataTableProps) {
               <TableHead className="text-xs font-bold uppercase tracking-wider text-destructive text-right">Cancel.</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-destructive text-right">Vlr Cancel.</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-destructive text-right">Ent. Cancel.</TableHead>
+              {hasActions && (
+                <TableHead className="w-[50px]"></TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -125,6 +139,35 @@ export function CloserDataTable({ metrics }: CloserDataTableProps) {
                   <TableCell className="text-right text-destructive text-sm">
                     {formatCurrency(metric.cancellation_entries || 0)}
                   </TableCell>
+                  {hasActions && (
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Ações</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {onEditMetric && (
+                            <DropdownMenuItem onClick={() => onEditMetric(metric)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          {onDeleteMetric && (
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => onDeleteMetric(metric.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

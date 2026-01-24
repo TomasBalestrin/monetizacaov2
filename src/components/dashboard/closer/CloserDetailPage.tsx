@@ -4,13 +4,23 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Phone, Target, DollarSign, TrendingUp, ChevronLeft, ChevronRight, XCircle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { PeriodFilter } from '@/components/dashboard/PeriodFilter';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { CloserWeeklyComparisonChart } from './CloserWeeklyComparisonChart';
 import { CloserDataTable } from './CloserDataTable';
 import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
-import { useClosers, useCloserMetrics, type CloserMetricRecord } from '@/hooks/useMetrics';
+import { useClosers, useCloserMetrics, useDeleteMetric, type CloserMetricRecord } from '@/hooks/useMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeMetrics, useRealtimeSyncStatus } from '@/hooks/useRealtimeMetrics';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
@@ -82,6 +92,10 @@ export function CloserDetailPage({
   const queryClient = useQueryClient();
   const [, setSearchParams] = useSearchParams();
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
+  const [editingMetric, setEditingMetric] = useState<CloserMetricRecord | undefined>();
+  const [deletingMetricId, setDeletingMetricId] = useState<string | null>(null);
+  
+  const deleteMetric = useDeleteMetric();
   
   // Enable realtime subscriptions for automatic data refresh
   useRealtimeMetrics();
@@ -127,6 +141,21 @@ export function CloserDetailPage({
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['closer-metrics', closerId] });
   }, [queryClient, closerId]);
+
+  const handleEditMetric = useCallback((metric: CloserMetricRecord) => {
+    setEditingMetric(metric);
+  }, []);
+
+  const handleDeleteMetric = useCallback((metricId: string) => {
+    setDeletingMetricId(metricId);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (deletingMetricId) {
+      await deleteMetric.mutateAsync(deletingMetricId);
+      setDeletingMetricId(null);
+    }
+  }, [deletingMetricId, deleteMetric]);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
@@ -230,6 +259,36 @@ export function CloserDetailPage({
           squadSlug={squadSlug}
           defaultCloserId={closerId}
         />
+
+        {/* Dialog for editing metric */}
+        <SquadMetricsDialog
+          open={!!editingMetric}
+          onOpenChange={(open) => !open && setEditingMetric(undefined)}
+          squadSlug={squadSlug}
+          defaultCloserId={closerId}
+          metric={editingMetric}
+        />
+
+        {/* Delete confirmation dialog */}
+        <AlertDialog open={!!deletingMetricId} onOpenChange={(open) => !open && setDeletingMetricId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir esta métrica? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Swipe hint for mobile */}
         {totalItems > 1 && (
@@ -341,7 +400,11 @@ export function CloserDetailPage({
         {isLoadingMetrics ? (
           <TableSkeleton rows={5} columns={8} />
         ) : (
-          <CloserDataTable metrics={metrics || []} />
+          <CloserDataTable 
+            metrics={metrics || []} 
+            onEditMetric={handleEditMetric}
+            onDeleteMetric={handleDeleteMetric}
+          />
         )}
       </div>
     </PullToRefresh>

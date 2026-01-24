@@ -356,6 +356,8 @@ export function useUpdateMetric() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['closer-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['squad-metrics'] });
       toast({
         title: 'Métrica atualizada',
         description: 'A métrica foi atualizada com sucesso.',
@@ -387,6 +389,8 @@ export function useDeleteMetric() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['closer-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['squad-metrics'] });
       toast({
         title: 'Métrica removida',
         description: 'A métrica foi removida com sucesso.',

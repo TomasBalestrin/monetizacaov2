@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PeriodTypeSelector, type PeriodType } from './PeriodTypeSelector';
-import { useClosers, type Closer } from '@/hooks/useMetrics';
+import { useClosers, type CloserMetricRecord } from '@/hooks/useMetrics';
 
 const squadMetricsSchema = z.object({
   period_type: z.enum(['day', 'week', 'month']),
@@ -52,8 +52,20 @@ export type SquadMetricsFormValues = z.infer<typeof squadMetricsSchema>;
 interface SquadMetricsFormProps {
   squadId: string;
   defaultCloserId?: string;
+  defaultMetric?: CloserMetricRecord;
   onSubmit: (values: SquadMetricsFormValues, period: { start: Date; end: Date }) => Promise<void>;
   isLoading?: boolean;
+  submitLabel?: string;
+}
+
+function detectPeriodType(startDate: string, endDate: string): PeriodType {
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const daysDiff = differenceInDays(end, start);
+  
+  if (daysDiff === 0) return 'day';
+  if (daysDiff <= 7) return 'week';
+  return 'month';
 }
 
 function calculatePeriod(date: Date, type: PeriodType) {
@@ -91,26 +103,58 @@ function formatPeriodDisplay(date: Date | undefined, type: PeriodType): string {
   }
 }
 
-export function SquadMetricsForm({ squadId, defaultCloserId, onSubmit, isLoading }: SquadMetricsFormProps) {
+export function SquadMetricsForm({ 
+  squadId, 
+  defaultCloserId, 
+  defaultMetric,
+  onSubmit, 
+  isLoading,
+  submitLabel = 'Adicionar Métrica'
+}: SquadMetricsFormProps) {
   const { data: closers } = useClosers(squadId);
+  
+  // Detect period type from existing metric
+  const initialPeriodType = defaultMetric 
+    ? detectPeriodType(defaultMetric.period_start, defaultMetric.period_end)
+    : 'week';
   
   const form = useForm<SquadMetricsFormValues>({
     resolver: zodResolver(squadMetricsSchema),
     defaultValues: {
-      period_type: 'week',
-      closer_id: defaultCloserId || '',
-      selected_date: new Date(),
-      calls: 0,
-      sales: 0,
-      revenue: 0,
-      entries: 0,
-      revenue_trend: 0,
-      entries_trend: 0,
-      cancellations: 0,
-      cancellation_value: 0,
-      cancellation_entries: 0,
+      period_type: initialPeriodType,
+      closer_id: defaultMetric?.closer_id || defaultCloserId || '',
+      selected_date: defaultMetric ? parseISO(defaultMetric.period_start) : new Date(),
+      calls: defaultMetric?.calls ?? 0,
+      sales: defaultMetric?.sales ?? 0,
+      revenue: defaultMetric?.revenue ?? 0,
+      entries: defaultMetric?.entries ?? 0,
+      revenue_trend: defaultMetric?.revenue_trend ?? 0,
+      entries_trend: defaultMetric?.entries_trend ?? 0,
+      cancellations: defaultMetric?.cancellations ?? 0,
+      cancellation_value: defaultMetric?.cancellation_value ?? 0,
+      cancellation_entries: defaultMetric?.cancellation_entries ?? 0,
     },
   });
+
+  // Reset form when defaultMetric changes (for edit mode)
+  useEffect(() => {
+    if (defaultMetric) {
+      form.reset({
+        period_type: detectPeriodType(defaultMetric.period_start, defaultMetric.period_end),
+        closer_id: defaultMetric.closer_id,
+        selected_date: parseISO(defaultMetric.period_start),
+        calls: defaultMetric.calls,
+        sales: defaultMetric.sales,
+        revenue: defaultMetric.revenue,
+        entries: defaultMetric.entries,
+        revenue_trend: defaultMetric.revenue_trend ?? 0,
+        entries_trend: defaultMetric.entries_trend ?? 0,
+        cancellations: defaultMetric.cancellations ?? 0,
+        cancellation_value: defaultMetric.cancellation_value ?? 0,
+        cancellation_entries: defaultMetric.cancellation_entries ?? 0,
+      });
+    }
+  }, [defaultMetric, form]);
 
   const periodType = form.watch('period_type');
   const selectedDate = form.watch('selected_date');
@@ -351,7 +395,7 @@ export function SquadMetricsForm({ squadId, defaultCloserId, onSubmit, isLoading
 
         {/* Submit Button */}
         <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? 'Salvando...' : 'Adicionar Métrica'}
+          {isLoading ? 'Salvando...' : submitLabel}
         </Button>
       </form>
     </Form>

@@ -8,25 +8,29 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { SquadMetricsForm, type SquadMetricsFormValues } from './SquadMetricsForm';
-import { useCreateMetric, useSquads } from '@/hooks/useMetrics';
+import { useCreateMetric, useUpdateMetric, useSquads, type CloserMetricRecord } from '@/hooks/useMetrics';
 
 interface SquadMetricsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   squadSlug: string;
   defaultCloserId?: string;
+  metric?: CloserMetricRecord;
 }
 
 export function SquadMetricsDialog({ 
   open, 
   onOpenChange, 
   squadSlug,
-  defaultCloserId 
+  defaultCloserId,
+  metric 
 }: SquadMetricsDialogProps) {
   const createMetric = useCreateMetric();
+  const updateMetric = useUpdateMetric();
   const { data: squads } = useSquads();
   
   const squad = squads?.find(s => s.slug.toLowerCase() === squadSlug.toLowerCase());
+  const isEditing = !!metric?.id;
 
   const handleSubmit = async (
     values: SquadMetricsFormValues, 
@@ -48,27 +52,38 @@ export function SquadMetricsDialog({
       source: 'manual',
     };
 
-    await createMetric.mutateAsync(payload);
+    if (isEditing) {
+      await updateMetric.mutateAsync({ id: metric.id, ...payload });
+    } else {
+      await createMetric.mutateAsync(payload);
+    }
     onOpenChange(false);
   };
 
   if (!squad) return null;
 
+  const isPending = createMetric.isPending || updateMetric.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adicionar Métrica Manual</DialogTitle>
+          <DialogTitle>{isEditing ? 'Editar Métrica' : 'Adicionar Métrica Manual'}</DialogTitle>
           <DialogDescription>
-            Insira os dados de desempenho para um closer do Squad {squad.name}.
+            {isEditing 
+              ? `Atualize os dados de desempenho para o Squad ${squad.name}.`
+              : `Insira os dados de desempenho para um closer do Squad ${squad.name}.`
+            }
           </DialogDescription>
         </DialogHeader>
         
         <SquadMetricsForm
           squadId={squad.id}
           defaultCloserId={defaultCloserId}
+          defaultMetric={metric}
           onSubmit={handleSubmit}
-          isLoading={createMetric.isPending}
+          isLoading={isPending}
+          submitLabel={isEditing ? 'Atualizar Métrica' : 'Adicionar Métrica'}
         />
       </DialogContent>
     </Dialog>
