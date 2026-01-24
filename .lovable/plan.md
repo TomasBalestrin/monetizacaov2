@@ -1,200 +1,242 @@
 
 
-# Plano: Adicionar Inserção Manual de Dados
+# Plano: Adicionar Edição e Exclusão de Métricas
 
 ## Objetivo
 
-Implementar funcionalidade de adição manual de dados para métricas de closers, com opção de selecionar o tipo de período: **Dia**, **Semana** ou **Mês**.
+Implementar funcionalidade completa de CRUD (Create, Read, Update, Delete) nas métricas, permitindo editar e excluir registros diretamente nas tabelas de dados do closer e da squad.
 
-## Localização da Funcionalidade
+## Análise da Situação Atual
 
-A opção de inserção manual estará disponível em:
-1. **Página do Squad** - Botão "Adicionar Métrica" ao lado do botão "Sincronizar"
-2. **Página de Detalhes do Closer** - Botão para adicionar dados diretamente para aquele closer
+### O que já existe:
+| Componente | Criar | Editar | Excluir |
+|------------|-------|--------|---------|
+| `MetricsTable.tsx` (Admin) | ✅ | ✅ | ✅ |
+| `CloserDataTable.tsx` | ❌ | ❌ | ❌ |
+| `SquadMetricsDialog.tsx` | ✅ | ❌ | ❌ |
 
-## Interface do Usuário
+### Hooks disponíveis:
+- `useCreateMetric()` ✅
+- `useUpdateMetric()` ✅
+- `useDeleteMetric()` ✅
 
-### Dialog de Inserção Manual (SquadMetricsDialog)
+## Solução Proposta
 
-```text
-┌─────────────────────────────────────────────────┐
-│  Adicionar Métrica Manual                       │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  Tipo de Período:                               │
-│  ┌──────┐ ┌─────────┐ ┌───────┐                │
-│  │ Dia  │ │ Semana  │ │  Mês  │                │
-│  └──────┘ └─────────┘ └───────┘                │
-│                                                 │
-│  Closer:         [▼ Selecione um closer ]       │
-│                                                 │
-│  Data/Período:   [📅 Selecione a data   ]       │
-│                  (exibe intervalo automático)   │
-│                                                 │
-│  ───────────────────────────────────────────    │
-│  Calls:          [ 0 ]    Vendas:    [ 0 ]      │
-│  Faturamento:    [ 0,00 ] Entradas:  [ 0,00 ]   │
-│  ───────────────────────────────────────────    │
-│  Tend. Fat.:     [ 0,00 ] Tend. Ent: [ 0,00 ]   │
-│  Cancelamentos:  [ 0 ]    Vlr Cancel:[ 0,00 ]   │
-│  Ent. Cancel.:   [ 0,00 ]                       │
-│                                                 │
-│             [ Cancelar ]  [ Adicionar ]         │
-└─────────────────────────────────────────────────┘
-```
+### 1. Atualizar `SquadMetricsDialog` para suportar edição
 
-### Comportamento por Tipo de Período
-
-| Período | Comportamento |
-|---------|--------------|
-| **Dia** | Seleciona uma data única. `period_start` = `period_end` = data selecionada |
-| **Semana** | Seleciona uma semana (segunda a domingo). Calendário mostra seleção de semana |
-| **Mês** | Seleciona um mês. Calendário mostra seleção de mês inteiro |
-
-## Componentes a Criar
-
-### 1. `SquadMetricsDialog.tsx` (Novo)
-Dialog específico para adicionar métricas no contexto do squad, com:
-- Seletor de tipo de período (Tabs)
-- Seletor de closer filtrado pelo squad atual
-- Formulário com todos os campos de métricas
-
-### 2. `PeriodTypeSelector.tsx` (Novo)
-Componente reutilizável com tabs para selecionar Dia/Semana/Mês
-
-### 3. `SquadMetricsForm.tsx` (Novo)
-Formulário estendido do MetricsForm existente, incluindo:
-- Campos de tendência (revenue_trend, entries_trend)
-- Campos de cancelamento (cancellations, cancellation_value, cancellation_entries)
-- Lógica inteligente de cálculo de período baseado no tipo selecionado
-
-## Modificações em Arquivos Existentes
-
-### `SquadPage.tsx`
-- Adicionar estado para controlar abertura do dialog
-- Adicionar botão "Adicionar Métrica" no header
-- Importar e renderizar `SquadMetricsDialog`
-
-### `CloserDetailPage.tsx`
-- Adicionar botão para inserção manual (opcional, para o closer específico)
-
-### `useMetrics.ts`
-- Atualizar `useCreateMetric` para aceitar todos os campos (trends, cancellations)
-
-## Estrutura dos Arquivos
+Modificar o componente para aceitar uma métrica existente e alternar entre modo de criação e edição.
 
 ```text
-src/components/dashboard/
-├── SquadMetricsDialog.tsx      ← Novo
-├── SquadMetricsForm.tsx        ← Novo
-├── PeriodTypeSelector.tsx      ← Novo
-├── SquadPage.tsx               ← Modificar
-└── closer/
-    └── CloserDetailPage.tsx    ← Modificar
+┌──────────────────────────────────────────────────┐
+│  [Adicionar/Editar] Métrica Manual               │
+├──────────────────────────────────────────────────┤
+│  (formulário preenchido com dados existentes)    │
+│                                                  │
+│         [ Cancelar ]  [ Atualizar/Adicionar ]    │
+└──────────────────────────────────────────────────┘
 ```
 
-## Fluxo de Dados
+### 2. Atualizar `SquadMetricsForm` para modo de edição
+
+- Aceitar prop `defaultMetric?: CloserMetricRecord`
+- Preencher o formulário com valores existentes
+- Alterar texto do botão para "Atualizar Métrica"
+- Calcular o tipo de período automaticamente baseado nas datas
+
+### 3. Adicionar ações na `CloserDataTable`
+
+Adicionar coluna de ações com menu dropdown:
 
 ```text
-1. Usuário clica em "Adicionar Métrica"
-2. Dialog abre com squad pré-selecionado
-3. Usuário seleciona tipo de período (Dia/Semana/Mês)
-4. Usuário seleciona closer do squad
-5. Usuário seleciona data (calendário adapta ao tipo)
-6. Sistema calcula automaticamente period_start e period_end
-7. Usuário preenche métricas
-8. Submit → useCreateMetric → Supabase
-9. React Query invalida cache → UI atualiza
+| Período    | Calls | Vendas | ... | Ações |
+|------------|-------|--------|-----|-------|
+| 13/01-19/01|   25  |    4   | ... |  ⋮   |
+                                      ├─ ✏️ Editar
+                                      └─ 🗑️ Excluir
 ```
 
-## Detalhes Técnicos
+### 4. Criar Dialog de Confirmação de Exclusão
 
-### Schema do Formulário (Zod)
+Reutilizar o pattern do `AlertDialog` já existente no `MetricsTable`.
 
-```typescript
-const squadMetricsSchema = z.object({
-  period_type: z.enum(['day', 'week', 'month']),
-  closer_id: z.string().min(1),
-  selected_date: z.date(),
-  calls: z.coerce.number().int().min(0),
-  sales: z.coerce.number().int().min(0),
-  revenue: z.coerce.number().min(0),
-  entries: z.coerce.number().min(0),
-  revenue_trend: z.coerce.number().min(0).optional(),
-  entries_trend: z.coerce.number().min(0).optional(),
-  cancellations: z.coerce.number().int().min(0).optional(),
-  cancellation_value: z.coerce.number().min(0).optional(),
-  cancellation_entries: z.coerce.number().min(0).optional(),
-});
-```
-
-### Cálculo de Período
-
-```typescript
-import { 
-  startOfDay, endOfDay, 
-  startOfWeek, endOfWeek, 
-  startOfMonth, endOfMonth 
-} from 'date-fns';
-
-function calculatePeriod(date: Date, type: 'day' | 'week' | 'month') {
-  switch (type) {
-    case 'day':
-      return {
-        start: startOfDay(date),
-        end: endOfDay(date)
-      };
-    case 'week':
-      return {
-        start: startOfWeek(date, { weekStartsOn: 1 }),
-        end: endOfWeek(date, { weekStartsOn: 1 })
-      };
-    case 'month':
-      return {
-        start: startOfMonth(date),
-        end: endOfMonth(date)
-      };
-  }
-}
-```
-
-### Payload para Supabase
-
-```typescript
-const payload = {
-  closer_id: values.closer_id,
-  period_start: format(period.start, 'yyyy-MM-dd'),
-  period_end: format(period.end, 'yyyy-MM-dd'),
-  calls: values.calls,
-  sales: values.sales,
-  revenue: values.revenue,
-  entries: values.entries,
-  revenue_trend: values.revenue_trend ?? 0,
-  entries_trend: values.entries_trend ?? 0,
-  cancellations: values.cancellations ?? 0,
-  cancellation_value: values.cancellation_value ?? 0,
-  cancellation_entries: values.cancellation_entries ?? 0,
-  source: 'manual',
-};
-```
-
-## Arquivos a Criar/Modificar
+## Estrutura de Arquivos
 
 | Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| `src/components/dashboard/PeriodTypeSelector.tsx` | Criar | Componente de seleção Dia/Semana/Mês |
-| `src/components/dashboard/SquadMetricsForm.tsx` | Criar | Formulário completo com todos os campos |
-| `src/components/dashboard/SquadMetricsDialog.tsx` | Criar | Dialog de inserção manual |
-| `src/components/dashboard/SquadPage.tsx` | Modificar | Adicionar botão e integrar dialog |
-| `src/components/dashboard/closer/CloserDetailPage.tsx` | Modificar | Adicionar botão de inserção (opcional) |
-| `src/hooks/useMetrics.ts` | Modificar | Expandir payload do createMetric |
+| `src/components/dashboard/SquadMetricsDialog.tsx` | Modificar | Suportar edição de métrica existente |
+| `src/components/dashboard/SquadMetricsForm.tsx` | Modificar | Aceitar valores default e modo edição |
+| `src/components/dashboard/closer/CloserDataTable.tsx` | Modificar | Adicionar coluna de ações (editar/excluir) |
+| `src/hooks/useMetrics.ts` | Modificar | Atualizar `useUpdateMetric` para invalidar `closer-metrics` |
+
+## Detalhes de Implementação
+
+### SquadMetricsDialog - Suporte a Edição
+
+```typescript
+interface SquadMetricsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  squadSlug: string;
+  defaultCloserId?: string;
+  metric?: CloserMetricRecord; // Nova prop para edição
+}
+
+// No handleSubmit
+if (metric?.id) {
+  await updateMetric.mutateAsync({ id: metric.id, ...payload });
+} else {
+  await createMetric.mutateAsync(payload);
+}
+```
+
+### SquadMetricsForm - Valores Default
+
+```typescript
+interface SquadMetricsFormProps {
+  squadId: string;
+  defaultCloserId?: string;
+  defaultMetric?: CloserMetricRecord; // Dados para edição
+  onSubmit: (...) => Promise<void>;
+  isLoading?: boolean;
+  submitLabel?: string; // "Adicionar" ou "Atualizar"
+}
+
+// Detectar tipo de período baseado nas datas
+function detectPeriodType(start: Date, end: Date): PeriodType {
+  const daysDiff = differenceInDays(end, start);
+  if (daysDiff === 0) return 'day';
+  if (daysDiff <= 7) return 'week';
+  return 'month';
+}
+```
+
+### CloserDataTable - Coluna de Ações
+
+```typescript
+interface CloserDataTableProps {
+  metrics: CloserMetricRecord[];
+  squadSlug: string; // Necessário para o dialog de edição
+  onEditMetric?: (metric: CloserMetricRecord) => void;
+  onDeleteMetric?: (metricId: string) => void;
+}
+
+// Nova coluna no header
+<TableHead className="w-[50px]"></TableHead>
+
+// Célula com dropdown
+<TableCell>
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" size="icon">
+        <MoreHorizontal className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      <DropdownMenuItem onClick={() => onEditMetric?.(metric)}>
+        <Edit className="mr-2 h-4 w-4" />
+        Editar
+      </DropdownMenuItem>
+      <DropdownMenuItem 
+        className="text-destructive"
+        onClick={() => onDeleteMetric?.(metric.id)}
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        Excluir
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</TableCell>
+```
+
+### CloserDetailPage - Integração
+
+```typescript
+// Estados para controle
+const [editingMetric, setEditingMetric] = useState<CloserMetricRecord>();
+const [deletingMetricId, setDeletingMetricId] = useState<string | null>();
+
+// Hooks
+const deleteMetric = useDeleteMetric();
+
+// Render
+<CloserDataTable 
+  metrics={metrics}
+  squadSlug={squadSlug}
+  onEditMetric={setEditingMetric}
+  onDeleteMetric={setDeletingMetricId}
+/>
+
+{/* Edit Dialog */}
+<SquadMetricsDialog
+  open={!!editingMetric}
+  onOpenChange={(open) => !open && setEditingMetric(undefined)}
+  squadSlug={squadSlug}
+  defaultCloserId={closerId}
+  metric={editingMetric}
+/>
+
+{/* Delete Confirmation */}
+<AlertDialog open={!!deletingMetricId}>
+  ...
+</AlertDialog>
+```
+
+### useMetrics - Invalidar Queries Corretamente
+
+```typescript
+export function useUpdateMetric() {
+  // ...
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['closer-metrics'] }); // Adicionar
+    queryClient.invalidateQueries({ queryKey: ['squad-metrics'] }); // Adicionar
+    // ...
+  },
+}
+
+export function useDeleteMetric() {
+  // ...
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['closer-metrics'] }); // Adicionar
+    queryClient.invalidateQueries({ queryKey: ['squad-metrics'] }); // Adicionar
+    // ...
+  },
+}
+```
+
+## Fluxo de Edição
+
+```text
+1. Usuário clica no menu "⋮" na tabela de dados
+2. Seleciona "Editar"
+3. Dialog abre com dados preenchidos
+4. Sistema detecta tipo de período (dia/semana/mês) automaticamente
+5. Usuário modifica campos desejados
+6. Submit → useUpdateMetric
+7. React Query invalida caches
+8. UI atualiza automaticamente
+```
+
+## Fluxo de Exclusão
+
+```text
+1. Usuário clica no menu "⋮" na tabela de dados
+2. Seleciona "Excluir"
+3. AlertDialog de confirmação aparece
+4. Usuário confirma
+5. useDeleteMetric → Supabase
+6. Toast de sucesso
+7. React Query invalida caches
+8. Linha some da tabela
+```
 
 ## Resultado Esperado
 
-1. Botão "Adicionar Métrica" visível na página do squad ao lado de "Sincronizar"
-2. Dialog intuitivo com seleção de período (Dia/Semana/Mês)
-3. Calendário adaptativo ao tipo de período selecionado
-4. Todos os campos de métricas disponíveis (incluindo trends e cancelamentos)
-5. Dados salvos com `source: 'manual'` para diferenciação
-6. UI atualiza automaticamente após inserção (realtime)
+1. Menu de ações (⋮) visível em cada linha da tabela de dados do closer
+2. Opção "Editar" abre dialog com dados preenchidos
+3. Opção "Excluir" mostra confirmação antes de remover
+4. Formulário de edição detecta automaticamente o tipo de período
+5. UI atualiza em tempo real após alterações
+6. Toasts informativos para ações realizadas
 
