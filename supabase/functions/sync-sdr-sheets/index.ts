@@ -9,9 +9,9 @@ const corsHeaders = {
 const FUNNEL_MAPPING = [
   { funnel: 'Teste', sdr: 'Jaque', type: 'sdr' },
   { funnel: 'MPM', sdr: 'Jaque', type: 'sdr' },
-  { funnel: 'Mentoria Julia', sdr: 'Clara', type: 'social_selling' },
-  { funnel: 'Mentoria julia', sdr: 'Clara', type: 'social_selling' },
-  { funnel: 'Mentoria júlia', sdr: 'Clara', type: 'social_selling' },
+  { funnel: 'Mentoria Julia', sdr: 'Clara', type: 'mentoria' },
+  { funnel: 'Mentoria julia', sdr: 'Clara', type: 'mentoria' },
+  { funnel: 'Mentoria júlia', sdr: 'Clara', type: 'mentoria' },
   { funnel: 'Implementação Dienifer', sdr: 'Dienifer', type: 'sdr' },
   { funnel: 'Implementacao Dienifer', sdr: 'Dienifer', type: 'sdr' },
   { funnel: 'Implementação Carlos', sdr: 'Carlos', type: 'sdr' },
@@ -25,7 +25,7 @@ const FUNNEL_MAPPING = [
   { funnel: 'Organico Cleiton', sdr: 'Nathali', type: 'sdr' },
 ];
 
-const COLUMN_OFFSETS = {
+const COLUMN_OFFSETS: Record<string, { activated: number | null; scheduled: number; scheduled_same_day: number | null; attended: number; sales: number }> = {
   sdr: {
     activated: 0,
     scheduled: 1,
@@ -39,6 +39,13 @@ const COLUMN_OFFSETS = {
     scheduled_same_day: 4,
     attended: 5,
     sales: 7,
+  },
+  mentoria: {
+    activated: null,       // Não existe na planilha
+    scheduled: 0,          // Coluna inicial (Agendado)
+    scheduled_same_day: null, // Não existe
+    attended: 1,           // +1 (Realizado)
+    sales: 3,              // +3 (Vendas, pula % Comp)
   },
 };
 
@@ -296,16 +303,20 @@ Deno.serve(async (req) => {
       
       for (const block of funnelBlocks) {
         const titleCol = block.startCol;
-        const offsets = COLUMN_OFFSETS[block.type as keyof typeof COLUMN_OFFSETS] || COLUMN_OFFSETS.sdr;
+        const offsets = COLUMN_OFFSETS[block.type] || COLUMN_OFFSETS.sdr;
 
         const metric: RawMetric = {
           sdr: block.sdr,
           type: block.type,
           funnel: block.funnel,
           date: parsedDate,
-          activated: parseNumber(row[titleCol + offsets.activated]),
+          activated: offsets.activated !== null 
+            ? parseNumber(row[titleCol + offsets.activated]) 
+            : 0,
           scheduled: parseNumber(row[titleCol + offsets.scheduled]),
-          scheduled_same_day: parseNumber(row[titleCol + offsets.scheduled_same_day]),
+          scheduled_same_day: offsets.scheduled_same_day !== null 
+            ? parseNumber(row[titleCol + offsets.scheduled_same_day]) 
+            : 0,
           attended: parseNumber(row[titleCol + offsets.attended]),
           sales: parseNumber(row[titleCol + offsets.sales]),
         };
