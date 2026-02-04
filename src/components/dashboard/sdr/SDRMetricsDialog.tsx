@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, TrendingUp } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -51,15 +51,21 @@ export function SDRMetricsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Nova Métrica {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}
-          </DialogTitle>
-          <DialogDescription>
-            Adicione métricas manualmente para um {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}.
-          </DialogDescription>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto bg-background/95 backdrop-blur-sm border-border/50">
+        <DialogHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
+              <TrendingUp className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-semibold">
+                Nova Métrica {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Insira os dados de desempenho manualmente
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <SDRMetricsForm
