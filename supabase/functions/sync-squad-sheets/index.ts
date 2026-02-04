@@ -432,13 +432,48 @@ Deno.serve(async (req) => {
         console.log(`  Sales (offset ${blockConfig.metrics.sales}): row ${blockStartRow + blockConfig.metrics.sales} = ${getBlockValue(blockConfig.metrics.sales)}`);
         console.log(`  Revenue (offset ${blockConfig.metrics.revenue}): row ${blockStartRow + blockConfig.metrics.revenue} = ${getBlockValue(blockConfig.metrics.revenue)}`);
         
-        const dateRowIndex = blockStartRow - 1 - 1;
+        // Calculate date row: use dateRow config (relative to block start)
+        // If dateRow is set (e.g., 3), it means the date is 3 rows BEFORE the block start
+        // dateRow: 1 = 1 row before block (default), dateRow: 3 = 3 rows before block
+        const dateRowOffset = blockConfig.dateRow || 1;
+        const dateRowIndex = blockStartRow - dateRowOffset - 1; // -1 for 0-based index
+        
+        console.log(`  Date row: index ${dateRowIndex} (blockStart ${blockStartRow} - dateRowOffset ${dateRowOffset} - 1), value: ${values[dateRowIndex]?.[columnIndex] || 'N/A'}`);
+        
         let periodDates = (dateRowIndex >= 0 && dateRowIndex < values.length)
           ? extractDateFromRow(values[dateRowIndex], columnIndex) 
           : null;
         
+        // If date extraction failed, try extracting from spreadsheet title (e.g., "Comercial JANEIRO")
         if (!periodDates) {
-          periodDates = calculateWeekDates(weekNumber);
+          const monthMatch = spreadsheetName.match(/(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i);
+          if (monthMatch) {
+            const monthNames: Record<string, number> = {
+              'janeiro': 0, 'fevereiro': 1, 'março': 2, 'abril': 3, 'maio': 4, 'junho': 5,
+              'julho': 6, 'agosto': 7, 'setembro': 8, 'outubro': 9, 'novembro': 10, 'dezembro': 11
+            };
+            const month = monthNames[monthMatch[1].toLowerCase()];
+            const year = new Date().getFullYear();
+            
+            // Calculate week dates within that month
+            const startDay = 1 + ((weekNumber - 1) * 7);
+            const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+            const endDay = Math.min(startDay + 6, lastDayOfMonth);
+            
+            const startDate = new Date(year, month, startDay);
+            const endDate = new Date(year, month, endDay);
+            
+            periodDates = {
+              start: startDate.toISOString().split('T')[0],
+              end: endDate.toISOString().split('T')[0],
+            };
+            console.log(`  Extracted month from spreadsheet name: ${monthMatch[1]} → ${periodDates.start} to ${periodDates.end}`);
+          } else {
+            periodDates = calculateWeekDates(weekNumber);
+            console.log(`  Using fallback dates (current month): ${periodDates.start} to ${periodDates.end}`);
+          }
+        } else {
+          console.log(`  Extracted dates from cell: ${periodDates.start} to ${periodDates.end}`);
         }
         
         const metrics: SheetData = {
