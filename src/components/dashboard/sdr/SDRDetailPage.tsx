@@ -1,16 +1,27 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { SDRMetricCard } from './SDRMetricCard';
 import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
 import { SDRDataTable } from './SDRDataTable';
-import { useSDRs, useSDRMetrics, useSDRFunnels, type SDRAggregatedMetrics, type SDRMetric } from '@/hooks/useSdrMetrics';
+import { SDRMetricsDialog } from './SDRMetricsDialog';
+import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/hooks/useSdrMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeSDRMetrics, useRealtimeSyncStatus } from '@/hooks/useRealtimeMetrics';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
@@ -99,6 +110,13 @@ export function SDRDetailPage({
   const [, setSearchParams] = useSearchParams();
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
   
+  // Dialog states
+  const [showMetricsDialog, setShowMetricsDialog] = useState(false);
+  const [editingMetric, setEditingMetric] = useState<SDRMetric | null>(null);
+  const [deletingMetricId, setDeletingMetricId] = useState<string | null>(null);
+  
+  const deleteMetric = useDeleteSDRMetric();
+  
   // Enable realtime subscriptions for automatic data refresh
   useRealtimeSDRMetrics();
   useRealtimeSyncStatus();
@@ -164,6 +182,28 @@ export function SDRDetailPage({
     await queryClient.invalidateQueries({ queryKey: ['sdr-metrics', sdrId] });
     await queryClient.invalidateQueries({ queryKey: ['sdr-funnels', sdrId] });
   }, [queryClient, sdrId]);
+
+  // Edit/Delete handlers
+  const handleEditMetric = useCallback((metric: SDRMetric) => {
+    setEditingMetric(metric);
+  }, []);
+
+  const handleDeleteMetric = useCallback((metricId: string) => {
+    setDeletingMetricId(metricId);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (deletingMetricId) {
+      await deleteMetric.mutateAsync(deletingMetricId);
+      setDeletingMetricId(null);
+    }
+  }, [deletingMetricId, deleteMetric]);
+
+  const handleCloseEditDialog = useCallback((open: boolean) => {
+    if (!open) {
+      setEditingMetric(null);
+    }
+  }, []);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
@@ -266,6 +306,16 @@ export function SDRDetailPage({
               selectedMonth={selectedMonth}
               onMonthChange={onMonthChange}
             />
+
+            {/* Add Metric Button */}
+            <Button
+              onClick={() => setShowMetricsDialog(true)}
+              size="sm"
+              className="gap-1.5"
+            >
+              <Plus size={16} />
+              <span className="hidden sm:inline">Adicionar</span>
+            </Button>
           </div>
         </div>
 
@@ -344,16 +394,56 @@ export function SDRDetailPage({
           <SDRWeeklyComparisonChart metrics={displayMetrics || []} />
         )}
 
-        {/* Data Table */}
+        {/* Data Table with Edit/Delete actions */}
         {isLoadingMetrics ? (
           <TableSkeleton rows={5} columns={8} />
         ) : (
           <SDRDataTable 
             metrics={displayMetrics || []} 
             showFunnelColumn={!selectedFunnel && hasFunnels}
+            onEditMetric={handleEditMetric}
+            onDeleteMetric={handleDeleteMetric}
           />
         )}
       </div>
+
+      {/* Add Metrics Dialog */}
+      <SDRMetricsDialog
+        open={showMetricsDialog}
+        onOpenChange={setShowMetricsDialog}
+        sdrType={sdr?.type || 'sdr'}
+        defaultSdrId={sdrId}
+      />
+
+      {/* Edit Metrics Dialog */}
+      <SDRMetricsDialog
+        open={!!editingMetric}
+        onOpenChange={handleCloseEditDialog}
+        sdrType={sdr?.type || 'sdr'}
+        defaultSdrId={sdrId}
+        editingMetric={editingMetric}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingMetricId} onOpenChange={(open) => !open && setDeletingMetricId(null)}>
+        <AlertDialogContent className="bg-background border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Métrica</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta métrica? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMetric.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PullToRefresh>
   );
 }

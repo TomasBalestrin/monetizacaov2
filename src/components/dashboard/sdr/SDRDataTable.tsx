@@ -1,7 +1,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TableIcon } from 'lucide-react';
+import { TableIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -10,12 +10,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import type { SDRMetric } from '@/hooks/useSdrMetrics';
 import { cn } from '@/lib/utils';
 
 interface SDRDataTableProps {
   metrics: SDRMetric[];
   showFunnelColumn?: boolean;
+  onEditMetric?: (metric: SDRMetric) => void;
+  onDeleteMetric?: (metricId: string) => void;
 }
 
 function getPercentageColor(value: number): string {
@@ -30,7 +39,14 @@ function getPercentageBg(value: number): string {
   return 'bg-red-500/10';
 }
 
-export function SDRDataTable({ metrics, showFunnelColumn = false }: SDRDataTableProps) {
+export function SDRDataTable({ 
+  metrics, 
+  showFunnelColumn = false,
+  onEditMetric,
+  onDeleteMetric,
+}: SDRDataTableProps) {
+  const hasActions = onEditMetric || onDeleteMetric;
+
   if (metrics.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-32 bg-card rounded-xl border border-border gap-2">
@@ -69,6 +85,9 @@ export function SDRDataTable({ metrics, showFunnelColumn = false }: SDRDataTable
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Comp.</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Vendas</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Conv.</TableHead>
+              {hasActions && (
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground w-[50px]"></TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -136,6 +155,34 @@ export function SDRDataTable({ metrics, showFunnelColumn = false }: SDRDataTable
                       {conversionRate.toFixed(1)}%
                     </span>
                   </TableCell>
+                  {hasActions && (
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-popover border-border">
+                          {onEditMetric && (
+                            <DropdownMenuItem onClick={() => onEditMetric(metric)} className="cursor-pointer">
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          {onDeleteMetric && (
+                            <DropdownMenuItem 
+                              onClick={() => onDeleteMetric(metric.id)} 
+                              className="cursor-pointer text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

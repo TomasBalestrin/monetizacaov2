@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,7 +11,8 @@ import {
   UserCheck, 
   ShoppingCart,
   Clock,
-  Zap
+  Zap,
+  Filter
 } from 'lucide-react';
 import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useSDRs, type SDRMetric } from '@/hooks/useSdrMetrics';
+import { useSDRs, useSDRFunnels, type SDRMetric } from '@/hooks/useSdrMetrics';
 
 const sdrMetricsSchema = z.object({
   sdr_id: z.string().min(1, 'Selecione um SDR'),
@@ -100,7 +101,7 @@ export function SDRMetricsForm({
     defaultValues: {
       sdr_id: defaultMetric?.sdr_id || defaultSdrId || '',
       date: defaultMetric ? parseDateString(defaultMetric.date) : new Date(),
-      funnel: defaultMetric?.funnel || '',
+      funnel: defaultMetric?.funnel || 'none',
       activated: defaultMetric?.activated ?? 0,
       scheduled: defaultMetric?.scheduled ?? 0,
       scheduled_same_day: defaultMetric?.scheduled_same_day ?? 0,
@@ -109,13 +110,31 @@ export function SDRMetricsForm({
     },
   });
 
+  // Watch the selected SDR to fetch its funnels
+  const selectedSdrId = form.watch('sdr_id');
+  const { data: sdrFunnels, isLoading: isLoadingFunnels } = useSDRFunnels(selectedSdrId);
+
+  // Reset funnel when SDR changes (unless it's initial load with defaultMetric)
+  useEffect(() => {
+    if (selectedSdrId && !defaultMetric) {
+      form.setValue('funnel', 'none');
+    }
+  }, [selectedSdrId, form, defaultMetric]);
+
   const handleSubmit = async (values: SDRMetricsFormValues) => {
-    await onSubmit(values);
+    // Convert "none" to empty string for submission
+    const submissionValues = {
+      ...values,
+      funnel: values.funnel === 'none' ? '' : values.funnel,
+    };
+    await onSubmit(submissionValues);
   };
 
   const setQuickDate = (date: Date) => {
     form.setValue('date', date);
   };
+
+  const hasFunnels = sdrFunnels && sdrFunnels.length > 0;
 
   return (
     <Form {...form}>
@@ -220,22 +239,50 @@ export function SDRMetricsForm({
           )}
         />
 
-        {/* Funnel (optional) - Smaller, secondary styling */}
+        {/* Funnel Selector - Dynamic based on selected SDR */}
         <FormField
           control={form.control}
           name="funnel"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-xs font-medium text-muted-foreground">
-                Funil <span className="text-muted-foreground/50">(opcional)</span>
+              <FormLabel className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Filter className="h-3.5 w-3.5" />
+                Funil
               </FormLabel>
-              <FormControl>
-                <Input 
-                  placeholder="Ex: Funil Principal" 
-                  className="h-10 bg-card border-border/50 hover:border-primary/50 focus:border-primary transition-colors"
-                  {...field} 
-                />
-              </FormControl>
+              <Select 
+                onValueChange={field.onChange} 
+                value={field.value || 'none'}
+                disabled={!selectedSdrId || isLoadingFunnels}
+              >
+                <FormControl>
+                  <SelectTrigger className="h-10 bg-card border-border/50 hover:border-primary/50 transition-colors">
+                    <SelectValue 
+                      placeholder={
+                        !selectedSdrId 
+                          ? "Selecione um SDR primeiro" 
+                          : isLoadingFunnels 
+                            ? "Carregando funis..." 
+                            : "Selecione o funil"
+                      } 
+                    />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent className="bg-popover border-border">
+                  <SelectItem value="none" className="cursor-pointer">
+                    <span className="text-muted-foreground">Nenhum</span>
+                  </SelectItem>
+                  {hasFunnels && sdrFunnels.map((funnel) => (
+                    <SelectItem key={funnel} value={funnel} className="cursor-pointer">
+                      {funnel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedSdrId && !isLoadingFunnels && !hasFunnels && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Nenhum funil cadastrado para este SDR
+                </p>
+              )}
               <FormMessage />
             </FormItem>
           )}
