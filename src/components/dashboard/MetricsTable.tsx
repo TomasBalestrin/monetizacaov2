@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
+import { parseDateString } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { Edit, Trash2, MoreHorizontal } from 'lucide-react';
 
@@ -153,9 +154,9 @@ export function MetricsTable() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(metric.period_start), 'dd/MM', { locale: ptBR })}
+                        {format(parseDateString(metric.period_start), 'dd/MM', { locale: ptBR })}
                         {' - '}
-                        {format(new Date(metric.period_end), 'dd/MM/yy', { locale: ptBR })}
+                        {format(parseDateString(metric.period_end), 'dd/MM/yy', { locale: ptBR })}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {metric.calls}

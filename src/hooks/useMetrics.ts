@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { calculateTrend } from '@/lib/workingDays';
+import { parseDateString } from '@/lib/utils';
 export interface Squad {
   id: string;
   name: string;
@@ -172,7 +173,7 @@ export function useSquadMetrics(periodStart?: string, periodEnd?: string) {
   const { data: metrics, isLoading, error } = useMetrics(periodStart, periodEnd);
 
   // Data de referência para cálculo da tendência
-  const referenceDate = periodStart ? new Date(periodStart) : new Date();
+  const referenceDate = periodStart ? parseDateString(periodStart) : new Date();
 
   const squadMetrics: SquadMetrics[] = squads?.map(squad => {
     const squadCloserMetrics = metrics?.filter(m => m.closer?.squad_id === squad.id) || [];
@@ -282,7 +283,7 @@ export function useTotalMetrics(periodStart?: string, periodEnd?: string) {
   const { squadMetrics, isLoading, error } = useSquadMetrics(periodStart, periodEnd);
 
   // Data de referência para cálculo da tendência total
-  const referenceDate = periodStart ? new Date(periodStart) : new Date();
+  const referenceDate = periodStart ? parseDateString(periodStart) : new Date();
 
   const totals = squadMetrics.reduce(
     (acc, sm) => ({

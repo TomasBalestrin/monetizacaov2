@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, parseISO, subDays } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   CalendarIcon, 
@@ -14,7 +14,7 @@ import {
   ChevronDown,
   User
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -93,8 +93,8 @@ function MetricInput({ icon: Icon, label, iconBgColor, iconColor, children }: Me
 }
 
 function detectPeriodType(startDate: string, endDate: string): PeriodType {
-  const start = parseISO(startDate);
-  const end = parseISO(endDate);
+  const start = parseDateString(startDate);
+  const end = parseDateString(endDate);
   const daysDiff = differenceInDays(end, start);
   
   if (daysDiff === 0) return 'day';
@@ -189,7 +189,7 @@ export function SquadMetricsForm({
     defaultValues: {
       period_type: initialPeriodType,
       closer_id: defaultMetric?.closer_id || defaultCloserId || '',
-      selected_date: defaultMetric ? parseISO(defaultMetric.period_start) : (selectedMonth || new Date()),
+      selected_date: defaultMetric ? parseDateString(defaultMetric.period_start) : (selectedMonth || new Date()),
       calls: defaultMetric?.calls ?? 0,
       sales: defaultMetric?.sales ?? 0,
       revenue: defaultMetric?.revenue ?? 0,
@@ -208,7 +208,7 @@ export function SquadMetricsForm({
       form.reset({
         period_type: detectPeriodType(defaultMetric.period_start, defaultMetric.period_end),
         closer_id: defaultMetric.closer_id,
-        selected_date: parseISO(defaultMetric.period_start),
+        selected_date: parseDateString(defaultMetric.period_start),
         calls: defaultMetric.calls,
         sales: defaultMetric.sales,
         revenue: defaultMetric.revenue,

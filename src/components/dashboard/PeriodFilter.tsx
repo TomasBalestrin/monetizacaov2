@@ -9,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, parseDateString } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
 
 interface PeriodFilterProps {
@@ -29,8 +29,8 @@ export function PeriodFilter({ periodStart, periodEnd, onPeriodChange }: PeriodF
   useEffect(() => {
     if (isOpen && periodStart && periodEnd) {
       setDateRange({
-        from: new Date(periodStart),
-        to: new Date(periodEnd),
+        from: parseDateString(periodStart),
+        to: parseDateString(periodEnd),
       });
     }
   }, [isOpen, periodStart, periodEnd]);
@@ -86,8 +86,8 @@ export function PeriodFilter({ periodStart, periodEnd, onPeriodChange }: PeriodF
   const getDisplayLabel = () => {
     if (!periodStart && !periodEnd) return 'Selecionar período';
     if (periodStart && periodEnd) {
-      const start = new Date(periodStart);
-      const end = new Date(periodEnd);
+      const start = parseDateString(periodStart);
+      const end = parseDateString(periodEnd);
       return `${format(start, 'dd/MM', { locale: ptBR })} - ${format(end, 'dd/MM', { locale: ptBR })}`;
     }
     return 'Período';

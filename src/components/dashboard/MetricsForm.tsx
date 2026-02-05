@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -64,10 +64,10 @@ export function MetricsForm({ defaultValues, onSubmit, isLoading }: MetricsFormP
     defaultValues: {
       closer_id: defaultValues?.closer_id || '',
       period_start: defaultValues?.period_start 
-        ? new Date(defaultValues.period_start) 
+        ? parseDateString(defaultValues.period_start) 
         : undefined,
       period_end: defaultValues?.period_end 
-        ? new Date(defaultValues.period_end) 
+        ? parseDateString(defaultValues.period_end) 
         : undefined,
       calls: defaultValues?.calls || 0,
       sales: defaultValues?.sales || 0,

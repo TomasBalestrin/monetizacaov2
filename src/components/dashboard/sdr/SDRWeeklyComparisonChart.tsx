@@ -10,11 +10,11 @@ import {
   Legend,
   LabelList,
 } from 'recharts';
-import { format, startOfWeek, parseISO } from 'date-fns';
+import { format, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
 import type { SDRMetric } from '@/hooks/useSdrMetrics';
-import { cn } from '@/lib/utils';
+import { cn, parseDateString } from '@/lib/utils';
 
 interface SDRWeeklyComparisonChartProps {
   metrics: SDRMetric[];
@@ -44,7 +44,7 @@ function groupMetricsByWeek(metrics: SDRMetric[]): WeeklyData[] {
   const weeklyMap = new Map<string, WeeklyData>();
 
   for (const m of metrics) {
-    const date = parseISO(m.date);
+    const date = parseDateString(m.date);
     const weekStart = startOfWeek(date, { weekStartsOn: 1 });
     const weekKey = format(weekStart, 'yyyy-MM-dd');
     const weekLabel = format(weekStart, "'Sem' dd/MM", { locale: ptBR });
