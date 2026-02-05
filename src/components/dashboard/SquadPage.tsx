@@ -105,6 +105,7 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
         open={isMetricsDialogOpen}
         onOpenChange={setIsMetricsDialogOpen}
         squadSlug={squadSlug}
+        selectedMonth={selectedMonth}
       />
 
       {/* Squad-specific sheets configuration */}

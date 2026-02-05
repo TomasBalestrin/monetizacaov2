@@ -63,6 +63,7 @@ interface SquadMetricsFormProps {
   squadId: string;
   defaultCloserId?: string;
   defaultMetric?: CloserMetricRecord;
+  selectedMonth?: Date;
   onSubmit: (values: SquadMetricsFormValues, period: { start: Date; end: Date }) => Promise<void>;
   isLoading?: boolean;
   submitLabel?: string;
@@ -164,6 +165,7 @@ export function SquadMetricsForm({
   squadId, 
   defaultCloserId, 
   defaultMetric,
+  selectedMonth,
   onSubmit, 
   isLoading,
   submitLabel = 'Adicionar Métrica'
@@ -187,7 +189,7 @@ export function SquadMetricsForm({
     defaultValues: {
       period_type: initialPeriodType,
       closer_id: defaultMetric?.closer_id || defaultCloserId || '',
-      selected_date: defaultMetric ? parseISO(defaultMetric.period_start) : new Date(),
+      selected_date: defaultMetric ? parseISO(defaultMetric.period_start) : (selectedMonth || new Date()),
       calls: defaultMetric?.calls ?? 0,
       sales: defaultMetric?.sales ?? 0,
       revenue: defaultMetric?.revenue ?? 0,

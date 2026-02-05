@@ -16,6 +16,7 @@ interface SquadMetricsDialogProps {
   squadSlug: string;
   defaultCloserId?: string;
   metric?: CloserMetricRecord;
+  selectedMonth?: Date;
 }
 
 export function SquadMetricsDialog({ 
@@ -23,7 +24,8 @@ export function SquadMetricsDialog({
   onOpenChange, 
   squadSlug,
   defaultCloserId,
-  metric 
+  metric,
+  selectedMonth
 }: SquadMetricsDialogProps) {
   const createMetric = useCreateMetric();
   const updateMetric = useUpdateMetric();
@@ -97,6 +99,7 @@ export function SquadMetricsDialog({
           squadId={squad.id}
           defaultCloserId={defaultCloserId}
           defaultMetric={metric}
+          selectedMonth={selectedMonth}
           onSubmit={handleSubmit}
           isLoading={isPending}
           submitLabel={isEditing ? 'Atualizar Métrica' : 'Adicionar Métrica'}
