@@ -91,6 +91,9 @@ export function SDRMetricsForm({
   submitLabel = 'Adicionar Métrica',
 }: SDRMetricsFormProps) {
   const { data: sdrs } = useSDRs(sdrType);
+  
+  // Filter out SDRs with empty or invalid IDs
+  const validSdrs = sdrs?.filter(sdr => sdr.id && sdr.id.trim() !== '') || [];
 
   const form = useForm<SDRMetricsFormValues>({
     resolver: zodResolver(sdrMetricsSchema),
@@ -126,14 +129,14 @@ export function SDRMetricsForm({
               <FormLabel className="text-xs font-medium text-muted-foreground">
                 {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}
               </FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger className="h-11 bg-card border-border/50 hover:border-primary/50 transition-colors">
                     <SelectValue placeholder={`Selecione um ${sdrType === 'sdr' ? 'SDR' : 'Social Selling'}`} />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent className="bg-popover border-border">
-                  {sdrs?.map((sdr) => (
+                  {validSdrs.map((sdr) => (
                     <SelectItem key={sdr.id} value={sdr.id} className="cursor-pointer">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
