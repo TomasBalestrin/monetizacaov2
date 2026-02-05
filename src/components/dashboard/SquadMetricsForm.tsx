@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PeriodTypeSelector, type PeriodType } from './PeriodTypeSelector';
+import { MonthSelector } from './MonthSelector';
 import { useClosers, type CloserMetricRecord } from '@/hooks/useMetrics';
 
 const squadMetricsSchema = z.object({
@@ -346,65 +347,81 @@ export function SquadMetricsForm({
                   <div className="p-1.5 rounded-md bg-amber-500/20">
                     <CalendarIcon className="h-3.5 w-3.5 text-amber-400" />
                   </div>
-                  <span className="text-xs font-medium text-muted-foreground">Data</span>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {periodType === 'month' ? 'Mês' : 'Data'}
+                  </span>
                 </div>
-                <div className="flex gap-1.5">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
-                    onClick={() => setQuickDate('today')}
-                  >
-                    Hoje
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
-                    onClick={() => setQuickDate('yesterday')}
-                  >
-                    Ontem
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
-                    onClick={() => setQuickDate('thisWeek')}
-                  >
-                    Semana
-                  </Button>
-                </div>
-              </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full pl-3 text-left font-normal h-11 bg-muted/30 border-border/50',
-                        !field.value && 'text-muted-foreground'
-                      )}
+                {periodType !== 'month' && (
+                  <div className="flex gap-1.5">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
+                      onClick={() => setQuickDate('today')}
                     >
-                      {formatPeriodDisplay(field.value, periodType)}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      Hoje
                     </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    disabled={(date) => date > new Date()}
-                    initialFocus
-                    locale={ptBR}
-                    className={cn('p-3 pointer-events-auto')}
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
+                      onClick={() => setQuickDate('yesterday')}
+                    >
+                      Ontem
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
+                      onClick={() => setQuickDate('thisWeek')}
+                    >
+                      Semana
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Month Selector for monthly periods */}
+              {periodType === 'month' ? (
+                <div className="flex justify-center py-2 px-3 rounded-lg bg-muted/30 border border-border/50">
+                  <MonthSelector
+                    selectedMonth={field.value || new Date()}
+                    onMonthChange={(date) => field.onChange(date)}
                   />
-                </PopoverContent>
-              </Popover>
+                </div>
+              ) : (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full pl-3 text-left font-normal h-11 bg-muted/30 border-border/50',
+                          !field.value && 'text-muted-foreground'
+                        )}
+                      >
+                        {formatPeriodDisplay(field.value, periodType)}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      disabled={(date) => date > new Date()}
+                      initialFocus
+                      locale={ptBR}
+                      className={cn('p-3 pointer-events-auto')}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              
               {selectedDate && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/20 border border-border/30">
                   <span className="text-xs text-muted-foreground">Período:</span>
