@@ -1,48 +1,90 @@
 
-# Correção da Tela Branca ao Adicionar Usuário
+# Correção: Data Salva um Dia Antes do Selecionado
 
 ## Problema Identificado
 
-O diálogo de criação de usuário (`CreateUserDialog.tsx`) está causando um crash do React porque os componentes `<SelectItem />` para vincular Closer e SDR possuem `value=""` (string vazia), o que é proibido pelo Radix UI Select.
+Ao adicionar uma nova métrica, a data está sendo registrada um dia antes da data selecionada. Isso ocorre porque o `format()` do date-fns pode converter a data para UTC, causando um deslocamento de fuso horário.
 
-**Linhas problemáticas:**
-- Linha 210: `<SelectItem value="">Nenhum</SelectItem>`
-- Linha 236: `<SelectItem value="">Nenhum</SelectItem>`
+Por exemplo, se o usuário seleciona **05/02/2026** às 22h no Brasil (UTC-3), a conversão para UTC resulta em **06/02/2026 01:00**, e depois o `format('yyyy-MM-dd')` pode retornar a data incorreta dependendo do contexto.
 
-Este é o mesmo erro que foi corrigido anteriormente no `SDRMetricsForm.tsx`.
+## Arquivos Afetados
 
-## Solução
+1. `src/components/dashboard/sdr/SDRMetricsDialog.tsx` - Linha 34
+2. `src/components/dashboard/SquadMetricsDialog.tsx` - Linhas 43-44
+3. `src/components/dashboard/MetricsDialog.tsx` - Linhas 27-28
+4. `src/components/dashboard/sdr/SDRMetricsForm.tsx` - Linha 102 (parsing de data ao editar)
 
-1. **Substituir valores vazios por um valor placeholder válido** (ex: "none")
-2. **Filtrar closers e SDRs inválidos** (sem ID válido)
-3. **Ajustar a lógica de envio** para tratar "none" como undefined
+## Solucao
 
-## Arquivos a Modificar
+Criar uma funcao utilitaria para formatar datas no formato local sem conversao UTC.
 
-- `src/components/dashboard/CreateUserDialog.tsx`
+### 1. Criar funcao utilitaria em `src/lib/utils.ts`
 
-## Alterações Técnicas
-
-```tsx
-// 1. Adicionar filtragem de dados válidos
-const validClosers = closers?.filter(c => c.id && c.id.trim() !== '') || [];
-const validSdrs = sdrs?.filter(s => s.id && s.id.trim() !== '') || [];
-
-// 2. Mudar defaultValues para usar "none" ao invés de ""
-defaultValues: {
-  // ...
-  linked_closer_id: 'none',
-  linked_sdr_id: 'none',
+```typescript
+// Formata uma data para string 'yyyy-MM-dd' usando o timezone local
+export function formatDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-// 3. Ajustar onSubmit para converter "none" para undefined
-linked_closer_id: data.linked_closer_id === 'none' ? undefined : data.linked_closer_id,
-linked_sdr_id: data.linked_sdr_id === 'none' ? undefined : data.linked_sdr_id,
+// Faz parsing de string 'yyyy-MM-dd' para Date no timezone local
+export function parseDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+```
 
-// 4. Alterar SelectItems para usar "none"
-<SelectItem value="none">Nenhum</SelectItem>
+### 2. Atualizar SDRMetricsDialog.tsx
+
+```diff
+- import { format } from 'date-fns';
++ import { formatDateString } from '@/lib/utils';
+
+// Linha 34
+- date: format(values.date, 'yyyy-MM-dd'),
++ date: formatDateString(values.date),
+```
+
+### 3. Atualizar SquadMetricsDialog.tsx
+
+```diff
+- import { format } from 'date-fns';
++ import { formatDateString } from '@/lib/utils';
+
+// Linhas 43-44
+- period_start: format(period.start, 'yyyy-MM-dd'),
+- period_end: format(period.end, 'yyyy-MM-dd'),
++ period_start: formatDateString(period.start),
++ period_end: formatDateString(period.end),
+```
+
+### 4. Atualizar MetricsDialog.tsx
+
+```diff
+- import { format } from 'date-fns';
++ import { formatDateString } from '@/lib/utils';
+
+// Linhas 27-28
+- period_start: format(values.period_start, 'yyyy-MM-dd'),
+- period_end: format(values.period_end, 'yyyy-MM-dd'),
++ period_start: formatDateString(values.period_start),
++ period_end: formatDateString(values.period_end),
+```
+
+### 5. Atualizar SDRMetricsForm.tsx (parsing ao editar)
+
+```diff
++ import { parseDateString } from '@/lib/utils';
+
+// Linha 102
+- date: defaultMetric ? new Date(defaultMetric.date) : new Date(),
++ date: defaultMetric ? parseDateString(defaultMetric.date) : new Date(),
 ```
 
 ## Resultado Esperado
 
-O diálogo de criação de usuário abrirá corretamente e permitirá criar usuários com ou sem vínculos a entidades.
+- A data selecionada pelo usuario sera salva exatamente como foi escolhida
+- Nao havera mais deslocamento de um dia devido a conversao UTC
+- O parsing de datas ao editar tambem usara o timezone local corretamente
