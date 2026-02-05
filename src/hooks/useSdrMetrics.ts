@@ -287,6 +287,9 @@ export function useCreateSDRMetric() {
       sales: number;
       source: string;
     }) => {
+      // Get the current user's ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Calculate rates
       const scheduled_rate = metric.activated > 0 
         ? (metric.scheduled / metric.activated) * 100 
@@ -305,6 +308,7 @@ export function useCreateSDRMetric() {
           scheduled_rate,
           attendance_rate,
           conversion_rate,
+          created_by: user?.id,
         })
         .select()
         .single();

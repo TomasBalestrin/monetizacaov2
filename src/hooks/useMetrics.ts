@@ -326,6 +326,7 @@ export interface CreateMetricPayload {
   cancellations?: number;
   cancellation_value?: number;
   cancellation_entries?: number;
+  created_by?: string;
 }
 
 export function useCreateMetric() {
@@ -334,9 +335,15 @@ export function useCreateMetric() {
 
   return useMutation({
     mutationFn: async (metric: CreateMetricPayload) => {
+      // Get the current user's ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error } = await supabase
         .from('metrics')
-        .insert(metric)
+        .insert({
+          ...metric,
+          created_by: user?.id,
+        })
         .select()
         .single();
       

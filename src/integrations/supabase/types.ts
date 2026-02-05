@@ -93,6 +93,7 @@ export type Database = {
           cancellations: number | null
           closer_id: string
           created_at: string
+          created_by: string | null
           entries: number
           entries_trend: number | null
           id: string
@@ -111,6 +112,7 @@ export type Database = {
           cancellations?: number | null
           closer_id: string
           created_at?: string
+          created_by?: string | null
           entries?: number
           entries_trend?: number | null
           id?: string
@@ -129,6 +131,7 @@ export type Database = {
           cancellations?: number | null
           closer_id?: string
           created_at?: string
+          created_by?: string | null
           entries?: number
           entries_trend?: number | null
           id?: string
@@ -199,6 +202,7 @@ export type Database = {
           attended: number
           conversion_rate: number
           created_at: string
+          created_by: string | null
           date: string
           funnel: string | null
           id: string
@@ -216,6 +220,7 @@ export type Database = {
           attended?: number
           conversion_rate?: number
           created_at?: string
+          created_by?: string | null
           date: string
           funnel?: string | null
           id?: string
@@ -233,6 +238,7 @@ export type Database = {
           attended?: number
           conversion_rate?: number
           created_at?: string
+          created_by?: string | null
           date?: string
           funnel?: string | null
           id?: string
