@@ -1,96 +1,48 @@
 
-# Plano: Sincronizar Mês Selecionado com Formulário de Métricas
+# Correção da Tela Branca ao Adicionar Usuário
 
 ## Problema Identificado
 
-Quando o usuário está visualizando dados de **Janeiro 2026** no dashboard e clica em "Adicionar Métrica", o formulário abre com a data de **Fevereiro 2026** (data atual), obrigando o usuário a navegar manualmente para o mês correto.
+O diálogo de criação de usuário (`CreateUserDialog.tsx`) está causando um crash do React porque os componentes `<SelectItem />` para vincular Closer e SDR possuem `value=""` (string vazia), o que é proibido pelo Radix UI Select.
 
-## Fluxo Atual
+**Linhas problemáticas:**
+- Linha 210: `<SelectItem value="">Nenhum</SelectItem>`
+- Linha 236: `<SelectItem value="">Nenhum</SelectItem>`
 
-```text
-Dashboard (Janeiro 2026 selecionado)
-        ↓
-  Clica "Adicionar Métrica"
-        ↓
-Formulário abre com Fevereiro 2026 ❌
-```
-
-## Fluxo Desejado
-
-```text
-Dashboard (Janeiro 2026 selecionado)
-        ↓
-  Clica "Adicionar Métrica"
-        ↓
-Formulário abre com Janeiro 2026 ✓
-```
+Este é o mesmo erro que foi corrigido anteriormente no `SDRMetricsForm.tsx`.
 
 ## Solução
 
-Passar o `selectedMonth` do `SquadPage` para o `SquadMetricsDialog` e depois para o `SquadMetricsForm`, para que o formulário inicialize com o mês correto.
+1. **Substituir valores vazios por um valor placeholder válido** (ex: "none")
+2. **Filtrar closers e SDRs inválidos** (sem ID válido)
+3. **Ajustar a lógica de envio** para tratar "none" como undefined
 
 ## Arquivos a Modificar
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/dashboard/SquadPage.tsx` | Passar `selectedMonth` para `SquadMetricsDialog` |
-| `src/components/dashboard/SquadMetricsDialog.tsx` | Receber e passar `selectedMonth` para `SquadMetricsForm` |
-| `src/components/dashboard/SquadMetricsForm.tsx` | Usar `selectedMonth` como valor inicial do `selected_date` |
+- `src/components/dashboard/CreateUserDialog.tsx`
 
-## Seção Técnica
-
-### 1. SquadPage.tsx
+## Alterações Técnicas
 
 ```tsx
-<SquadMetricsDialog
-  open={isMetricsDialogOpen}
-  onOpenChange={setIsMetricsDialogOpen}
-  squadSlug={squadSlug}
-  selectedMonth={selectedMonth}  // ← Adicionar
-/>
-```
+// 1. Adicionar filtragem de dados válidos
+const validClosers = closers?.filter(c => c.id && c.id.trim() !== '') || [];
+const validSdrs = sdrs?.filter(s => s.id && s.id.trim() !== '') || [];
 
-### 2. SquadMetricsDialog.tsx
-
-```tsx
-interface SquadMetricsDialogProps {
-  // ... props existentes
-  selectedMonth?: Date;  // ← Adicionar
+// 2. Mudar defaultValues para usar "none" ao invés de ""
+defaultValues: {
+  // ...
+  linked_closer_id: 'none',
+  linked_sdr_id: 'none',
 }
 
-// Passar para o form
-<SquadMetricsForm
-  squadId={squad.id}
-  defaultCloserId={defaultCloserId}
-  defaultMetric={metric}
-  selectedMonth={selectedMonth}  // ← Adicionar
-  onSubmit={handleSubmit}
-  isLoading={isPending}
-/>
+// 3. Ajustar onSubmit para converter "none" para undefined
+linked_closer_id: data.linked_closer_id === 'none' ? undefined : data.linked_closer_id,
+linked_sdr_id: data.linked_sdr_id === 'none' ? undefined : data.linked_sdr_id,
+
+// 4. Alterar SelectItems para usar "none"
+<SelectItem value="none">Nenhum</SelectItem>
 ```
 
-### 3. SquadMetricsForm.tsx
+## Resultado Esperado
 
-```tsx
-interface SquadMetricsFormProps {
-  // ... props existentes
-  selectedMonth?: Date;  // ← Adicionar
-}
-
-// Usar no defaultValues
-const form = useForm<SquadMetricsFormValues>({
-  defaultValues: {
-    selected_date: defaultMetric 
-      ? new Date(defaultMetric.period_start) 
-      : selectedMonth || new Date(),  // ← Usar selectedMonth
-    // ...
-  },
-});
-```
-
-## Benefícios
-
-1. **Consistência de dados**: O formulário reflete o contexto do dashboard
-2. **Menos cliques**: Usuário não precisa navegar para o mês correto
-3. **Menos erros**: Reduz risco de adicionar métrica no mês errado
-4. **Experiência fluida**: O sistema "entende" o contexto do usuário
+O diálogo de criação de usuário abrirá corretamente e permitirá criar usuários com ou sem vínculos a entidades.
