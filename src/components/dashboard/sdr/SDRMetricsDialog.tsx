@@ -39,7 +39,7 @@ export function SDRMetricsDialog({
         await updateMetric.mutateAsync({
           id: editingMetric.id,
           date: formatDateString(values.date),
-          funnel: values.funnel || null,
+          funnel: values.funnel || '',
           activated: values.activated,
           scheduled: values.scheduled,
           scheduled_same_day: values.scheduled_same_day,
@@ -52,7 +52,7 @@ export function SDRMetricsDialog({
         await createMetric.mutateAsync({
           sdr_id: values.sdr_id,
           date: formatDateString(values.date),
-          funnel: values.funnel || null,
+          funnel: values.funnel || '',
           activated: values.activated,
           scheduled: values.scheduled,
           scheduled_same_day: values.scheduled_same_day,

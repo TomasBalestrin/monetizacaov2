@@ -112,7 +112,7 @@ export function useSDRFunnels(sdrId?: string) {
         .from('sdr_metrics')
         .select('funnel')
         .eq('sdr_id', sdrId)
-        .not('funnel', 'is', null);
+        .neq('funnel', '');
 
       if (error) throw error;
 
@@ -199,7 +199,7 @@ export function useSDRTotalMetrics(
         .from('sdr_metrics')
         .select('*')
         .in('sdr_id', sdrIds)
-        .not('funnel', 'is', null);
+        .neq('funnel', '');
 
       if (periodStart) {
         query = query.gte('date', periodStart);
@@ -244,7 +244,7 @@ export function useSDRsWithMetrics(
         .from('sdr_metrics')
         .select('*')
         .in('sdr_id', sdrIds)
-        .not('funnel', 'is', null);
+        .neq('funnel', '');
 
       if (periodStart) {
         query = query.gte('date', periodStart);
@@ -303,12 +303,15 @@ export function useCreateSDRMetric() {
 
       const { data, error } = await supabase
         .from('sdr_metrics')
-        .insert({
+        .upsert({
           ...metric,
+          funnel: metric.funnel || '',
           scheduled_rate,
           attendance_rate,
           conversion_rate,
           created_by: user?.id,
+        }, {
+          onConflict: 'sdr_id,date,funnel',
         })
         .select()
         .single();
@@ -360,6 +363,10 @@ export function useUpdateSDRMetric() {
         calculatedRates.conversion_rate = updates.attended > 0 
           ? (updates.sales / updates.attended) * 100 
           : 0;
+      }
+
+      if (updates.funnel === null || updates.funnel === undefined) {
+        updates.funnel = '';
       }
 
       const { data, error } = await supabase

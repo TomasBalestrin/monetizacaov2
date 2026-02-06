@@ -204,7 +204,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           date: string
-          funnel: string | null
+          funnel: string
           id: string
           sales: number
           scheduled: number
@@ -222,7 +222,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date: string
-          funnel?: string | null
+          funnel?: string
           id?: string
           sales?: number
           scheduled?: number
@@ -240,7 +240,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date?: string
-          funnel?: string | null
+          funnel?: string
           id?: string
           sales?: number
           scheduled?: number
