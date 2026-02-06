@@ -1,82 +1,111 @@
 
-# Correção do Deslocamento de Data em Adições Manuais
+# Correção: Erro ao Salvar Métrica SDR
 
-## Problema Identificado
+## Problema
 
-As datas estão sendo deslocadas para um dia anterior devido ao uso de funções que interpretam strings de data como UTC:
+Quando o usuário tenta salvar uma métrica manual, o sistema faz um `INSERT` simples. Se já existe um registro para a mesma combinação (SDR + data + funil), o banco de dados rejeita com erro de violação de constraint única.
 
-1. **`parseISO()`** - Interpreta "2026-02-05" como `2026-02-05T00:00:00Z` (UTC)
-2. **`new Date(string)`** - Mesmo comportamento de interpretar como UTC
-
-Para usuários no Brasil (UTC-3), isso resulta em:
-- `2026-02-05T00:00:00Z` = `2026-02-04T21:00:00-03:00` (dia anterior)
-
-## Locais Afetados
-
-| Arquivo | Linha | Problema |
-|---------|-------|----------|
-| SquadMetricsForm.tsx | 96-97 | `parseISO()` em `detectPeriodType()` |
-| SquadMetricsForm.tsx | 192 | `parseISO()` no `defaultValues` |
-| SquadMetricsForm.tsx | 211 | `parseISO()` no `useEffect` de reset |
-| SDRWeeklyComparisonChart.tsx | 47 | `parseISO()` no agrupamento semanal |
-| CloserWeeklyComparisonChart.tsx | 47 | `parseISO()` no agrupamento semanal |
-| MetricsTable.tsx | 156-158 | `new Date()` na exibição |
-| MetricsForm.tsx | 67, 70 | `new Date()` no `defaultValues` |
-| PeriodFilter.tsx | 32-33, 89-90 | `new Date()` na exibição |
-| useMetrics.ts | 175, 285 | `new Date()` na referência |
+Além disso, quando o funil é "Nenhum", o valor salvo é `NULL`, e o PostgreSQL permite múltiplos NULLs na constraint única, gerando duplicatas.
 
 ## Solução
 
-Substituir todas as ocorrências de `parseISO()` e `new Date(string)` pela função `parseDateString()` que já existe no projeto e faz o parsing correto no timezone local.
+### 1. Usar UPSERT ao invés de INSERT
+
+Alterar o `useCreateSDRMetric` em `src/hooks/useSdrMetrics.ts` para usar `.upsert()` com `onConflict: 'sdr_id,date,funnel'`. Isso faz com que, se o registro já existir, ele seja sobrescrito automaticamente.
+
+### 2. Converter funil NULL para string vazia
+
+Alterar a constraint única para usar `COALESCE(funnel, '')` via um unique index funcional, OU garantir que o funil nunca seja NULL (usar string vazia '' ao invés de null). Isso previne duplicatas.
+
+### 3. Limpar duplicatas existentes
+
+Remover registros duplicados com funil NULL que já existem no banco.
+
+## Alteracoes Tecnicas
+
+### Arquivo: `src/hooks/useSdrMetrics.ts` - useCreateSDRMetric
+
+Trocar `.insert()` por `.upsert()` com `onConflict`:
 
 ```typescript
-// De (incorreto - interpreta como UTC):
-const date = parseISO(metric.period_start);
-const date = new Date(metric.period_start);
-
-// Para (correto - interpreta no timezone local):
-import { parseDateString } from '@/lib/utils';
-const date = parseDateString(metric.period_start);
+const { data, error } = await supabase
+  .from('sdr_metrics')
+  .upsert({
+    ...metric,
+    funnel: metric.funnel || '',  // Nunca salvar NULL
+    scheduled_rate,
+    attendance_rate,
+    conversion_rate,
+    created_by: user?.id,
+  }, {
+    onConflict: 'sdr_id,date,funnel',
+  })
+  .select()
+  .single();
 ```
 
-## Arquivos a Modificar
+### Arquivo: `src/hooks/useSdrMetrics.ts` - useUpdateSDRMetric
 
-1. **`src/components/dashboard/SquadMetricsForm.tsx`**
-   - Linha 5: Remover `parseISO` da importação de date-fns
-   - Linha 17: Adicionar `parseDateString` à importação de utils
-   - Linhas 96-97: Trocar `parseISO` por `parseDateString`
-   - Linha 192: Trocar `parseISO` por `parseDateString`
-   - Linha 211: Trocar `parseISO` por `parseDateString`
+Garantir que o funil nunca seja NULL no update tambem:
 
-2. **`src/components/dashboard/sdr/SDRWeeklyComparisonChart.tsx`**
-   - Linha 13: Remover `parseISO` da importação
-   - Adicionar importação de `parseDateString`
-   - Linha 47: Trocar `parseISO` por `parseDateString`
+```typescript
+if (updates.funnel === null || updates.funnel === undefined) {
+  updates.funnel = '';
+}
+```
 
-3. **`src/components/dashboard/closer/CloserWeeklyComparisonChart.tsx`**
-   - Linha 13: Remover `parseISO` da importação
-   - Adicionar importação de `parseDateString`
-   - Linha 47: Trocar `parseISO` por `parseDateString`
+### Arquivo: `src/components/dashboard/sdr/SDRMetricsDialog.tsx`
 
-4. **`src/components/dashboard/MetricsTable.tsx`**
-   - Adicionar importação de `parseDateString`
-   - Linhas 156-158: Trocar `new Date()` por `parseDateString()`
+Garantir que o funil enviado nunca seja null:
 
-5. **`src/components/dashboard/MetricsForm.tsx`**
-   - Adicionar importação de `parseDateString`
-   - Linhas 67, 70: Trocar `new Date()` por `parseDateString()`
+```typescript
+funnel: values.funnel || '',  // Trocar de || null para || ''
+```
 
-6. **`src/components/dashboard/PeriodFilter.tsx`**
-   - Adicionar importação de `parseDateString`
-   - Linhas 32-33, 89-90: Trocar `new Date()` por `parseDateString()`
+### Migracao de Banco de Dados
 
-7. **`src/hooks/useMetrics.ts`**
-   - Adicionar importação de `parseDateString`
-   - Linhas 175, 285: Trocar `new Date()` por `parseDateString()`
+1. Atualizar registros existentes com funil NULL para string vazia:
+```sql
+UPDATE sdr_metrics SET funnel = '' WHERE funnel IS NULL;
+```
+
+2. Remover duplicatas (manter apenas o mais recente):
+```sql
+DELETE FROM sdr_metrics a
+USING sdr_metrics b
+WHERE a.sdr_id = b.sdr_id
+  AND a.date = b.date
+  AND COALESCE(a.funnel, '') = COALESCE(b.funnel, '')
+  AND a.created_at < b.created_at;
+```
+
+3. Atualizar registros restantes com funil NULL:
+```sql
+UPDATE sdr_metrics SET funnel = '' WHERE funnel IS NULL;
+```
+
+4. Adicionar constraint NOT NULL com default:
+```sql
+ALTER TABLE sdr_metrics ALTER COLUMN funnel SET DEFAULT '';
+ALTER TABLE sdr_metrics ALTER COLUMN funnel SET NOT NULL;
+```
+
+### Arquivos que precisam garantir funil = '' ao invés de NULL
+
+- `src/hooks/useSdrMetrics.ts` (create e update mutations)
+- `src/components/dashboard/sdr/SDRMetricsDialog.tsx` (handleSubmit)
+- `supabase/functions/sync-sdr-sheets/index.ts` (se enviar funnel como null)
+
+### Queries de leitura que filtram por funil
+
+Atualizar os hooks que usam `.not('funnel', 'is', null)` para `.neq('funnel', '')`:
+- `useSDRFunnels` - filtrar funis nao vazios
+- `useSDRTotalMetrics` - metricas agregadas
+- `useSDRsWithMetrics` - SDRs com metricas
 
 ## Resultado Esperado
 
-Após as correções:
-- As datas selecionadas no formulário serão salvas exatamente como escolhidas
-- As datas exibidas nas tabelas e gráficos corresponderão às datas no banco de dados
-- O comportamento será consistente independente do timezone do usuário
+- Salvar uma metrica manual nunca gera erro, mesmo se ja existir um registro para a mesma combinacao
+- O registro existente e sobrescrito (upsert)
+- Nao ha mais duplicatas com funil vazio/null
+- As agregacoes funcionam corretamente sem contar duplicatas
