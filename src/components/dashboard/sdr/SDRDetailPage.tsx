@@ -94,7 +94,7 @@ function aggregateMetricsByDate(metrics: SDRMetric[]): SDRMetric[] {
     m.scheduled_rate = m.activated > 0 ? (m.scheduled / m.activated) * 100 : 0;
     m.attendance_rate = m.scheduled_same_day > 0 ? (m.attended / m.scheduled_same_day) * 100 : 0;
     m.conversion_rate = m.attended > 0 ? (m.sales / m.attended) * 100 : 0;
-    m.funnel = null; // Clear funnel since it's aggregated
+    m.funnel = ''; // Clear funnel since it's aggregated
   }
   
   return aggregated.sort((a, b) => a.date.localeCompare(b.date));
