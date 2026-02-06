@@ -155,6 +155,7 @@ export function SDRDetailPage({
 
   const Icon = sdr?.type === 'social_selling' ? Users : Phone;
   const hasFunnels = funnels && funnels.length > 1;
+  const isAggregatedView = !selectedFunnel && hasFunnels;
 
   // Swipe navigation between SDRs
   const handleNavigateToSDR = useCallback((id: string) => {
@@ -307,15 +308,16 @@ export function SDRDetailPage({
               onMonthChange={onMonthChange}
             />
 
-            {/* Add Metric Button */}
-            <Button
-              onClick={() => setShowMetricsDialog(true)}
-              size="sm"
-              className="gap-1.5"
-            >
-              <Plus size={16} />
-              <span className="hidden sm:inline">Adicionar</span>
-            </Button>
+            {!isAggregatedView && (
+              <Button
+                onClick={() => setShowMetricsDialog(true)}
+                size="sm"
+                className="gap-1.5"
+              >
+                <Plus size={16} />
+                <span className="hidden sm:inline">Adicionar</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -401,8 +403,8 @@ export function SDRDetailPage({
           <SDRDataTable 
             metrics={displayMetrics || []} 
             showFunnelColumn={!selectedFunnel && hasFunnels}
-            onEditMetric={handleEditMetric}
-            onDeleteMetric={handleDeleteMetric}
+            onEditMetric={isAggregatedView ? undefined : handleEditMetric}
+            onDeleteMetric={isAggregatedView ? undefined : handleDeleteMetric}
           />
         )}
       </div>
