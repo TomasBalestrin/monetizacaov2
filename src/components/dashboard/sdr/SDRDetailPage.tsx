@@ -2,6 +2,7 @@ import React, { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { format, startOfMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,6 +25,7 @@ import { SDRMetricsDialog } from './SDRMetricsDialog';
 import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/hooks/useSdrMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeSDRMetrics } from '@/hooks/useRealtimeMetrics';
+import { useGoals, getGoalTarget } from '@/hooks/useGoals';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
 
@@ -122,6 +124,7 @@ export function SDRDetailPage({
   
   
   const { periodStart, periodEnd } = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
+  const monthStr = useMemo(() => format(startOfMonth(selectedMonth), 'yyyy-MM-dd'), [selectedMonth]);
   
   const { data: sdrs } = useSDRs();
   const { data: funnels, isLoading: isLoadingFunnels } = useSDRFunnels(sdrId);
@@ -129,8 +132,9 @@ export function SDRDetailPage({
     sdrId,
     periodStart,
     periodEnd,
-    undefined // Always fetch all funnels, filter client-side for aggregation
+    undefined
   );
+  const { data: goals } = useGoals('sdr', sdrId, monthStr);
 
   const sdr = sdrs?.find((s) => s.id === sdrId);
   
@@ -340,12 +344,14 @@ export function SDRDetailPage({
                 value={aggregatedMetrics?.totalActivated || 0}
                 icon={Users}
                 size="large"
+                goalTarget={getGoalTarget(goals, 'activated')}
               />
               <SDRMetricCard
                 title="Agendados"
                 value={aggregatedMetrics?.totalScheduled || 0}
                 icon={Calendar}
                 size="large"
+                goalTarget={getGoalTarget(goals, 'scheduled')}
               />
               <SDRMetricCard
                 title="% Agendamento"
@@ -362,6 +368,7 @@ export function SDRDetailPage({
                 icon={ShoppingCart}
                 variant="highlight"
                 size="featured"
+                goalTarget={getGoalTarget(goals, 'sales')}
               />
             </div>
             
@@ -376,6 +383,7 @@ export function SDRDetailPage({
                 title="Realizados"
                 value={aggregatedMetrics?.totalAttended || 0}
                 icon={UserCheck}
+                goalTarget={getGoalTarget(goals, 'attended')}
               />
               <SDRMetricCard
                 title="% Comparec."

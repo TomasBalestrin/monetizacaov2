@@ -2,6 +2,7 @@ import React, { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Phone, Target, DollarSign, TrendingUp, ChevronLeft, ChevronRight, XCircle, Plus } from 'lucide-react';
+import { format, startOfMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -23,6 +24,7 @@ import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
 import { useClosers, useCloserMetrics, useDeleteMetric, type CloserMetricRecord } from '@/hooks/useMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
+import { useGoals, getGoalTarget } from '@/hooks/useGoals';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
 
@@ -113,6 +115,7 @@ export function CloserDetailPage({
   
   // Calculate period from selected month
   const { periodStart, periodEnd } = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
+  const monthStr = useMemo(() => format(startOfMonth(selectedMonth), 'yyyy-MM-dd'), [selectedMonth]);
 
   const { data: closers } = useClosers();
   const { data: metrics, isLoading: isLoadingMetrics } = useCloserMetrics(
@@ -120,6 +123,7 @@ export function CloserDetailPage({
     periodStart,
     periodEnd
   );
+  const { data: goals } = useGoals('closer', closerId, monthStr);
 
   // Filter closers by current squad
   const squadClosers = useMemo(() => {
@@ -321,6 +325,7 @@ export function CloserDetailPage({
                 value={aggregatedMetrics?.totalCalls || 0}
                 icon={Phone}
                 large
+                goalTarget={getGoalTarget(goals, 'calls')}
               />
               <MetricCard
                 title="Número de Vendas"
@@ -328,6 +333,7 @@ export function CloserDetailPage({
                 icon={Target}
                 variant="success"
                 large
+                goalTarget={getGoalTarget(goals, 'sales')}
               />
               <MetricCard
                 title="Taxa de Conversão"
@@ -343,6 +349,7 @@ export function CloserDetailPage({
                 icon={DollarSign}
                 isCurrency
                 large
+                goalTarget={getGoalTarget(goals, 'revenue')}
               />
             </div>
             
@@ -359,6 +366,7 @@ export function CloserDetailPage({
                 value={aggregatedMetrics?.totalEntries || 0}
                 icon={DollarSign}
                 isCurrency
+                goalTarget={getGoalTarget(goals, 'entries')}
               />
               <MetricCard
                 title="Tendência Entradas"

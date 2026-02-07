@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { GoalProgress } from '@/components/dashboard/GoalProgress';
 import { LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface SDRMetricCardProps {
@@ -14,6 +15,7 @@ interface SDRMetricCardProps {
   trend?: number | null;
   trendLabel?: string;
   className?: string;
+  goalTarget?: number | null;
 }
 
 export function SDRMetricCard({
@@ -27,6 +29,7 @@ export function SDRMetricCard({
   trend,
   trendLabel = 'vs semana anterior',
   className,
+  goalTarget,
 }: SDRMetricCardProps) {
   const displayValue = isPercentage
     ? `${value.toFixed(1)}%`
@@ -124,6 +127,10 @@ export function SDRMetricCard({
             )}
           />
         </div>
+      )}
+
+      {goalTarget != null && (
+        <GoalProgress current={value} target={goalTarget} />
       )}
 
       {hasTrend && (

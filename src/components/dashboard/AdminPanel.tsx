@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2 } from 'lucide-react';
+import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2, Target } from 'lucide-react';
 import { useUsers, useAssignRole, useTogglePermission, useDeleteUser } from '@/hooks/useUserManagement';
 import { useAllEntityLinks, useClosersForLinking, useSDRsForLinking } from '@/hooks/useUserEntityLinks';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { MetricsTable } from './MetricsTable';
 import { CreateUserDialog } from './CreateUserDialog';
 import { EditUserLinksDialog } from './EditUserLinksDialog';
+import { GoalsConfig } from './GoalsConfig';
 
 const MODULES = ['dashboard', 'eagles', 'alcateia', 'sharks', 'sdrs', 'reports', 'admin'];
 
@@ -54,6 +55,10 @@ export function AdminPanel() {
           <TabsTrigger value="users" className="data-[state=active]:bg-background gap-2 px-4 py-2">
             <Users className="h-4 w-4" />
             Usuários
+          </TabsTrigger>
+          <TabsTrigger value="goals" className="data-[state=active]:bg-background gap-2 px-4 py-2">
+            <Target className="h-4 w-4" />
+            Metas
           </TabsTrigger>
         </TabsList>
 
@@ -188,6 +193,11 @@ export function AdminPanel() {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        {/* Goals Tab */}
+        <TabsContent value="goals" className="space-y-6">
+          <GoalsConfig />
         </TabsContent>
       </Tabs>
 

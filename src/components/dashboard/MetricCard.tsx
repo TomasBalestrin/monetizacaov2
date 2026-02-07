@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
+import { GoalProgress } from '@/components/dashboard/GoalProgress';
 
 interface MetricCardProps {
   title: string;
@@ -21,6 +22,7 @@ interface MetricCardProps {
   showProgress?: boolean;
   className?: string;
   variant?: 'default' | 'eagles' | 'alcateia' | 'sharks' | 'success' | 'warning' | 'destructive';
+  goalTarget?: number | null;
 }
 
 export function MetricCard({
@@ -35,6 +37,7 @@ export function MetricCard({
   showProgress = false,
   className,
   variant = 'default',
+  goalTarget,
 }: MetricCardProps) {
   const formatValue = (compact = true) => {
     if (typeof value === 'number') {
@@ -147,6 +150,9 @@ export function MetricCard({
             </div>
           </div>
         )}
+        {goalTarget != null && typeof value === 'number' && (
+          <GoalProgress current={value} target={goalTarget} isCurrency={isCurrency} />
+        )}
       </div>
     );
   }
@@ -184,6 +190,9 @@ export function MetricCard({
                   />
                 </div>
               </div>
+            )}
+            {goalTarget != null && typeof value === 'number' && (
+              <GoalProgress current={value} target={goalTarget} isCurrency={isCurrency} />
             )}
             {trend !== undefined && (
               <div

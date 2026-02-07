@@ -46,6 +46,42 @@ export type Database = {
           },
         ]
       }
+      goals: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          metric_key: string
+          month: string
+          target_value: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          metric_key: string
+          month: string
+          target_value?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          metric_key?: string
+          month?: string
+          target_value?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       google_sheets_config: {
         Row: {
           created_at: string | null
