@@ -10,13 +10,14 @@ import {
   TrendingUp,
   Zap,
   Shield,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type ModuleId = 'dashboard' | 'eagles' | 'alcateia' | 'sharks' | 'sdrs' | 'reports' | 'admin';
+export type ModuleId = 'dashboard' | 'eagles' | 'alcateia' | 'sharks' | 'sdrs' | 'reports' | 'admin' | 'goals';
 
 interface MenuItem {
   id: ModuleId;
@@ -35,6 +36,7 @@ const squadItems: MenuItem[] = [
 const mainItems: MenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard' },
   { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs' },
+  { id: 'goals', label: 'Metas', icon: Target, permission: 'goals' },
   { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'reports' },
 ];
 
@@ -50,7 +52,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: SidebarProps) {
-  const { signOut, hasPermission, isAdmin } = useAuth();
+  const { signOut, hasPermission, isAdmin, isManager } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
@@ -60,6 +62,8 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
     return items.filter((item) => {
       if (isAdmin) return true;
       if (item.id === 'admin') return false;
+      // Show "Metas" for managers who have any module permission
+      if (item.id === 'goals') return isManager;
       return hasPermission(item.permission);
     });
   };

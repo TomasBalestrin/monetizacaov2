@@ -504,6 +504,14 @@ export type Database = {
         Args: { _entity_id: string; _entity_type: string; _user_id: string }
         Returns: boolean
       }
+      manager_can_access_closer: {
+        Args: { _closer_id: string; _user_id: string }
+        Returns: boolean
+      }
+      manager_can_access_sdr: {
+        Args: { _sdr_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "viewer" | "user"

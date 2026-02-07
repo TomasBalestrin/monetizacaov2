@@ -10,8 +10,10 @@ import { MonthSelector } from '@/components/dashboard/MonthSelector';
 import { useClosers } from '@/hooks/useMetrics';
 import { useSDRs } from '@/hooks/useSdrMetrics';
 import { useAllGoals, useUpsertGoal, CLOSER_METRIC_KEYS, SDR_METRIC_KEYS } from '@/hooks/useGoals';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function GoalsConfig() {
+  const { isAdmin, isManager, permissions } = useAuth();
   const [entityType, setEntityType] = useState<'closer' | 'sdr'>('closer');
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<Date>(startOfMonth(new Date()));
@@ -25,12 +27,41 @@ export function GoalsConfig() {
   const monthStr = format(selectedMonth, 'yyyy-MM-dd');
   const { data: existingGoals, isLoading } = useAllGoals(monthStr);
 
+  // For managers, filter entities by their module permissions
+  // Squad slugs (eagles, alcateia, sharks) map to closer squads; 'sdrs' maps to SDR entities
+  const managerSquadSlugs = useMemo(() => {
+    if (isAdmin) return null; // admin sees all
+    return permissions.filter(p => ['eagles', 'alcateia', 'sharks'].includes(p));
+  }, [isAdmin, permissions]);
+
+  const canAccessSDRs = isAdmin || permissions.includes('sdrs');
+  const canAccessClosers = isAdmin || (managerSquadSlugs && managerSquadSlugs.length > 0);
+
+  // Available entity types for this user
+  const availableTypes = useMemo(() => {
+    const types: Array<{ value: 'closer' | 'sdr'; label: string }> = [];
+    if (canAccessClosers) types.push({ value: 'closer', label: 'Closer' });
+    if (canAccessSDRs) types.push({ value: 'sdr', label: 'SDR / Social' });
+    return types;
+  }, [canAccessClosers, canAccessSDRs]);
+
+  // Auto-select first available type
+  React.useEffect(() => {
+    if (availableTypes.length > 0 && !availableTypes.find(t => t.value === entityType)) {
+      setEntityType(availableTypes[0].value);
+      setSelectedEntityId('');
+    }
+  }, [availableTypes]);
+
   const entities = useMemo(() => {
     if (entityType === 'closer') {
-      return (closers || []).map(c => ({ id: c.id, name: c.name, extra: c.squad?.name }));
+      const allClosers = (closers || []).map(c => ({ id: c.id, name: c.name, extra: c.squad?.name, squadSlug: c.squad?.slug }));
+      if (isAdmin) return allClosers;
+      // Filter by manager's squad permissions
+      return allClosers.filter(c => managerSquadSlugs?.includes(c.squadSlug || ''));
     }
-    return (sdrs || []).map(s => ({ id: s.id, name: s.name, extra: s.type === 'sdr' ? 'SDR' : 'Social' }));
-  }, [entityType, closers, sdrs]);
+    return (sdrs || []).map(s => ({ id: s.id, name: s.name, extra: s.type === 'sdr' ? 'SDR' : 'Social', squadSlug: undefined }));
+  }, [entityType, closers, sdrs, isAdmin, managerSquadSlugs]);
 
   const metricKeys = entityType === 'closer' ? CLOSER_METRIC_KEYS : SDR_METRIC_KEYS;
 
@@ -101,8 +132,9 @@ export function GoalsConfig() {
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="closer">Closer</SelectItem>
-              <SelectItem value="sdr">SDR / Social</SelectItem>
+              {availableTypes.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
