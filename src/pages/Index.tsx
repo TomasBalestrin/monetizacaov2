@@ -9,6 +9,7 @@ import { SquadPage } from '@/components/dashboard/SquadPage';
 import { AdminPanel } from '@/components/dashboard/AdminPanel';
 import { SDRDashboard } from '@/components/dashboard/sdr';
 import { UserDashboard } from '@/components/dashboard/UserDashboard';
+import { GoalsConfig } from '@/components/dashboard/GoalsConfig';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -20,7 +21,7 @@ const Index = () => {
   // Handle URL module parameter
   useEffect(() => {
     const moduleParam = searchParams.get('module');
-    if (moduleParam && ['dashboard', 'eagles', 'alcateia', 'sharks', 'sdrs', 'reports', 'admin'].includes(moduleParam)) {
+    if (moduleParam && ['dashboard', 'eagles', 'alcateia', 'sharks', 'sdrs', 'reports', 'admin', 'goals'].includes(moduleParam)) {
       setActiveModule(moduleParam as ModuleId);
     }
   }, [searchParams]);
@@ -53,6 +54,8 @@ const Index = () => {
         return <SquadPage squadSlug="sharks" />;
       case 'admin':
         return <AdminPanel />;
+      case 'goals':
+        return <GoalsConfig />;
       case 'sdrs':
         return <SDRDashboard />;
       case 'reports':
