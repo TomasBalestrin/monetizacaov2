@@ -11,13 +11,14 @@ import {
   Zap,
   Shield,
   Target,
+  CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type ModuleId = 'dashboard' | 'eagles' | 'alcateia' | 'sharks' | 'sdrs' | 'reports' | 'admin' | 'goals';
+export type ModuleId = 'dashboard' | 'eagles' | 'alcateia' | 'sharks' | 'sdrs' | 'reports' | 'admin' | 'goals' | 'meetings';
 
 interface MenuItem {
   id: ModuleId;
@@ -36,6 +37,7 @@ const squadItems: MenuItem[] = [
 const mainItems: MenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard' },
   { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs' },
+  { id: 'meetings', label: 'Reuniões', icon: CalendarDays, permission: 'meetings' },
   { id: 'goals', label: 'Metas', icon: Target, permission: 'goals' },
   { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'reports' },
 ];
@@ -62,8 +64,8 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
     return items.filter((item) => {
       if (isAdmin) return true;
       if (item.id === 'admin') return false;
-      // Show "Metas" for managers who have any module permission
-      if (item.id === 'goals') return isManager;
+      // Show "Metas" and "Reuniões" for managers who have any module permission
+      if (item.id === 'goals' || item.id === 'meetings') return isManager;
       return hasPermission(item.permission);
     });
   };

@@ -10,6 +10,7 @@ import { AdminPanel } from '@/components/dashboard/AdminPanel';
 import { SDRDashboard } from '@/components/dashboard/sdr';
 import { UserDashboard } from '@/components/dashboard/UserDashboard';
 import { GoalsConfig } from '@/components/dashboard/GoalsConfig';
+import { MeetingsPage } from '@/components/dashboard/meetings';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -21,7 +22,7 @@ const Index = () => {
   // Handle URL module parameter
   useEffect(() => {
     const moduleParam = searchParams.get('module');
-    if (moduleParam && ['dashboard', 'eagles', 'alcateia', 'sharks', 'sdrs', 'reports', 'admin', 'goals'].includes(moduleParam)) {
+    if (moduleParam && ['dashboard', 'eagles', 'alcateia', 'sharks', 'sdrs', 'reports', 'admin', 'goals', 'meetings'].includes(moduleParam)) {
       setActiveModule(moduleParam as ModuleId);
     }
   }, [searchParams]);
@@ -56,6 +57,8 @@ const Index = () => {
         return <AdminPanel />;
       case 'goals':
         return <GoalsConfig />;
+      case 'meetings':
+        return <MeetingsPage />;
       case 'sdrs':
         return <SDRDashboard />;
       case 'reports':
