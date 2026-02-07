@@ -1,130 +1,173 @@
 
 
-# Nova Role "user" - Acesso Restrito ao Proprio Canal
+# Gerente com Acesso por Modulo
 
 ## Objetivo
 
-Criar uma nova role `user` no sistema onde o usuario so ve e gerencia os dados da entidade (Closer ou SDR) vinculada a ele. Diferente do `viewer` que ve tudo em modo leitura, o `user` tera uma experiencia focada exclusivamente nos seus proprios dados.
+Garantir que o gerente so consiga editar e gerenciar dados dos modulos aos quais tem permissao. Por exemplo, um gerente com permissao `sdrs` edita todos os dados de SDR e Social Selling, mas nao consegue editar dados de Closers.
 
-## O que muda
+## Situacao Atual
 
-### 1. Banco de Dados
+Hoje o gerente tem acesso total (ALL) a todas as tabelas de metricas, independente das permissoes de modulo. As permissoes de modulo so controlam a navegacao na sidebar (frontend), mas no banco de dados o gerente pode modificar qualquer dado.
 
-**Adicionar valor `user` ao enum `app_role`:**
+## O que precisa mudar
+
+### 1. Banco de Dados - Funcao auxiliar
+
+Criar uma funcao `manager_can_access_entity` que verifica se o gerente tem permissao de modulo para acessar uma entidade especifica:
+
+- Para **closers**: verificar se o gerente tem permissao do slug do squad ao qual o closer pertence (ex: `eagles`, `alcateia`, `sharks`)
+- Para **SDRs**: verificar se o gerente tem permissao `sdrs`
 
 ```sql
-ALTER TYPE public.app_role ADD VALUE 'user';
+CREATE OR REPLACE FUNCTION public.manager_can_access_closer(
+  _user_id uuid, _closer_id uuid
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.closers c
+    JOIN public.squads s ON c.squad_id = s.id
+    JOIN public.module_permissions mp ON mp.user_id = _user_id AND mp.module = s.slug
+    WHERE c.id = _closer_id
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.manager_can_access_sdr(
+  _user_id uuid, _sdr_id uuid
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.module_permissions
+    WHERE user_id = _user_id AND module = 'sdrs'
+  )
+$$;
 ```
 
-**Atualizar RLS das tabelas `metrics` e `sdr_metrics`** para que o role `user` possa inserir/editar/deletar metricas das suas entidades vinculadas (usando `is_linked_to_entity`).
+### 2. Atualizar RLS Policies
 
-**Atualizar RLS de `closers` e `sdrs`** para que o `user` veja apenas as entidades vinculadas a ele.
+**Tabela `metrics`** - Substituir a policy de manager:
 
-### 2. Experiencia do Usuario com Role `user`
+De: `has_role(auth.uid(), 'manager'::app_role)` (acesso total)
 
-Quando um usuario com role `user` faz login:
+Para: `has_role(auth.uid(), 'manager'::app_role) AND manager_can_access_closer(auth.uid(), closer_id)`
 
-- **Sem sidebar/navegacao completa**: ele vai direto para a pagina de detalhe da sua entidade vinculada
-- Se esta vinculado a um **Closer**: ve o `CloserDetailPage` diretamente
-- Se esta vinculado a um **SDR**: ve o `SDRDetailPage` diretamente
-- **Nao ve**: Dashboard geral, Squads, outros closers/SDRs, Admin, Relatorios
-- **Pode**: ver suas metricas, adicionar metricas, ver suas metas
+**Tabela `sdr_metrics`** - Substituir a policy de manager:
 
-### 3. Fluxo de Navegacao
+De: `has_role(auth.uid(), 'manager'::app_role)` (acesso total)
 
-```text
-Login -> Verificar role
-  |
-  +-> admin/manager/viewer -> Dashboard normal (como hoje)
-  |
-  +-> user -> Buscar entity_links do usuario
-                |
-                +-> Vinculado a Closer -> CloserDetailPage direto
-                +-> Vinculado a SDR -> SDRDetailPage direto
-                +-> Sem vinculo -> Tela de "aguardando vinculo"
-```
+Para: `has_role(auth.uid(), 'manager'::app_role) AND manager_can_access_sdr(auth.uid(), sdr_id)`
 
-### 4. Arquivos Alterados
+**Tabela `closers`** - Adicionar policy para manager ver apenas closers dos squads permitidos
+
+**Tabela `sdrs`** - Manager com permissao `sdrs` pode gerenciar SDRs
+
+**Tabela `goals`** - Permitir que managers gerenciem metas dos modulos que tem acesso (nao apenas visualizar)
+
+### 3. Atualizar Frontend - AuthContext
+
+Adicionar `isManager` ao contexto para uso nos componentes (ja existe no AuthContext).
+
+### 4. Permitir que gerente tambem adicione metricas
+
+Os botoes de "Adicionar Metrica" e acoes de editar/excluir ja estao visiveis nas paginas de detalhe. O gerente ja consegue navegar ate essas paginas via sidebar. Nenhuma mudanca de UI necessaria.
+
+## Arquivos Alterados
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| Migracao SQL | Adicionar `user` ao enum, atualizar RLS |
-| `src/contexts/AuthContext.tsx` | Adicionar `isUser` ao contexto |
-| `src/pages/Index.tsx` | Detectar role `user` e redirecionar para view dedicada |
-| `src/components/dashboard/Sidebar.tsx` | Esconder sidebar para role `user` |
-| `src/components/dashboard/BottomNavigation.tsx` | Esconder ou simplificar para role `user` |
-| `src/components/dashboard/AdminPanel.tsx` | Adicionar `user` como opcao no Select de roles |
-| `src/components/dashboard/CreateUserDialog.tsx` | Adicionar `user` como opcao |
-
-### 5. Novo Componente
-
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/components/dashboard/UserDashboard.tsx` | Pagina dedicada para role `user` que carrega automaticamente a entidade vinculada e exibe o detail page correspondente |
+| Migracao SQL | Criar funcoes auxiliares, atualizar RLS policies |
+| `src/components/dashboard/GoalsConfig.tsx` | Permitir gerentes (alem de admins) configurar metas dos seus modulos |
 
 ## Detalhes Tecnicos
 
-### SQL da Migracao
+### SQL Completo da Migracao
 
 ```sql
--- Adicionar nova role
-ALTER TYPE public.app_role ADD VALUE 'user';
+-- Funcao: manager pode acessar closer via squad permission
+CREATE OR REPLACE FUNCTION public.manager_can_access_closer(
+  _user_id uuid, _closer_id uuid
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.closers c
+    JOIN public.squads s ON c.squad_id = s.id
+    JOIN public.module_permissions mp ON mp.user_id = _user_id AND mp.module = s.slug
+    WHERE c.id = _closer_id
+  )
+$$;
 
--- Permitir que users vejam apenas suas entidades vinculadas (closers)
-CREATE POLICY "Users can view linked closers"
-  ON public.closers FOR SELECT
+-- Funcao: manager pode acessar sdr via module permission 'sdrs'
+CREATE OR REPLACE FUNCTION public.manager_can_access_sdr(
+  _user_id uuid, _sdr_id uuid
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.module_permissions
+    WHERE user_id = _user_id AND module = 'sdrs'
+  )
+$$;
+
+-- METRICS: Atualizar policy do manager
+DROP POLICY IF EXISTS "Managers can manage all metrics" ON public.metrics;
+CREATE POLICY "Managers can manage module metrics"
+  ON public.metrics FOR ALL
   USING (
-    has_role(auth.uid(), 'user'::app_role)
-    AND is_linked_to_entity(auth.uid(), 'closer', id)
+    has_role(auth.uid(), 'manager'::app_role)
+    AND manager_can_access_closer(auth.uid(), closer_id)
+  )
+  WITH CHECK (
+    has_role(auth.uid(), 'manager'::app_role)
+    AND manager_can_access_closer(auth.uid(), closer_id)
   );
 
--- Permitir que users vejam apenas suas entidades vinculadas (sdrs)
-CREATE POLICY "Users can view linked sdrs"
-  ON public.sdrs FOR SELECT
+-- SDR_METRICS: Atualizar policy do manager
+DROP POLICY IF EXISTS "Managers can manage all sdr_metrics" ON public.sdr_metrics;
+CREATE POLICY "Managers can manage module sdr_metrics"
+  ON public.sdr_metrics FOR ALL
   USING (
-    has_role(auth.uid(), 'user'::app_role)
-    AND is_linked_to_entity(auth.uid(), 'sdr', id)
+    has_role(auth.uid(), 'manager'::app_role)
+    AND manager_can_access_sdr(auth.uid(), sdr_id)
+  )
+  WITH CHECK (
+    has_role(auth.uid(), 'manager'::app_role)
+    AND manager_can_access_sdr(auth.uid(), sdr_id)
   );
 
--- Permitir que users insiram metricas para suas entidades
-CREATE POLICY "Users can insert metrics for linked closers"
-  ON public.metrics FOR INSERT
+-- GOALS: Permitir managers gerenciar metas dos seus modulos
+DROP POLICY IF EXISTS "Managers can view goals" ON public.goals;
+CREATE POLICY "Managers can manage module goals"
+  ON public.goals FOR ALL
+  USING (
+    has_role(auth.uid(), 'manager'::app_role)
+    AND (
+      (entity_type = 'closer' AND manager_can_access_closer(auth.uid(), entity_id))
+      OR
+      (entity_type = 'sdr' AND manager_can_access_sdr(auth.uid(), entity_id))
+    )
+  )
   WITH CHECK (
-    has_role(auth.uid(), 'user'::app_role)
-    AND is_linked_to_entity(auth.uid(), 'closer', closer_id)
-    AND created_by = auth.uid()
-  );
-
--- Permitir que users insiram metricas SDR para suas entidades
-CREATE POLICY "Users can insert sdr_metrics for linked sdrs"
-  ON public.sdr_metrics FOR INSERT
-  WITH CHECK (
-    has_role(auth.uid(), 'user'::app_role)
-    AND is_linked_to_entity(auth.uid(), 'sdr', sdr_id)
-    AND created_by = auth.uid()
+    has_role(auth.uid(), 'manager'::app_role)
+    AND (
+      (entity_type = 'closer' AND manager_can_access_closer(auth.uid(), entity_id))
+      OR
+      (entity_type = 'sdr' AND manager_can_access_sdr(auth.uid(), entity_id))
+    )
   );
 ```
 
-### Logica do UserDashboard
+### Impacto
 
-O componente `UserDashboard` ira:
-1. Buscar `user_entity_links` do usuario logado
-2. Identificar se e Closer ou SDR
-3. Renderizar o `CloserDetailPage` ou `SDRDetailPage` correspondente
-4. Sem navegacao lateral - layout limpo e focado
-5. Header simplificado com apenas o nome e botao de logout
-
-### Mudanca no Index.tsx
-
-```text
-if (role === 'user') {
-  return <UserDashboard />  // Layout dedicado sem sidebar
-} else {
-  return <Layout com Sidebar>  // Layout atual
-}
-```
-
-### Select de Roles no Admin
-
-Atualizar o dropdown de roles para incluir a opcao "Usuário" alem de Admin, Gerente e Visualizador.
+- Gerente de SDR: ve e edita apenas dados de SDR/Social Selling
+- Gerente de Squad Eagles: ve e edita apenas dados de closers do squad Eagles
+- Gerente com multiplos modulos: acesso a todos os modulos atribuidos
+- Admin: continua com acesso total sem restricoes
+- GoalsConfig: gerente podera definir metas para entidades dos seus modulos
 
