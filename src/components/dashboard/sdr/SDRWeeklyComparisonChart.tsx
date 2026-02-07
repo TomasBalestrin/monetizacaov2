@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Legend,
   LabelList,
+  Cell,
 } from 'recharts';
 import { format, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -18,6 +19,7 @@ import { cn, parseDateString } from '@/lib/utils';
 
 interface SDRWeeklyComparisonChartProps {
   metrics: SDRMetric[];
+  activeWeekKey?: string | null;
 }
 
 interface WeeklyData {
@@ -143,10 +145,29 @@ const renderCustomLabel = (props: any) => {
   );
 };
 
-export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartProps) {
+export function SDRWeeklyComparisonChart({ metrics, activeWeekKey }: SDRWeeklyComparisonChartProps) {
   const weeklyData = useMemo(() => groupMetricsByWeek(metrics), [metrics]);
 
   const comparison: WeeklyComparison = useMemo(() => {
+    // If a specific week is selected, use it as "current"
+    if (activeWeekKey) {
+      const activeIndex = weeklyData.findIndex(w => w.weekKey === activeWeekKey);
+      if (activeIndex >= 0) {
+        const current = weeklyData[activeIndex];
+        const previous = activeIndex > 0 ? weeklyData[activeIndex - 1] : null;
+        return {
+          current,
+          previous,
+          changes: previous ? {
+            activated: calculateChange(current.activated, previous.activated),
+            scheduled: calculateChange(current.scheduled, previous.scheduled),
+            attended: calculateChange(current.attended, previous.attended),
+            sales: calculateChange(current.sales, previous.sales),
+          } : { activated: null, scheduled: null, attended: null, sales: null },
+        };
+      }
+    }
+
     if (weeklyData.length < 2) {
       return {
         current: weeklyData[weeklyData.length - 1] || null,
@@ -168,7 +189,16 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
         sales: calculateChange(current.sales, previous.sales),
       },
     };
-  }, [weeklyData]);
+  }, [weeklyData, activeWeekKey]);
+
+  // Add opacity data for active week highlighting
+  const chartData = useMemo((): (WeeklyData & { opacity: number })[] => {
+    if (!activeWeekKey) return weeklyData.map(w => ({ ...w, opacity: 1 }));
+    return weeklyData.map(w => ({
+      ...w,
+      opacity: w.weekKey === activeWeekKey ? 1 : 0.35,
+    }));
+  }, [weeklyData, activeWeekKey]);
 
   // Vibrant color palette
   const chartColors = {
@@ -211,7 +241,7 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
       </div>
 
       <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={weeklyData} barCategoryGap="15%" barGap={2}>
+        <BarChart data={chartData} barCategoryGap="15%" barGap={2}>
           <defs>
             <linearGradient id="gradientActivated" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={chartColors.activated} stopOpacity={1} />
@@ -270,6 +300,9 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
             fill="url(#gradientActivated)"
             radius={[6, 6, 0, 0]}
           >
+            {activeWeekKey && chartData.map((entry, index) => (
+              <Cell key={`cell-act-${index}`} fillOpacity={entry.opacity} />
+            ))}
             <LabelList dataKey="activated" content={renderCustomLabel} />
           </Bar>
           <Bar
@@ -278,6 +311,9 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
             fill="url(#gradientScheduled)"
             radius={[6, 6, 0, 0]}
           >
+            {activeWeekKey && chartData.map((entry, index) => (
+              <Cell key={`cell-sch-${index}`} fillOpacity={entry.opacity} />
+            ))}
             <LabelList dataKey="scheduled" content={renderCustomLabel} />
           </Bar>
           <Bar
@@ -286,6 +322,9 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
             fill="url(#gradientAttended)"
             radius={[6, 6, 0, 0]}
           >
+            {activeWeekKey && chartData.map((entry, index) => (
+              <Cell key={`cell-att-${index}`} fillOpacity={entry.opacity} />
+            ))}
             <LabelList dataKey="attended" content={renderCustomLabel} />
           </Bar>
           <Bar
@@ -294,6 +333,9 @@ export function SDRWeeklyComparisonChart({ metrics }: SDRWeeklyComparisonChartPr
             fill="url(#gradientSales)"
             radius={[6, 6, 0, 0]}
           >
+            {activeWeekKey && chartData.map((entry, index) => (
+              <Cell key={`cell-sal-${index}`} fillOpacity={entry.opacity} />
+            ))}
             <LabelList dataKey="sales" content={renderCustomLabel} />
           </Bar>
         </BarChart>

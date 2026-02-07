@@ -17,6 +17,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
+import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
+import { parseDateString } from '@/lib/utils';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { SDRMetricCard } from './SDRMetricCard';
 import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
@@ -111,6 +113,7 @@ export function SDRDetailPage({
   const queryClient = useQueryClient();
   const [, setSearchParams] = useSearchParams();
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   
   // Dialog states
   const [showMetricsDialog, setShowMetricsDialog] = useState(false);
@@ -155,15 +158,38 @@ export function SDRDetailPage({
     return rawMetrics;
   }, [rawMetrics, selectedFunnel, funnels]);
   
-  const aggregatedMetrics = displayMetrics.length > 0 ? calculateAggregatedMetrics(displayMetrics) : null;
+  // Get week boundaries for filtering
+  const weekFilter = useMemo(() => {
+    if (!selectedWeek) return null;
+    const weeks = getWeeksOfMonth(selectedMonth);
+    return weeks.find(w => w.weekKey === selectedWeek) || null;
+  }, [selectedWeek, selectedMonth]);
+
+  // Filter by week for cards and table (chart gets full data)
+  const weekFilteredMetrics = useMemo(() => {
+    if (!weekFilter) return displayMetrics;
+    return displayMetrics.filter(m => {
+      const date = parseDateString(m.date);
+      return date >= weekFilter.startDate && date <= weekFilter.endDate;
+    });
+  }, [displayMetrics, weekFilter]);
+
+  const aggregatedMetrics = weekFilteredMetrics.length > 0 ? calculateAggregatedMetrics(weekFilteredMetrics) : null;
 
   const Icon = sdr?.type === 'social_selling' ? Users : Phone;
   const hasFunnels = funnels && funnels.length > 1;
   const isAggregatedView = !selectedFunnel && hasFunnels;
 
+  // Reset week when month changes
+  const handleMonthChange = useCallback((month: Date) => {
+    onMonthChange(month);
+    setSelectedWeek(null);
+  }, [onMonthChange]);
+
   // Swipe navigation between SDRs
   const handleNavigateToSDR = useCallback((id: string) => {
-    setSelectedFunnel(null); // Reset funnel selection when navigating
+    setSelectedFunnel(null);
+    setSelectedWeek(null);
     setSearchParams({ module: 'sdrs', sdr: id });
   }, [setSearchParams]);
 
@@ -311,7 +337,12 @@ export function SDRDetailPage({
             
             <MonthSelector
               selectedMonth={selectedMonth}
-              onMonthChange={onMonthChange}
+              onMonthChange={handleMonthChange}
+            />
+            <WeekSelector
+              selectedMonth={selectedMonth}
+              selectedWeek={selectedWeek}
+              onWeekChange={setSelectedWeek}
             />
 
             {!isAggregatedView && (
@@ -403,7 +434,7 @@ export function SDRDetailPage({
         {isLoadingMetrics ? (
           <ChartSkeleton height={350} />
         ) : (
-          <SDRWeeklyComparisonChart metrics={displayMetrics || []} />
+          <SDRWeeklyComparisonChart metrics={displayMetrics || []} activeWeekKey={selectedWeek} />
         )}
 
         {/* Data Table with Edit/Delete actions */}
@@ -411,7 +442,7 @@ export function SDRDetailPage({
           <TableSkeleton rows={5} columns={8} />
         ) : (
           <SDRDataTable 
-            metrics={displayMetrics || []} 
+            metrics={weekFilteredMetrics || []} 
             showFunnelColumn={!selectedFunnel && hasFunnels}
             onEditMetric={isAggregatedView ? undefined : handleEditMetric}
             onDeleteMetric={isAggregatedView ? undefined : handleDeleteMetric}
