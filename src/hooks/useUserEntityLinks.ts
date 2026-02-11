@@ -17,7 +17,7 @@ export function useAllEntityLinks() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('user_entity_links')
-        .select('*')
+        .select('id, user_id, entity_type, entity_id, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -35,7 +35,7 @@ export function useUserEntityLinks(userId?: string) {
 
       const { data, error } = await supabase
         .from('user_entity_links')
-        .select('*')
+        .select('id, user_id, entity_type, entity_id, created_at')
         .eq('user_id', userId);
 
       if (error) throw error;

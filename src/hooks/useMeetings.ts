@@ -50,7 +50,7 @@ export function useMeetings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('meetings')
-        .select('*')
+        .select('id, title, description, meeting_date, status, created_by, created_at, updated_at')
         .order('meeting_date', { ascending: false });
       if (error) throw error;
       return data as Meeting[];
@@ -65,7 +65,7 @@ export function useMeetingParticipants(meetingId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('meeting_participants')
-        .select('*')
+        .select('id, meeting_id, user_id, created_at')
         .eq('meeting_id', meetingId!);
       if (error) throw error;
 
@@ -177,7 +177,7 @@ export function useMeetingNotes(meetingId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('meeting_notes')
-        .select('*')
+        .select('id, meeting_id, content, created_by, created_at, updated_at')
         .eq('meeting_id', meetingId!)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -236,7 +236,7 @@ export function useActionItems(meetingId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('meeting_action_items')
-        .select('*')
+        .select('id, meeting_id, title, assigned_to, due_date, status, created_by, created_at, updated_at')
         .eq('meeting_id', meetingId!)
         .order('created_at', { ascending: true });
       if (error) throw error;

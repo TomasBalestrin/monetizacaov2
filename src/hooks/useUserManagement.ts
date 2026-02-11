@@ -20,7 +20,7 @@ export function useUsers() {
       // Get profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, created_at')
         .order('created_at', { ascending: false });
       
       if (profilesError) throw profilesError;
@@ -28,14 +28,14 @@ export function useUsers() {
       // Get roles for all users
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
+        .select('id, user_id, role');
       
       if (rolesError) throw rolesError;
 
       // Get permissions for all users
       const { data: permissions, error: permError } = await supabase
         .from('module_permissions')
-        .select('*');
+        .select('id, user_id, module');
       
       if (permError) throw permError;
 

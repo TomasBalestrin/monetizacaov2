@@ -629,6 +629,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_sdr_total_metrics: {
+        Args: { p_period_end?: string; p_period_start?: string; p_type: string }
+        Returns: Json
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

@@ -1,17 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar, ModuleId } from '@/components/dashboard/Sidebar';
 import { Header } from '@/components/dashboard/Header';
 import { BottomNavigation } from '@/components/dashboard/BottomNavigation';
-import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
-import { SquadPage } from '@/components/dashboard/SquadPage';
-import { AdminPanel } from '@/components/dashboard/AdminPanel';
-import { SDRDashboard } from '@/components/dashboard/sdr';
-import { UserDashboard } from '@/components/dashboard/UserDashboard';
-import { GoalsConfig } from '@/components/dashboard/GoalsConfig';
-import { MeetingsPage } from '@/components/dashboard/meetings';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
+
+// P2: Lazy load heavy page components
+const DashboardOverview = lazy(() => import('@/components/dashboard/DashboardOverview').then(m => ({ default: m.DashboardOverview })));
+const SquadPage = lazy(() => import('@/components/dashboard/SquadPage').then(m => ({ default: m.SquadPage })));
+const AdminPanel = lazy(() => import('@/components/dashboard/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const SDRDashboard = lazy(() => import('@/components/dashboard/sdr').then(m => ({ default: m.SDRDashboard })));
+const UserDashboard = lazy(() => import('@/components/dashboard/UserDashboard').then(m => ({ default: m.UserDashboard })));
+const GoalsConfig = lazy(() => import('@/components/dashboard/GoalsConfig').then(m => ({ default: m.GoalsConfig })));
+const MeetingsPage = lazy(() => import('@/components/dashboard/meetings').then(m => ({ default: m.MeetingsPage })));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[40vh]">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -40,7 +51,11 @@ const Index = () => {
 
   // Role "user" gets a dedicated layout without sidebar
   if (isUser) {
-    return <UserDashboard />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <UserDashboard />
+      </Suspense>
+    );
   }
 
   const renderContent = () => {
@@ -88,7 +103,11 @@ const Index = () => {
         <Header onMenuClick={() => setSidebarOpen(true)} />
         
         <main className="flex-1 p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
-          {renderContent()}
+          <ErrorBoundary section={activeModule} key={activeModule}>
+            <Suspense fallback={<PageLoader />}>
+              {renderContent()}
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
       
