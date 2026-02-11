@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus, CalendarPlus } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,6 +45,7 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
       totalActivated: 0,
       totalScheduled: 0,
       avgScheduledRate: 0,
+      totalScheduledFollowUp: 0,
       totalScheduledSameDay: 0,
       totalAttended: 0,
       avgAttendanceRate: 0,
@@ -55,6 +56,7 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
 
   const totalActivated = metrics.reduce((sum, m) => sum + (m.activated || 0), 0);
   const totalScheduled = metrics.reduce((sum, m) => sum + (m.scheduled || 0), 0);
+  const totalScheduledFollowUp = metrics.reduce((sum, m) => sum + (m.scheduled_follow_up || 0), 0);
   const totalScheduledSameDay = metrics.reduce((sum, m) => sum + (m.scheduled_same_day || 0), 0);
   const totalAttended = metrics.reduce((sum, m) => sum + (m.attended || 0), 0);
   const totalSales = metrics.reduce((sum, m) => sum + (m.sales || 0), 0);
@@ -67,6 +69,7 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
     totalActivated,
     totalScheduled,
     avgScheduledRate,
+    totalScheduledFollowUp,
     totalScheduledSameDay,
     totalAttended,
     avgAttendanceRate,
@@ -84,6 +87,7 @@ function aggregateMetricsByDate(metrics: SDRMetric[]): SDRMetric[] {
     if (existing) {
       existing.activated += m.activated || 0;
       existing.scheduled += m.scheduled || 0;
+      existing.scheduled_follow_up += m.scheduled_follow_up || 0;
       existing.scheduled_same_day += m.scheduled_same_day || 0;
       existing.attended += m.attended || 0;
       existing.sales += m.sales || 0;
@@ -406,7 +410,12 @@ export function SDRDetailPage({
             </div>
             
             {/* Secondary Metrics Row - Regular Cards */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <SDRMetricCard
+                title="Agend. Follow Up"
+                value={aggregatedMetrics?.totalScheduledFollowUp || 0}
+                icon={CalendarPlus}
+              />
               <SDRMetricCard
                 title="Agend. no dia"
                 value={aggregatedMetrics?.totalScheduledSameDay || 0}

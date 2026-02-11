@@ -1,0 +1,1 @@
+ALTER TABLE public.sdr_metrics ADD COLUMN scheduled_follow_up integer NOT NULL DEFAULT 0;

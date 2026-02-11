@@ -12,7 +12,8 @@ import {
   ShoppingCart,
   Clock,
   Zap,
-  Filter
+  Filter,
+  CalendarPlus
 } from 'lucide-react';
 import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ const sdrMetricsSchema = z.object({
   funnel: z.string().optional(),
   activated: z.coerce.number().int().min(0),
   scheduled: z.coerce.number().int().min(0),
+  scheduled_follow_up: z.coerce.number().int().min(0),
   scheduled_same_day: z.coerce.number().int().min(0),
   attended: z.coerce.number().int().min(0),
   sales: z.coerce.number().int().min(0),
@@ -104,6 +106,7 @@ export function SDRMetricsForm({
       funnel: defaultMetric?.funnel || 'none',
       activated: defaultMetric?.activated ?? 0,
       scheduled: defaultMetric?.scheduled ?? 0,
+      scheduled_follow_up: defaultMetric?.scheduled_follow_up ?? 0,
       scheduled_same_day: defaultMetric?.scheduled_same_day ?? 0,
       attended: defaultMetric?.attended ?? 0,
       sales: defaultMetric?.sales ?? 0,
@@ -337,6 +340,26 @@ export function SDRMetricsForm({
               )}
             />
             
+            <FormField
+              control={form.control}
+              name="scheduled_follow_up"
+              render={({ field }) => (
+                <FormItem>
+                  <MetricInput icon={CalendarPlus} label="Agend. Follow Up" iconColor="text-indigo-500">
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={0} 
+                        className="h-10 bg-card border-border/50 text-center font-medium hover:border-indigo-500/50 focus:border-indigo-500 transition-colors"
+                        {...field} 
+                      />
+                    </FormControl>
+                  </MetricInput>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="scheduled_same_day"

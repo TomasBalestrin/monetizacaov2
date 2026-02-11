@@ -79,6 +79,7 @@ export function SDRDataTable({
               )}
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Ativados</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agendados</TableHead>
+              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agend. FU</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Agend.</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agend. dia</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Realizados</TableHead>
@@ -121,6 +122,7 @@ export function SDRDataTable({
                   )}
                   <TableCell className="text-right font-medium">{metric.activated}</TableCell>
                   <TableCell className="text-right font-medium">{metric.scheduled}</TableCell>
+                  <TableCell className="text-right font-medium">{metric.scheduled_follow_up || 0}</TableCell>
                   <TableCell className="text-right">
                     <span className={cn(
                       "px-2 py-0.5 rounded-md text-xs font-bold",

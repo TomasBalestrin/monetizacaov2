@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus } from 'lucide-react';
+import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus, CalendarPlus } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
 import { parseDateString } from '@/lib/utils';
@@ -126,7 +126,7 @@ export function SDRDashboard() {
         {isLoading ? (
           <MetricCardSkeletonGrid count={7} />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             <SDRMetricCard
               title="Ativados"
               value={totalMetrics?.totalActivated || 0}
@@ -143,6 +143,11 @@ export function SDRDashboard() {
               isPercentage
               showProgress
               icon={TrendingUp}
+            />
+            <SDRMetricCard
+              title="Agend. Follow Up"
+              value={totalMetrics?.totalScheduledFollowUp || 0}
+              icon={CalendarPlus}
             />
             <SDRMetricCard
               title="Agend. no dia"

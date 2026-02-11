@@ -385,6 +385,7 @@ export type Database = {
           id: string
           sales: number
           scheduled: number
+          scheduled_follow_up: number
           scheduled_rate: number
           scheduled_same_day: number
           sdr_id: string
@@ -403,6 +404,7 @@ export type Database = {
           id?: string
           sales?: number
           scheduled?: number
+          scheduled_follow_up?: number
           scheduled_rate?: number
           scheduled_same_day?: number
           sdr_id: string
@@ -421,6 +423,7 @@ export type Database = {
           id?: string
           sales?: number
           scheduled?: number
+          scheduled_follow_up?: number
           scheduled_rate?: number
           scheduled_same_day?: number
           sdr_id?: string

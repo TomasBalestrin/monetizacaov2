@@ -18,6 +18,7 @@ export interface SDRMetric {
   activated: number;
   scheduled: number;
   scheduled_rate: number;
+  scheduled_follow_up: number;
   scheduled_same_day: number;
   attended: number;
   attendance_rate: number;
@@ -32,6 +33,7 @@ export interface SDRAggregatedMetrics {
   totalActivated: number;
   totalScheduled: number;
   avgScheduledRate: number;
+  totalScheduledFollowUp: number;
   totalScheduledSameDay: number;
   totalAttended: number;
   avgAttendanceRate: number;
@@ -131,6 +133,7 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
       totalActivated: 0,
       totalScheduled: 0,
       avgScheduledRate: 0,
+      totalScheduledFollowUp: 0,
       totalScheduledSameDay: 0,
       totalAttended: 0,
       avgAttendanceRate: 0,
@@ -141,11 +144,11 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
 
   const totalActivated = metrics.reduce((sum, m) => sum + (m.activated || 0), 0);
   const totalScheduled = metrics.reduce((sum, m) => sum + (m.scheduled || 0), 0);
+  const totalScheduledFollowUp = metrics.reduce((sum, m) => sum + (m.scheduled_follow_up || 0), 0);
   const totalScheduledSameDay = metrics.reduce((sum, m) => sum + (m.scheduled_same_day || 0), 0);
   const totalAttended = metrics.reduce((sum, m) => sum + (m.attended || 0), 0);
   const totalSales = metrics.reduce((sum, m) => sum + (m.sales || 0), 0);
 
-  // Calculate rates dynamically
   const avgScheduledRate = totalActivated > 0 ? (totalScheduled / totalActivated) * 100 : 0;
   const avgAttendanceRate = totalScheduledSameDay > 0 ? (totalAttended / totalScheduledSameDay) * 100 : 0;
   const avgConversionRate = totalAttended > 0 ? (totalSales / totalAttended) * 100 : 0;
@@ -154,6 +157,7 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
     totalActivated,
     totalScheduled,
     avgScheduledRate,
+    totalScheduledFollowUp,
     totalScheduledSameDay,
     totalAttended,
     avgAttendanceRate,
@@ -282,6 +286,7 @@ export function useCreateSDRMetric() {
       funnel: string | null;
       activated: number;
       scheduled: number;
+      scheduled_follow_up: number;
       scheduled_same_day: number;
       attended: number;
       sales: number;
@@ -342,6 +347,7 @@ export function useUpdateSDRMetric() {
       funnel?: string | null;
       activated?: number;
       scheduled?: number;
+      scheduled_follow_up?: number;
       scheduled_same_day?: number;
       attended?: number;
       sales?: number;
