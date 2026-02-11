@@ -10,7 +10,20 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000, // 30s — dados ficam "frescos" por 30s
+      gcTime: 5 * 60 * 1000, // 5min — garbage collection
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Backoff exponencial: 1s, 2s, 4s...
+      refetchOnWindowFocus: false, // Evita refetch desnecessário ao voltar na aba
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

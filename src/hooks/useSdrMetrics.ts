@@ -52,7 +52,7 @@ export function useSDRs(type?: 'sdr' | 'social_selling') {
     queryFn: async () => {
       let query = supabase
         .from('sdrs')
-        .select('*')
+        .select('id, name, type, created_at, updated_at')
         .order('name');
 
       if (type) {
@@ -80,7 +80,7 @@ export function useSDRMetrics(
 
       let query = supabase
         .from('sdr_metrics')
-        .select('*')
+        .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, conversion_rate, source, created_at, updated_at')
         .eq('sdr_id', sdrId)
         .order('date', { ascending: true });
 
@@ -166,7 +166,7 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
   };
 }
 
-// Fetch aggregated metrics for all SDRs of a given type
+// Fetch aggregated metrics using RPC (P3: aggregation in database = 10-50x faster)
 export function useSDRTotalMetrics(
   type: 'sdr' | 'social_selling',
   periodStart?: string,
@@ -175,47 +175,27 @@ export function useSDRTotalMetrics(
   return useQuery({
     queryKey: ['sdr-total-metrics', type, periodStart, periodEnd],
     queryFn: async () => {
-      // First get all SDRs of the given type
-      const { data: sdrs, error: sdrsError } = await supabase
-        .from('sdrs')
-        .select('id')
-        .eq('type', type);
+      const { data, error } = await supabase.rpc('get_sdr_total_metrics', {
+        p_type: type,
+        p_period_start: periodStart || null,
+        p_period_end: periodEnd || null,
+      });
 
-      if (sdrsError) throw sdrsError;
+      if (error) throw error;
 
-      if (!sdrs || sdrs.length === 0) {
-        return {
-          totalActivated: 0,
-          totalScheduled: 0,
-          avgScheduledRate: 0,
-          totalScheduledSameDay: 0,
-          totalAttended: 0,
-          avgAttendanceRate: 0,
-          totalSales: 0,
-          avgConversionRate: 0,
-        } as SDRAggregatedMetrics;
-      }
-
-      const sdrIds = sdrs.map((s) => s.id);
-
-      // Then get all metrics for those SDRs (only those with funnel identified)
-      let query = supabase
-        .from('sdr_metrics')
-        .select('*')
-        .in('sdr_id', sdrIds)
-        .neq('funnel', '');
-
-      if (periodStart) {
-        query = query.gte('date', periodStart);
-      }
-      if (periodEnd) {
-        query = query.lte('date', periodEnd);
-      }
-
-      const { data: metrics, error: metricsError } = await query;
-      if (metricsError) throw metricsError;
-
-      return calculateAggregatedMetrics(metrics as SDRMetric[]);
+      // RPC returns JSON with camelCase keys matching our interface
+      const result = data as unknown as SDRAggregatedMetrics;
+      return {
+        totalActivated: Number(result.totalActivated) || 0,
+        totalScheduled: Number(result.totalScheduled) || 0,
+        avgScheduledRate: Number(result.avgScheduledRate) || 0,
+        totalScheduledFollowUp: Number(result.totalScheduledFollowUp) || 0,
+        totalScheduledSameDay: Number(result.totalScheduledSameDay) || 0,
+        totalAttended: Number(result.totalAttended) || 0,
+        avgAttendanceRate: Number(result.avgAttendanceRate) || 0,
+        totalSales: Number(result.totalSales) || 0,
+        avgConversionRate: Number(result.avgConversionRate) || 0,
+      } as SDRAggregatedMetrics;
     },
   });
 }
@@ -232,7 +212,7 @@ export function useSDRsWithMetrics(
       // Get all SDRs of the given type
       const { data: sdrs, error: sdrsError } = await supabase
         .from('sdrs')
-        .select('*')
+        .select('id, name, type, created_at, updated_at')
         .eq('type', type)
         .order('name');
 
@@ -246,7 +226,7 @@ export function useSDRsWithMetrics(
       const sdrIds = sdrs.map((s) => s.id);
       let query = supabase
         .from('sdr_metrics')
-        .select('*')
+        .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, conversion_rate, source, created_at, updated_at')
         .in('sdr_id', sdrIds)
         .neq('funnel', '');
 

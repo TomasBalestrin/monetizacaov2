@@ -37,7 +37,7 @@ export function useGoals(entityType: string, entityId: string | undefined, month
       if (!entityId || !month) return [];
       const { data, error } = await supabase
         .from('goals')
-        .select('*')
+        .select('id, entity_type, entity_id, month, metric_key, target_value, created_by, created_at, updated_at')
         .eq('entity_type', entityType)
         .eq('entity_id', entityId)
         .eq('month', month);
@@ -57,7 +57,7 @@ export function useAllGoals(month: string | undefined) {
       if (!month) return [];
       const { data, error } = await supabase
         .from('goals')
-        .select('*')
+        .select('id, entity_type, entity_id, month, metric_key, target_value, created_by, created_at, updated_at')
         .eq('month', month);
 
       if (error) throw error;

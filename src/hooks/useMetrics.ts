@@ -91,7 +91,7 @@ export function useSquads() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('squads')
-        .select('*')
+        .select('id, name, slug')
         .order('name');
       
       if (error) throw error;
@@ -126,7 +126,7 @@ export function useMetrics(periodStart?: string, periodEnd?: string) {
     queryFn: async () => {
       let query = supabase
         .from('metrics')
-        .select('*, closer:closers(*, squad:squads(*))');
+        .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, closer:closers(id, name, squad_id, squad:squads(id, name, slug))');
       
       if (periodStart) {
         query = query.gte('period_start', periodStart);
@@ -149,7 +149,7 @@ export function useCloserMetrics(closerId: string, periodStart?: string, periodE
     queryFn: async () => {
       let query = supabase
         .from('metrics')
-        .select('*')
+        .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries')
         .eq('closer_id', closerId)
         .order('period_start', { ascending: true });
       
@@ -423,10 +423,6 @@ export function useDeleteMetric() {
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
       queryClient.invalidateQueries({ queryKey: ['closer-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['squad-metrics'] });
-      toast({
-        title: 'Métrica removida',
-        description: 'A métrica foi removida com sucesso.',
-      });
     },
     onError: (error) => {
       toast({
