@@ -50,8 +50,6 @@
     /* Squad accent colors */
     --eagles: 217 91% 60%;
     --eagles-light: 217 91% 70%;
-    --alcateia: 270 70% 60%;
-    --alcateia-light: 270 70% 70%;
     --sharks: 152 69% 45%;
     --sharks-light: 152 69% 55%;
 
@@ -111,8 +109,6 @@
     /* Squad accent colors - dark mode */
     --eagles: 217 91% 60%;
     --eagles-light: 217 91% 45%;
-    --alcateia: 270 70% 60%;
-    --alcateia-light: 270 70% 45%;
     --sharks: 152 69% 45%;
     --sharks-light: 152 69% 35%;
   }
@@ -176,9 +172,6 @@
     background: linear-gradient(135deg, hsl(var(--eagles)) 0%, hsl(var(--eagles-light)) 100%);
   }
 
-  .gradient-alcateia {
-    background: linear-gradient(135deg, hsl(var(--alcateia)) 0%, hsl(var(--alcateia-light)) 100%);
-  }
 
   .gradient-sharks {
     background: linear-gradient(135deg, hsl(var(--sharks)) 0%, hsl(var(--sharks-light)) 100%);

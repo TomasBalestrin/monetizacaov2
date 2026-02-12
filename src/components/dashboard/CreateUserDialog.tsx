@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useCreateUser } from '@/hooks/useUserManagement';
 import { useClosersForLinking, useSDRsForLinking } from '@/hooks/useUserEntityLinks';
 
-const MODULES = ['dashboard', 'eagles', 'alcateia', 'sharks', 'sdrs', 'reports', 'admin'];
+const MODULES = ['dashboard', 'eagles', 'sharks', 'sdrs', 'reports', 'admin'];
 
 const createUserSchema = z.object({
   email: z.string().email('Email inválido'),

@@ -28,7 +28,7 @@ export function GoalsConfig() {
   const { data: existingGoals, isLoading } = useAllGoals(monthStr);
 
   // For managers, filter entities by their module permissions
-  // Squad slugs (eagles, alcateia, sharks) map to closer squads; 'sdrs' maps to SDR entities
+  // Squad slugs (eagles, sharks) map to closer squads; 'sdrs' maps to SDR entities
   const managerSquadSlugs = useMemo(() => {
     if (isAdmin) return null; // admin sees all
     return permissions.filter(p => ['eagles', 'sharks'].includes(p));
