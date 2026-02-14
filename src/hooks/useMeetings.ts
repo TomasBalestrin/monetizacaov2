@@ -213,6 +213,22 @@ export function useAddNote() {
   });
 }
 
+export function useUpdateNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; meeting_id: string; content: string }) => {
+      const { error } = await supabase
+        .from('meeting_notes')
+        .update({ content: input.content })
+        .eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['meeting-notes', vars.meeting_id] });
+    },
+  });
+}
+
 export function useDeleteNote() {
   const queryClient = useQueryClient();
 
