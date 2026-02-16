@@ -7,3 +7,4 @@ export { SDRDataTable } from './SDRDataTable';
 export { SDRTypeToggle } from './SDRTypeToggle';
 export { SDRMetricsForm } from './SDRMetricsForm';
 export { SDRMetricsDialog } from './SDRMetricsDialog';
+export { SDRFunnelManager } from './SDRFunnelManager';

@@ -372,6 +372,38 @@ export type Database = {
         }
         Relationships: []
       }
+      sdr_funnels: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          funnel_name: string
+          id: string
+          sdr_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          funnel_name: string
+          id?: string
+          sdr_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          funnel_name?: string
+          id?: string
+          sdr_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_funnels_sdr_id_fkey"
+            columns: ["sdr_id"]
+            isOneToOne: false
+            referencedRelation: "sdrs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sdr_metrics: {
         Row: {
           activated: number

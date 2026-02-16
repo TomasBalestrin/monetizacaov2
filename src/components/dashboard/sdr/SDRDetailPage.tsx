@@ -25,6 +25,8 @@ import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
 import { SDRDataTable } from './SDRDataTable';
 import { SDRMetricsDialog } from './SDRMetricsDialog';
 import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/hooks/useSdrMetrics';
+import { useAuth } from '@/contexts/AuthContext';
+import { SDRFunnelManager } from './SDRFunnelManager';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeSDRMetrics } from '@/hooks/useRealtimeMetrics';
 import { useGoals, getGoalTarget } from '@/hooks/useGoals';
@@ -115,6 +117,7 @@ export function SDRDetailPage({
   onBack,
 }: SDRDetailPageProps) {
   const queryClient = useQueryClient();
+  const { isAdmin, isManager } = useAuth();
   const [, setSearchParams] = useSearchParams();
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
@@ -273,7 +276,12 @@ export function SDRDetailPage({
             <div>
               {sdr ? (
                 <>
-                  <h1 className="text-2xl font-bold text-foreground">{sdr.name}</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-foreground">{sdr.name}</h1>
+                    {(isAdmin || isManager) && (
+                      <SDRFunnelManager sdrId={sdrId} sdrName={sdr.name} />
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <p className="text-muted-foreground capitalize">
                       {sdr.type === 'sdr' ? 'SDR' : 'Social Selling'}

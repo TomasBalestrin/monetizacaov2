@@ -103,7 +103,7 @@ export function useSDRMetrics(
   });
 }
 
-// Fetch list of unique funnels for a specific SDR
+// Fetch funnels for a specific SDR from sdr_funnels table
 export function useSDRFunnels(sdrId?: string) {
   return useQuery({
     queryKey: ['sdr-funnels', sdrId],
@@ -111,18 +111,67 @@ export function useSDRFunnels(sdrId?: string) {
       if (!sdrId) return [];
 
       const { data, error } = await supabase
-        .from('sdr_metrics')
-        .select('funnel')
+        .from('sdr_funnels')
+        .select('id, sdr_id, funnel_name, created_at')
         .eq('sdr_id', sdrId)
-        .neq('funnel', '');
+        .order('funnel_name');
 
       if (error) throw error;
-
-      // Return unique funnel names
-      const uniqueFunnels = [...new Set(data?.map((m) => m.funnel).filter(Boolean))] as string[];
-      return uniqueFunnels.sort();
+      return (data || []).map(f => f.funnel_name);
     },
     enabled: !!sdrId,
+  });
+}
+
+// Add a funnel to an SDR
+export function useAddSDRFunnel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sdrId, funnelName }: { sdrId: string; funnelName: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from('sdr_funnels')
+        .insert({ sdr_id: sdrId, funnel_name: funnelName, created_by: user?.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sdr-funnels', variables.sdrId] });
+      toast.success('Funil adicionado!');
+    },
+    onError: (error: any) => {
+      if (error?.code === '23505') {
+        toast.error('Este funil já existe para este SDR');
+      } else {
+        toast.error('Erro ao adicionar funil');
+      }
+    },
+  });
+}
+
+// Remove a funnel from an SDR
+export function useDeleteSDRFunnel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sdrId, funnelName }: { sdrId: string; funnelName: string }) => {
+      const { error } = await supabase
+        .from('sdr_funnels')
+        .delete()
+        .eq('sdr_id', sdrId)
+        .eq('funnel_name', funnelName);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sdr-funnels', variables.sdrId] });
+      toast.success('Funil removido!');
+    },
+    onError: () => {
+      toast.error('Erro ao remover funil');
+    },
   });
 }
 
