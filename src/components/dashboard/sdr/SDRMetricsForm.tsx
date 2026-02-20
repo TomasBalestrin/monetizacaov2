@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -117,8 +117,13 @@ export function SDRMetricsForm({
   const selectedSdrId = form.watch('sdr_id');
   const { data: sdrFunnels, isLoading: isLoadingFunnels } = useSDRFunnels(selectedSdrId);
 
-  // Reset funnel when SDR changes (unless it's initial load with defaultMetric)
+  // Reset funnel when SDR changes, but NOT on first render (to preserve pre-selected SDR's funnel)
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     if (selectedSdrId && !defaultMetric) {
       form.setValue('funnel', 'none');
     }
