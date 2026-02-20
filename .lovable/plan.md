@@ -1,70 +1,70 @@
 
-# Diagnóstico e Correção do Problema de Salvamento de Métricas por Funil
+# Correção da Soma Incorreta na View "Todos os Funis"
 
-## Problema Identificado
+## Causa Raiz Identificada
 
-Ao analisar o banco de dados, foram encontrados registros com `funnel = ""` (vazio) misturados com registros de funis nomeados para a Clara nas mesmas datas:
+Ao selecionar "Todos os Funis", a função `aggregateMetricsByDate` no `SDRDetailPage.tsx` soma **todos** os registros da tabela, incluindo os que têm `funnel = ""` (vazio). Esses registros com funil vazio foram criados pelo bug anterior (reset indevido do formulário) e não deveriam ser contabilizados na soma dos funis atribuídos.
 
-- 20/02: 1 registro com `funnel = ""` — nenhum com "Mentoria Julia"
-- 19/02: 1 registro com `funnel = ""`, 1 com "Mentoria Julia", 1 com "SS Julia"
+**Exemplo concreto para Clara em 19/02:**
+- `funnel = ""` → activated:0, scheduled:2, attended:0, sales:0
+- `funnel = "Mentoria Julia"` → activated:0, scheduled:3, attended:2, sales:1
+- `funnel = "SS Julia"` → activated:50, scheduled:3, attended:0, sales:0
 
-Isso indica que ao tentar salvar dados no funil "Mentoria Julia" para 20/02, o formulário pode ter submetido com `funnel = ""` por alguma dessas causas:
+Resultado atual (errado): activated:50, scheduled:8, attended:2, sales:1
+Resultado correto: activated:50, scheduled:6, attended:2, sales:1
 
-**Causa 1 - Reset de funil ao mudar SDR**: O `useEffect` no `SDRMetricsForm` reseta o funil para `"none"` sempre que `selectedSdrId` muda. Se a página for recarregada com o SDR já pré-selecionado (`defaultSdrId`), o `useEffect` dispara uma vez e reseta o funil para `"none"` mesmo que o usuário já tivesse selecionado um funil.
+## Solucao
 
-**Causa 2 - Condição do useEffect frágil**: A condição `if (selectedSdrId && !defaultMetric)` não é suficiente para evitar o reset indevido no primeiro render quando o SDR vem do `defaultSdrId`.
+A correção é simples e precisa ser feita em dois lugares:
 
-**Causa 3 - Registros semente com funil vazio**: As tentativas anteriores de adicionar funis via insert de registros semente criaram registros com `funnel = ""` que agora aparecem na tabela e confundem a visualização.
+### 1. Filtrar registros com funnel vazio na view "Todos os Funis"
 
-## Alterações Planejadas
-
-### 1. Corrigir o useEffect de reset de funil em `SDRMetricsForm.tsx`
-
-Adicionar uma referência (`useRef`) para distinguir o **primeiro render** dos renders subsequentes, evitando que o funil seja resetado quando o SDR já vinha pré-selecionado via `defaultSdrId`:
+Em `SDRDetailPage.tsx`, na função `aggregateMetricsByDate` ou no bloco `displayMetrics`, excluir os registros onde `funnel === ""` antes de agregar — pois quando o SDR tem funis cadastrados, os registros com funil vazio são registros-problema do bug anterior e não devem compor a soma total.
 
 ```typescript
-// Antes (problemático):
-useEffect(() => {
-  if (selectedSdrId && !defaultMetric) {
-    form.setValue('funnel', 'none');
-  }
-}, [selectedSdrId]);
-
-// Depois (corrigido):
-const isFirstRender = useRef(true);
-useEffect(() => {
-  if (isFirstRender.current) {
-    isFirstRender.current = false;
-    return; // Não resetar no primeiro render
-  }
-  if (selectedSdrId && !defaultMetric) {
-    form.setValue('funnel', 'none');
-  }
-}, [selectedSdrId]);
+// Na lógica displayMetrics, ao agregar por data, filtrar funil vazio:
+if (funnels && funnels.length > 1) {
+  // Excluir registros sem funil atribuído quando SDR tem funis configurados
+  const metricsWithFunnel = rawMetrics.filter(m => m.funnel !== '');
+  return aggregateMetricsByDate(metricsWithFunnel);
+}
 ```
 
-### 2. Tornar o campo de funil obrigatório quando há funis disponíveis
+### 2. Hook useSDRMetrics — filtro opcional por funnel conhecido
 
-No schema Zod, modificar a validação para exigir a seleção de um funil quando o SDR tem funis cadastrados. Isso previne o envio silencioso com funil vazio.
+Complementarmente, garantir que a query ao banco já exclua registros de funnil vazio quando o SDR tem funis cadastrados. Isso torna o filtro mais robusto mesmo que o problema se repita no futuro.
 
-Adicionar validação visual: se o SDR tem funis mas o usuário deixou em "Nenhum", mostrar um aviso.
+### 3. Verificar o hook useSDRsWithMetrics (dashboard geral)
 
-### 3. Limpar registros semente com funil vazio para Clara (data operacional)
+O `useSDRsWithMetrics` já tem um filtro `.neq('funnel', '')` que exclui corretamente os registros com funil vazio. Portanto, o dashboard geral já está correto. O problema é exclusivamente na página de detalhe do SDR.
 
-Executar operação no banco para remover os registros com `funnel = ""` que foram criados pelas tentativas anteriores de seed, para não poluir o dashboard da Clara com dados zerados/inválidos.
+## Alterações de Codigo
 
-### 4. Verificar e corrigir o mesmo padrão no `SDRDetailPage`
+**Arquivo:** `src/components/dashboard/sdr/SDRDetailPage.tsx`
 
-Na página de detalhe, o SDR já vem pré-selecionado via prop `sdrId`, então o `defaultSdrId` é sempre passado. O useEffect dispara no mount e reseta o funil antes que o usuário consiga selecioná-lo.
+Modificar o bloco `displayMetrics` (linha 152-166) para filtrar registros com `funnel = ""` antes de agregar quando o SDR possui funis cadastrados:
 
-## Resumo das Alterações de Código
+```typescript
+const displayMetrics = useMemo(() => {
+  if (!rawMetrics) return [];
+  
+  if (selectedFunnel) {
+    // Filter by specific funnel
+    return rawMetrics.filter(m => m.funnel === selectedFunnel);
+  }
+  
+  // When viewing all funnels and SDR has multiple funnels,
+  // exclude empty-funnel records (created by the old bug) and aggregate by date
+  if (funnels && funnels.length > 1) {
+    const metricsWithFunnel = rawMetrics.filter(m => m.funnel !== '');
+    return aggregateMetricsByDate(metricsWithFunnel);
+  }
+  
+  return rawMetrics;
+}, [rawMetrics, selectedFunnel, funnels]);
+```
 
-- `src/components/dashboard/sdr/SDRMetricsForm.tsx`: Corrigir useEffect com `useRef` para evitar reset no primeiro render
-- Limpeza dos registros com `funnel = ""` para Social Sellings que têm funis cadastrados (operação no banco de dados)
-
-## Resultado Esperado
-
-Após a correção:
-- O funil selecionado pelo usuário será preservado corretamente ao submeter o formulário
-- Não haverá mais registros com funil vazio criados acidentalmente quando um funil deveria ter sido selecionado
-- O dashboard da Clara exibirá apenas dados válidos nos funis "Mentoria Julia" e "SS Julia"
+Esta mudança garante que:
+- Quando um funil especifico esta selecionado: mostra apenas registros daquele funil (sem alteracao)
+- Quando "Todos os Funis" esta selecionado e o SDR tem funis cadastrados: soma apenas os registros com funil nomeado, excluindo os registros com funil vazio criados pelo bug anterior
+- Quando o SDR nao tem funis cadastrados: exibe todos os registros normalmente (sem alteracao)
