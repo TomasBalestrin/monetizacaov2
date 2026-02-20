@@ -1,55 +1,70 @@
 
+# Diagnóstico e Correção do Problema de Salvamento de Métricas por Funil
 
-# Gerenciamento de Funis por SDR
+## Problema Identificado
 
-## Problema
-Atualmente, os funis de cada SDR sao descobertos dinamicamente a partir de registros existentes na tabela `sdr_metrics`. Nao existe uma interface dedicada para vincular ou desvincular funis de um SDR -- a unica forma e inserir registros semente diretamente no banco de dados.
+Ao analisar o banco de dados, foram encontrados registros com `funnel = ""` (vazio) misturados com registros de funis nomeados para a Clara nas mesmas datas:
 
-## Solucao
-Criar uma tabela dedicada `sdr_funnels` para gerenciar os funis de cada SDR, e adicionar uma interface de gerenciamento acessivel para admins e gerentes.
+- 20/02: 1 registro com `funnel = ""` — nenhum com "Mentoria Julia"
+- 19/02: 1 registro com `funnel = ""`, 1 com "Mentoria Julia", 1 com "SS Julia"
 
-## Alteracoes
+Isso indica que ao tentar salvar dados no funil "Mentoria Julia" para 20/02, o formulário pode ter submetido com `funnel = ""` por alguma dessas causas:
 
-### 1. Banco de Dados - Nova tabela `sdr_funnels`
+**Causa 1 - Reset de funil ao mudar SDR**: O `useEffect` no `SDRMetricsForm` reseta o funil para `"none"` sempre que `selectedSdrId` muda. Se a página for recarregada com o SDR já pré-selecionado (`defaultSdrId`), o `useEffect` dispara uma vez e reseta o funil para `"none"` mesmo que o usuário já tivesse selecionado um funil.
 
-```text
-sdr_funnels
------------
-id          uuid (PK)
-sdr_id      uuid (FK -> sdrs.id, ON DELETE CASCADE)
-funnel_name text (NOT NULL)
-created_at  timestamptz
-created_by  uuid
+**Causa 2 - Condição do useEffect frágil**: A condição `if (selectedSdrId && !defaultMetric)` não é suficiente para evitar o reset indevido no primeiro render quando o SDR vem do `defaultSdrId`.
 
-UNIQUE(sdr_id, funnel_name)
+**Causa 3 - Registros semente com funil vazio**: As tentativas anteriores de adicionar funis via insert de registros semente criaram registros com `funnel = ""` que agora aparecem na tabela e confundem a visualização.
+
+## Alterações Planejadas
+
+### 1. Corrigir o useEffect de reset de funil em `SDRMetricsForm.tsx`
+
+Adicionar uma referência (`useRef`) para distinguir o **primeiro render** dos renders subsequentes, evitando que o funil seja resetado quando o SDR já vinha pré-selecionado via `defaultSdrId`:
+
+```typescript
+// Antes (problemático):
+useEffect(() => {
+  if (selectedSdrId && !defaultMetric) {
+    form.setValue('funnel', 'none');
+  }
+}, [selectedSdrId]);
+
+// Depois (corrigido):
+const isFirstRender = useRef(true);
+useEffect(() => {
+  if (isFirstRender.current) {
+    isFirstRender.current = false;
+    return; // Não resetar no primeiro render
+  }
+  if (selectedSdrId && !defaultMetric) {
+    form.setValue('funnel', 'none');
+  }
+}, [selectedSdrId]);
 ```
 
-Politicas RLS:
-- Admins: acesso total (ALL)
-- Managers: acesso total para SDRs do seu escopo (usando `manager_can_access_sdr`)
-- Usuarios autenticados: leitura (SELECT)
+### 2. Tornar o campo de funil obrigatório quando há funis disponíveis
 
-Migracao de dados: inserir registros na nova tabela a partir dos funis unicos ja existentes em `sdr_metrics`.
+No schema Zod, modificar a validação para exigir a seleção de um funil quando o SDR tem funis cadastrados. Isso previne o envio silencioso com funil vazio.
 
-### 2. Hook `useSDRFunnels` - Atualizar fonte de dados
-Modificar `src/hooks/useSdrMetrics.ts` para:
-- Buscar funis da nova tabela `sdr_funnels` ao inves de extrair valores unicos de `sdr_metrics`
-- Adicionar hooks `useAddSDRFunnel` e `useDeleteSDRFunnel` para criar/remover funis
+Adicionar validação visual: se o SDR tem funis mas o usuário deixou em "Nenhum", mostrar um aviso.
 
-### 3. Novo componente `SDRFunnelManager`
-Criar `src/components/dashboard/sdr/SDRFunnelManager.tsx`:
-- Dialog que exibe os funis vinculados a um SDR
-- Campo de texto + botao para adicionar novo funil
-- Botao de remover (icone de lixeira) ao lado de cada funil existente
-- Acessivel apenas para admins e managers (verificacao via `useAuth`)
+### 3. Limpar registros semente com funil vazio para Clara (data operacional)
 
-### 4. Integrar na interface existente
-- No `SDRDetailPage`: adicionar botao de engrenagem/configuracao ao lado do nome do SDR para abrir o gerenciador de funis (visivel apenas para admins/managers)
-- No `SDRDashboard`: opcionalmente, adicionar acesso ao gerenciador ao clicar com botao direito ou via menu no card do SDR
+Executar operação no banco para remover os registros com `funnel = ""` que foram criados pelas tentativas anteriores de seed, para não poluir o dashboard da Clara com dados zerados/inválidos.
 
-## Detalhes Tecnicos
+### 4. Verificar e corrigir o mesmo padrão no `SDRDetailPage`
 
-O formulario de metricas (`SDRMetricsForm`) continuara usando o hook `useSDRFunnels`, que agora consultara a tabela dedicada ao inves de derivar dos dados. Isso garante que funis novos aparecam imediatamente nos seletores sem precisar de registros semente.
+Na página de detalhe, o SDR já vem pré-selecionado via prop `sdrId`, então o `defaultSdrId` é sempre passado. O useEffect dispara no mount e reseta o funil antes que o usuário consiga selecioná-lo.
 
-A migracao incluira um INSERT que popula `sdr_funnels` com todos os funis unicos ja existentes em `sdr_metrics`, garantindo que nada seja perdido.
+## Resumo das Alterações de Código
 
+- `src/components/dashboard/sdr/SDRMetricsForm.tsx`: Corrigir useEffect com `useRef` para evitar reset no primeiro render
+- Limpeza dos registros com `funnel = ""` para Social Sellings que têm funis cadastrados (operação no banco de dados)
+
+## Resultado Esperado
+
+Após a correção:
+- O funil selecionado pelo usuário será preservado corretamente ao submeter o formulário
+- Não haverá mais registros com funil vazio criados acidentalmente quando um funil deveria ter sido selecionado
+- O dashboard da Clara exibirá apenas dados válidos nos funis "Mentoria Julia" e "SS Julia"
