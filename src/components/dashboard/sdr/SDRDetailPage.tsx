@@ -158,8 +158,10 @@ export function SDRDetailPage({
     }
     
     // If no funnel selected and SDR has multiple funnels, aggregate by date
+    // Exclude empty-funnel records (created by a previous bug) to avoid inflating totals
     if (funnels && funnels.length > 1) {
-      return aggregateMetricsByDate(rawMetrics);
+      const metricsWithFunnel = rawMetrics.filter(m => m.funnel !== '');
+      return aggregateMetricsByDate(metricsWithFunnel);
     }
     
     return rawMetrics;
