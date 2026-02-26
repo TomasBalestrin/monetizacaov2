@@ -25,10 +25,10 @@ import { CloserDataTable } from './CloserDataTable';
 import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
 import { CloserFunnelForm } from './CloserFunnelForm';
 import { useClosers, useCloserMetrics, useDeleteMetric, type CloserMetricRecord } from '@/hooks/useMetrics';
+import { useCloserFunnelData, useUserFunnels, type FunnelDailyData } from '@/hooks/useFunnels';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
 import { useGoals, getGoalTarget } from '@/hooks/useGoals';
-import { useUserFunnels } from '@/hooks/useFunnels';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
 import {
@@ -136,6 +136,36 @@ export function CloserDetailPage({
   );
   const { data: goals } = useGoals('closer', closerId, monthStr);
   const { data: closerFunnels } = useUserFunnels(closerId);
+  const { data: funnelData, isLoading: isLoadingFunnelData } = useCloserFunnelData(
+    closerId,
+    selectedFunnel || undefined,
+    selectedFunnel ? periodStart : undefined,
+    selectedFunnel ? periodEnd : undefined
+  );
+
+  // Map funnel_daily_data to CloserMetricRecord format
+  const mappedFunnelMetrics: CloserMetricRecord[] = useMemo(() => {
+    if (!funnelData || !selectedFunnel) return [];
+    return funnelData.map((fd: FunnelDailyData) => ({
+      id: fd.id,
+      closer_id: fd.user_id,
+      period_start: fd.date,
+      period_end: fd.date,
+      calls: fd.calls_done,
+      sales: fd.sales_count,
+      revenue: fd.sales_value,
+      entries: 0,
+      revenue_trend: 0,
+      entries_trend: 0,
+      cancellations: 0,
+      cancellation_value: 0,
+      cancellation_entries: 0,
+      created_at: fd.created_at,
+      updated_at: fd.created_at,
+      created_by: fd.created_by,
+      source: 'funnel',
+    }));
+  }, [funnelData, selectedFunnel]);
 
   // Filter closers by current squad
   const squadClosers = useMemo(() => {
@@ -145,17 +175,24 @@ export function CloserDetailPage({
 
   const closer = squadClosers.find((c) => c.id === closerId);
 
+  // Use funnel data when a funnel is selected, otherwise use regular metrics
+  const activeMetrics = useMemo(() => {
+    return selectedFunnel ? mappedFunnelMetrics : (metrics || []);
+  }, [selectedFunnel, mappedFunnelMetrics, metrics]);
+
+  const isLoadingActiveMetrics = selectedFunnel ? isLoadingFunnelData : isLoadingMetrics;
+
   // Week filtering
   const weekFilteredMetrics = useMemo(() => {
-    if (!metrics || !selectedWeek) return metrics || [];
+    if (!selectedWeek) return activeMetrics;
     const weeks = getWeeksOfMonth(selectedMonth);
     const activeWeek = weeks.find(w => w.weekKey === selectedWeek);
-    if (!activeWeek) return metrics;
-    return metrics.filter(m => {
+    if (!activeWeek) return activeMetrics;
+    return activeMetrics.filter(m => {
       const date = parseDateString(m.period_start);
       return date >= activeWeek.startDate && date <= activeWeek.endDate;
     });
-  }, [metrics, selectedWeek, selectedMonth]);
+  }, [activeMetrics, selectedWeek, selectedMonth]);
 
   const aggregatedMetrics = weekFilteredMetrics.length > 0 ? calculateAggregatedMetrics(weekFilteredMetrics, squadSlug) : null;
 
@@ -391,7 +428,7 @@ export function CloserDetailPage({
         )}
 
         {/* Metrics - Hierarchical Grid */}
-        {isLoadingMetrics ? (
+        {isLoadingActiveMetrics ? (
           <MetricCardSkeletonGrid count={7} />
         ) : (
           <div className="space-y-4">
@@ -487,14 +524,14 @@ export function CloserDetailPage({
         )}
 
         {/* Chart */}
-        {isLoadingMetrics ? (
+        {isLoadingActiveMetrics ? (
           <ChartSkeleton height={350} />
         ) : (
-          <CloserWeeklyComparisonChart metrics={metrics || []} activeWeekKey={selectedWeek} />
+          <CloserWeeklyComparisonChart metrics={activeMetrics} activeWeekKey={selectedWeek} />
         )}
 
         {/* Data Table */}
-        {isLoadingMetrics ? (
+        {isLoadingActiveMetrics ? (
           <TableSkeleton rows={5} columns={8} />
         ) : (
           <CloserDataTable 
