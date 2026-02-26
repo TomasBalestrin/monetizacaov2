@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, TrendingUp, Users, Phone, DollarSign, Target, Filter, ArrowLeft } from 'lucide-react';
+import { FileText, TrendingUp, Users, Phone, DollarSign, Target, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { PeriodFilter } from '@/components/dashboard/PeriodFilter';
 import { useAllFunnelsSummary, useFunnelReport, type FunnelSummary } from '@/hooks/useFunnels';
 import { MetricCardSkeletonGrid } from '@/components/dashboard/skeletons';
 import { FunnelChart } from './FunnelChart';
-import { FunnelSummaryCard } from './FunnelSummaryCard';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Select,
   SelectContent,
@@ -41,17 +41,22 @@ export function ReportsPage() {
     periodEnd
   );
 
+  const displayedSummaries = useMemo(() => {
+    if (!summaries) return [];
+    return selectedFunnelId ? summaries.filter(f => f.funnel_id === selectedFunnelId) : summaries;
+  }, [summaries, selectedFunnelId]);
+
   const totals = useMemo(() => {
-    if (!summaries || summaries.length === 0) return null;
+    if (!displayedSummaries || displayedSummaries.length === 0) return null;
     return {
-      leads: summaries.reduce((s, f) => s + Number(f.total_leads), 0),
-      qualified: summaries.reduce((s, f) => s + Number(f.total_qualified), 0),
-      scheduled: summaries.reduce((s, f) => s + Number(f.total_calls_scheduled), 0),
-      done: summaries.reduce((s, f) => s + Number(f.total_calls_done), 0),
-      sales: summaries.reduce((s, f) => s + Number(f.total_sales), 0),
-      revenue: summaries.reduce((s, f) => s + Number(f.total_revenue), 0),
+      leads: displayedSummaries.reduce((s, f) => s + Number(f.total_leads), 0),
+      qualified: displayedSummaries.reduce((s, f) => s + Number(f.total_qualified), 0),
+      scheduled: displayedSummaries.reduce((s, f) => s + Number(f.total_calls_scheduled), 0),
+      done: displayedSummaries.reduce((s, f) => s + Number(f.total_calls_done), 0),
+      sales: displayedSummaries.reduce((s, f) => s + Number(f.total_sales), 0),
+      revenue: displayedSummaries.reduce((s, f) => s + Number(f.total_revenue), 0),
     };
-  }, [summaries]);
+  }, [displayedSummaries]);
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -61,16 +66,6 @@ export function ReportsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
-          {selectedFunnelId && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSelectedFunnelId(null)}
-              className="shrink-0"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-          )}
           <div className="p-3 rounded-2xl bg-primary/10">
             <FileText size={28} className="text-primary" />
           </div>
@@ -131,18 +126,45 @@ export function ReportsPage() {
         <FunnelChart report={detailedReport} />
       )}
 
-      {/* All funnels summary cards */}
-      {!selectedFunnelId && summaries && summaries.length > 0 && (
+      {/* Funnel Data Table */}
+      {displayedSummaries.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Desempenho por Funil</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {summaries.map((f) => (
-              <FunnelSummaryCard
-                key={f.funnel_id}
-                summary={f}
-                onClick={() => setSelectedFunnelId(f.funnel_id)}
-              />
-            ))}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Funil</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">Qualificados</TableHead>
+                  <TableHead className="text-right">Agendadas</TableHead>
+                  <TableHead className="text-right">Realizadas</TableHead>
+                  <TableHead className="text-right">Vendas</TableHead>
+                  <TableHead className="text-right">Faturamento</TableHead>
+                  <TableHead className="text-right">Conversão</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayedSummaries.map((f) => (
+                  <TableRow key={f.funnel_id}>
+                    <TableCell className="font-medium">{f.funnel_name}</TableCell>
+                    <TableCell>
+                      {f.category ? (
+                        <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{f.category}</span>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">{Number(f.total_leads)}</TableCell>
+                    <TableCell className="text-right">{Number(f.total_qualified)}</TableCell>
+                    <TableCell className="text-right">{Number(f.total_calls_scheduled)}</TableCell>
+                    <TableCell className="text-right">{Number(f.total_calls_done)}</TableCell>
+                    <TableCell className="text-right">{Number(f.total_sales)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(Number(f.total_revenue))}</TableCell>
+                    <TableCell className="text-right font-semibold">{Number(f.conversion_rate).toFixed(1)}%</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
