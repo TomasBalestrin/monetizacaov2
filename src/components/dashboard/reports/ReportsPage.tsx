@@ -135,7 +135,7 @@ export function ReportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Funil</TableHead>
-                  <TableHead>Categoria</TableHead>
+                  
                   <TableHead className="text-right">Leads</TableHead>
                   <TableHead className="text-right">Qualificados</TableHead>
                   <TableHead className="text-right">Agendadas</TableHead>
@@ -149,11 +149,8 @@ export function ReportsPage() {
                 {displayedSummaries.map((f) => (
                   <TableRow key={f.funnel_id}>
                     <TableCell className="font-medium">{f.funnel_name}</TableCell>
-                    <TableCell>
-                      {f.category ? (
-                        <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{f.category}</span>
-                      ) : '—'}
-                    </TableCell>
+
+
                     <TableCell className="text-right">{Number(f.total_leads)}</TableCell>
                     <TableCell className="text-right">{Number(f.total_qualified)}</TableCell>
                     <TableCell className="text-right">{Number(f.total_calls_scheduled)}</TableCell>
