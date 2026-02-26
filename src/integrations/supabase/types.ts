@@ -776,6 +776,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_all_funnels_summary: {
+        Args: { p_period_end?: string; p_period_start?: string }
+        Returns: Json
+      }
+      get_funnel_report: {
+        Args: {
+          p_funnel_id: string
+          p_period_end?: string
+          p_period_start?: string
+        }
+        Returns: Json
+      }
       get_sdr_total_metrics: {
         Args: { p_period_end?: string; p_period_start?: string; p_type: string }
         Returns: Json

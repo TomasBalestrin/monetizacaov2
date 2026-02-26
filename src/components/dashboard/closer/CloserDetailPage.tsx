@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Phone, Target, DollarSign, TrendingUp, ChevronLeft, ChevronRight, XCircle, Plus } from 'lucide-react';
+import { ArrowLeft, Phone, Target, DollarSign, TrendingUp, ChevronLeft, ChevronRight, XCircle, Plus, Filter, Layers } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,12 +23,21 @@ import { MetricCard } from '@/components/dashboard/MetricCard';
 import { CloserWeeklyComparisonChart } from './CloserWeeklyComparisonChart';
 import { CloserDataTable } from './CloserDataTable';
 import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
+import { CloserFunnelForm } from './CloserFunnelForm';
 import { useClosers, useCloserMetrics, useDeleteMetric, type CloserMetricRecord } from '@/hooks/useMetrics';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
 import { useGoals, getGoalTarget } from '@/hooks/useGoals';
+import { useUserFunnels } from '@/hooks/useFunnels';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface CloserDetailPageProps {
   closerId: string;
@@ -103,9 +112,11 @@ export function CloserDetailPage({
   const queryClient = useQueryClient();
   const [, setSearchParams] = useSearchParams();
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
+  const [isFunnelFormOpen, setIsFunnelFormOpen] = useState(false);
   const [editingMetric, setEditingMetric] = useState<CloserMetricRecord | undefined>();
   const [deletingMetricId, setDeletingMetricId] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
   
   const deleteMetric = useDeleteMetric();
   
@@ -124,6 +135,7 @@ export function CloserDetailPage({
     periodEnd
   );
   const { data: goals } = useGoals('closer', closerId, monthStr);
+  const { data: closerFunnels } = useUserFunnels(closerId);
 
   // Filter closers by current squad
   const squadClosers = useMemo(() => {
@@ -281,6 +293,36 @@ export function CloserDetailPage({
               <Plus size={16} />
               Adicionar
             </Button>
+
+            {closerFunnels && closerFunnels.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFunnelFormOpen(true)}
+                className="gap-2"
+              >
+                <Layers size={16} />
+                Por Funil
+              </Button>
+            )}
+
+            {closerFunnels && closerFunnels.length > 0 && (
+              <Select
+                value={selectedFunnel || 'all'}
+                onValueChange={(v) => setSelectedFunnel(v === 'all' ? null : v)}
+              >
+                <SelectTrigger className="w-[160px] h-9">
+                  <Filter size={14} className="mr-1 text-muted-foreground" />
+                  <SelectValue placeholder="Funil" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Funis</SelectItem>
+                  {closerFunnels.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             
             <MonthSelector
               selectedMonth={selectedMonth}
@@ -302,7 +344,16 @@ export function CloserDetailPage({
           defaultCloserId={closerId}
         />
 
-        {/* Dialog for editing metric */}
+        {/* Dialog for per-funnel data entry */}
+        {closer && (
+          <CloserFunnelForm
+            open={isFunnelFormOpen}
+            onOpenChange={setIsFunnelFormOpen}
+            closerId={closerId}
+            closerName={closer.name}
+          />
+        )}
+
         <SquadMetricsDialog
           open={!!editingMetric}
           onOpenChange={(open) => !open && setEditingMetric(undefined)}

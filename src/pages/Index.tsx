@@ -15,6 +15,7 @@ const SDRDashboard = lazy(() => import('@/components/dashboard/sdr').then(m => (
 const UserDashboard = lazy(() => import('@/components/dashboard/UserDashboard').then(m => ({ default: m.UserDashboard })));
 const GoalsConfig = lazy(() => import('@/components/dashboard/GoalsConfig').then(m => ({ default: m.GoalsConfig })));
 const MeetingsPage = lazy(() => import('@/components/dashboard/meetings').then(m => ({ default: m.MeetingsPage })));
+const ReportsPage = lazy(() => import('@/components/dashboard/reports').then(m => ({ default: m.ReportsPage })));
 
 function PageLoader() {
   return (
@@ -75,14 +76,7 @@ const Index = () => {
       case 'sdrs':
         return <SDRDashboard />;
       case 'reports':
-        return (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Relatórios</h2>
-              <p className="text-muted-foreground">Em desenvolvimento...</p>
-            </div>
-          </div>
-        );
+        return <ReportsPage />;
       default:
         return <DashboardOverview />;
     }

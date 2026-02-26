@@ -36,16 +36,16 @@ O PRD abrange 4 frentes selecionadas. Dado o tamanho, a implementação será fa
 
 ---
 
-## Fase 4: Módulo de Relatórios Backend (P1) — PRÓXIMO
+## Fase 4: Módulo de Relatórios Backend (P1) ✅ CONCLUÍDO
 
-### 4.1 Views e RPCs no banco
-### 4.2 Frontend: Página de Relatórios
-### 4.3 Hooks de dados
+### 4.1 ✅ RPCs `get_funnel_report` e `get_all_funnels_summary` criadas
+### 4.2 ✅ Frontend: Página de Relatórios com FunnelChart, FunnelSummaryCard, filtros
+### 4.3 ✅ Hook `useFunnels.ts` com todas as queries e mutations
 
 ---
 
-## Fase 5: Cadastro Closer por Funil + Filtro (P1-P2) — PRÓXIMO
+## Fase 5: Cadastro Closer por Funil + Filtro (P1-P2) ✅ CONCLUÍDO
 
-### 5.1 Reestruturar formulário de entrada de dados do Closer
-### 5.2 Filtro por funil no dashboard do Closer
-### 5.3 Hooks de dados
+### 5.1 ✅ Formulário `CloserFunnelForm` com entrada batch por funil
+### 5.2 ✅ Filtro por funil no dashboard do Closer (dropdown Select)
+### 5.3 ✅ Hooks: `useUserFunnels`, `useCloserFunnelData`, `useCreateFunnelDailyData`
