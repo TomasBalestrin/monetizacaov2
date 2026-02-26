@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { FileText, TrendingUp, Users, Phone, DollarSign, Target, Filter } from 'lucide-react';
+import { FileText, TrendingUp, Users, Phone, DollarSign, Target, Filter, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
@@ -48,6 +49,16 @@ export function ReportsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
+          {selectedFunnelId && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedFunnelId(null)}
+              className="shrink-0"
+            >
+              <ArrowLeft size={20} />
+            </Button>
+          )}
           <div className="p-3 rounded-2xl bg-primary/10">
             <FileText size={28} className="text-primary" />
           </div>
