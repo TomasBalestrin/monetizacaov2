@@ -143,10 +143,6 @@ export function useDeleteUser() {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      // Note: We can only delete the profile, roles, and permissions
-      // The auth.users entry requires admin SDK which we don't have access to
-      // For now, we'll delete related data
-      
       const { error: rolesError } = await supabase
         .from('user_roles')
         .delete()
@@ -160,9 +156,6 @@ export function useDeleteUser() {
         .eq('user_id', userId);
       
       if (permsError) throw permsError;
-
-      // Note: Profile will be cascade deleted if auth user is deleted
-      // For now just clear permissions
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -178,6 +171,39 @@ export function useDeleteUser() {
         description: 'Não foi possível atualizar o usuário.',
       });
       console.error('Error deleting user:', error);
+    },
+  });
+}
+
+export function useDeleteUserCompletely() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: userId }
+      });
+
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
+      
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: 'Usuário excluído',
+        description: 'O usuário foi removido permanentemente do sistema.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir usuário',
+        description: error.message,
+      });
+      console.error('Error deleting user completely:', error);
     },
   });
 }

@@ -14,6 +14,7 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   trend?: number;
+  trendWarning?: string;
   icon?: LucideIcon;
   large?: boolean;
   compact?: boolean;
@@ -29,6 +30,7 @@ export function MetricCard({
   title,
   value,
   trend,
+  trendWarning,
   icon: Icon,
   large = false,
   compact = false,
@@ -207,6 +209,9 @@ export function MetricCard({
                   {trend.toFixed(1)}%
                 </span>
               </div>
+            )}
+            {trendWarning && (
+              <p className="text-xs text-muted-foreground mt-1 italic">{trendWarning}</p>
             )}
           </div>
           {Icon && (

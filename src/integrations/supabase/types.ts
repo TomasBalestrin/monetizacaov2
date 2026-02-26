@@ -46,6 +46,89 @@ export type Database = {
           },
         ]
       }
+      funnel_daily_data: {
+        Row: {
+          calls_done: number
+          calls_scheduled: number
+          created_at: string
+          created_by: string | null
+          date: string
+          funnel_id: string
+          id: string
+          leads_count: number
+          qualified_count: number
+          sales_count: number
+          sales_value: number
+          sdr_id: string | null
+          user_id: string
+        }
+        Insert: {
+          calls_done?: number
+          calls_scheduled?: number
+          created_at?: string
+          created_by?: string | null
+          date: string
+          funnel_id: string
+          id?: string
+          leads_count?: number
+          qualified_count?: number
+          sales_count?: number
+          sales_value?: number
+          sdr_id?: string | null
+          user_id: string
+        }
+        Update: {
+          calls_done?: number
+          calls_scheduled?: number
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          funnel_id?: string
+          id?: string
+          leads_count?: number
+          qualified_count?: number
+          sales_count?: number
+          sales_value?: number
+          sdr_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_daily_data_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnels: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           created_at: string
@@ -634,6 +717,38 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_funnels: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          funnel_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          funnel_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          funnel_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_funnels_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
             referencedColumns: ["id"]
           },
         ]

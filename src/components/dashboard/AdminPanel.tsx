@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2, Target } from 'lucide-react';
-import { useUsers, useAssignRole, useTogglePermission, useDeleteUser } from '@/hooks/useUserManagement';
+import { useUsers, useAssignRole, useTogglePermission } from '@/hooks/useUserManagement';
+import { DeleteUserDialog } from './DeleteUserDialog';
 import { useAllEntityLinks, useClosersForLinking, useSDRsForLinking } from '@/hooks/useUserEntityLinks';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ const MODULES = ['dashboard', 'eagles', 'sharks', 'sdrs', 'reports', 'admin'];
 export function AdminPanel() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editLinksUser, setEditLinksUser] = useState<{ id: string; email: string } | null>(null);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<{ id: string; email: string } | null>(null);
   const { user: currentUser } = useAuth();
   const { data: users, isLoading } = useUsers();
   const { data: entityLinks } = useAllEntityLinks();
@@ -24,7 +26,6 @@ export function AdminPanel() {
   const { data: sdrs } = useSDRsForLinking();
   const assignRole = useAssignRole();
   const togglePermission = useTogglePermission();
-  const deleteUser = useDeleteUser();
 
   // Helper to get entity names for a user
   const getUserLinks = (userId: string) => {
@@ -147,8 +148,7 @@ export function AdminPanel() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => deleteUser.mutate(user.id)}
-                            disabled={deleteUser.isPending}
+                            onClick={() => setDeleteUserTarget({ id: user.id, email: user.email })}
                           >
                             <Trash2 size={16} className="mr-1" />
                             Remover
@@ -213,6 +213,15 @@ export function AdminPanel() {
           onOpenChange={(open) => !open && setEditLinksUser(null)}
           userId={editLinksUser.id}
           userEmail={editLinksUser.email}
+        />
+      )}
+
+      {deleteUserTarget && (
+        <DeleteUserDialog
+          open={!!deleteUserTarget}
+          onOpenChange={(open) => !open && setDeleteUserTarget(null)}
+          userId={deleteUserTarget.id}
+          userEmail={deleteUserTarget.email}
         />
       )}
     </div>

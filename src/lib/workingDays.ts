@@ -179,33 +179,32 @@ export function getWorkingDaysInMonth(year: number, month: number): number {
  * @returns Tendência projetada para o mês completo
  */
 export function calculateTrend(value: number, periodStart: Date): number {
+  const result = calculateTrendDetailed(value, periodStart);
+  return result.projected;
+}
+
+/**
+ * Versão detalhada que retorna também os dias úteis para exibição de avisos
+ */
+export function calculateTrendDetailed(value: number, periodStart: Date): { projected: number; workedDays: number; totalDays: number } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Mês de referência é baseado no período selecionado
   const referenceMonth = periodStart.getMonth();
   const referenceYear = periodStart.getFullYear();
-  
-  // Primeiro dia do mês de referência
   const monthStart = new Date(referenceYear, referenceMonth, 1);
   
-  // Se hoje está no mesmo mês, conta até hoje
-  // Se não, conta até o último dia do mês de referência
   let workedUntil: Date;
   if (today.getFullYear() === referenceYear && today.getMonth() === referenceMonth) {
     workedUntil = today;
   } else {
-    // Se o período é de um mês anterior ou futuro, usa o mês completo
     workedUntil = new Date(referenceYear, referenceMonth + 1, 0);
   }
   
-  // Dias úteis trabalhados (início do mês até a data de referência)
   const workedDays = getWorkingDaysBetween(monthStart, workedUntil);
-  
-  // Total de dias úteis no mês
   const totalDays = getWorkingDaysInMonth(referenceYear, referenceMonth);
   
-  if (workedDays === 0) return 0;
+  if (workedDays === 0) return { projected: 0, workedDays, totalDays };
   
-  return (value / workedDays) * totalDays;
+  return { projected: (value / workedDays) * totalDays, workedDays, totalDays };
 }
