@@ -186,6 +186,33 @@ export function useCreateFunnelDailyData() {
   });
 }
 
+// Sales by person and product (RPC)
+export interface PersonProductSales {
+  person_name: string;
+  person_type: string;
+  funnel_name: string;
+  total_sales: number;
+  total_revenue: number;
+  total_leads: number;
+  total_qualified: number;
+  total_scheduled: number;
+  total_done: number;
+}
+
+export function useSalesByPersonAndProduct(periodStart?: string, periodEnd?: string) {
+  return useQuery({
+    queryKey: ['sales-by-person-product', periodStart, periodEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_sales_by_person_and_product', {
+        p_period_start: periodStart || null,
+        p_period_end: periodEnd || null,
+      });
+      if (error) throw error;
+      return (data as unknown as PersonProductSales[]) || [];
+    },
+  });
+}
+
 // Delete funnel daily data
 export function useDeleteFunnelDailyData() {
   const queryClient = useQueryClient();

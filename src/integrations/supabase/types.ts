@@ -788,6 +788,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_sales_by_person_and_product: {
+        Args: { p_period_end?: string; p_period_start?: string }
+        Returns: Json
+      }
       get_sdr_total_metrics: {
         Args: { p_period_end?: string; p_period_start?: string; p_type: string }
         Returns: Json
