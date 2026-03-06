@@ -188,8 +188,10 @@ export function useCreateFunnelDailyData() {
 
 // Sales by person and product (RPC)
 export interface PersonProductSales {
+  person_id: string;
   person_name: string;
   person_type: string;
+  funnel_id: string | null;
   funnel_name: string;
   total_sales: number;
   total_revenue: number;
@@ -197,6 +199,7 @@ export interface PersonProductSales {
   total_qualified: number;
   total_scheduled: number;
   total_done: number;
+  total_entries: number;
 }
 
 export function useSalesByPersonAndProduct(periodStart?: string, periodEnd?: string) {

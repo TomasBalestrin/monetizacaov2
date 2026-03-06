@@ -210,7 +210,7 @@ export function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="by-product" className="space-y-6">
-          <ProductSalesTable data={personProductData || []} isLoading={isLoadingPersonProduct} />
+          <ProductSalesTable data={personProductData || []} isLoading={isLoadingPersonProduct} periodStart={periodStart} periodEnd={periodEnd} canEdit={canManage} />
         </TabsContent>
       </Tabs>
 
