@@ -81,6 +81,9 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
       const delta = newValue - currentValue;
       if (delta === 0) return;
 
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+
       if (row.person_type === 'closer') {
         if (row.funnel_id) {
           if (field === 'sales') {
@@ -90,11 +93,12 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
               date: periodEnd,
               sales_count: delta,
               sales_value: 0,
+              created_by: userId,
             });
             if (error) throw error;
           }
         } else {
-          const insertPayload = {
+          const { error } = await supabase.from('metrics').insert({
             closer_id: row.person_id,
             period_start: periodStart,
             period_end: periodEnd,
@@ -103,8 +107,8 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
             calls: 0,
             revenue: 0,
             entries: field === 'entries' ? delta : 0,
-          };
-          const { error } = await supabase.from('metrics').insert(insertPayload);
+            created_by: userId,
+          });
           if (error) throw error;
         }
       } else {
@@ -116,6 +120,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
             funnel: row.funnel_name,
             sales: delta,
             source: 'manual',
+            created_by: userId,
           });
           if (error) throw error;
         }
