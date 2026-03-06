@@ -177,6 +177,58 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
     </TableRow>
   );
 
+  const handleSaveAggField = async (
+    p: typeof personTotals[0],
+    field: 'sales' | 'entries',
+    newValue: number
+  ) => {
+    const currentValue = field === 'sales' ? p.total_sales : p.total_entries;
+    const delta = newValue - currentValue;
+    if (delta === 0) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+
+      if (p.person_type === 'closer') {
+        const { error } = await supabase.from('metrics').insert({
+          closer_id: p.person_id,
+          period_start: periodStart,
+          period_end: periodEnd,
+          source: 'manual' as const,
+          sales: field === 'sales' ? delta : 0,
+          calls: 0,
+          revenue: 0,
+          entries: field === 'entries' ? delta : 0,
+          created_by: userId,
+        });
+        if (error) throw error;
+      } else {
+        if (field === 'sales') {
+          // For aggregated SDR, pick first matching funnel or use empty
+          const matchingRows = filtered.filter(r => r.person_id === p.person_id);
+          const funnelName = matchingRows.length > 0 ? matchingRows[0].funnel_name : '';
+          const { error } = await supabase.from('sdr_metrics').insert({
+            sdr_id: p.person_id,
+            date: periodEnd,
+            funnel: funnelName,
+            sales: delta,
+            source: 'manual',
+            created_by: userId,
+          });
+          if (error) throw error;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['sales-by-person-product'] });
+      queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
+      toast.success('Valor atualizado!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao salvar valor');
+    }
+  };
+
   const renderAggRow = (p: typeof personTotals[0], i: number) => (
     <TableRow key={i}>
       <TableCell className="font-medium">{p.person_name}</TableCell>
@@ -185,9 +237,21 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
       </TableCell>
       <TableCell className="text-right">{p.total_leads}</TableCell>
       <TableCell className="text-right">{p.total_done}</TableCell>
-      <TableCell className="text-right">{p.total_sales}</TableCell>
+      <TableCell className="text-right">
+        <EditableCell
+          value={p.total_sales}
+          onSave={(v) => handleSaveAggField(p, 'sales', v)}
+          disabled={!canEdit}
+        />
+      </TableCell>
       <TableCell className="text-right">{formatCurrency(p.total_revenue)}</TableCell>
-      <TableCell className="text-right">{p.total_entries}</TableCell>
+      <TableCell className="text-right">
+        <EditableCell
+          value={p.total_entries}
+          onSave={(v) => handleSaveAggField(p, 'entries', v)}
+          disabled={!canEdit || p.person_type !== 'closer'}
+        />
+      </TableCell>
       <TableCell className="text-right font-semibold">
         {p.total_done > 0 ? ((p.total_sales / p.total_done) * 100).toFixed(1) : '0.0'}%
       </TableCell>
