@@ -71,13 +71,18 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
     return t;
   };
 
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['sales-by-person-product'] });
+    queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
+  };
+
   const handleSaveField = async (
     row: PersonProductSales,
-    field: 'sales' | 'entries',
+    field: 'sales' | 'entries' | 'revenue',
     newValue: number
   ) => {
     try {
-      const currentValue = field === 'sales' ? Number(row.total_sales) : Number(row.total_entries);
+      const currentValue = field === 'sales' ? Number(row.total_sales) : field === 'revenue' ? Number(row.total_revenue) : Number(row.total_entries);
       const delta = newValue - currentValue;
       if (delta === 0) return;
 
@@ -85,18 +90,25 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
       const userId = user?.id;
 
       if (row.person_type === 'closer') {
-        if (row.funnel_id) {
-          if (field === 'sales') {
-            const { error } = await supabase.from('funnel_daily_data').insert({
-              user_id: row.person_id,
-              funnel_id: row.funnel_id,
-              date: periodEnd,
-              sales_count: delta,
-              sales_value: 0,
-              created_by: userId,
-            });
-            if (error) throw error;
-          }
+        if (row.funnel_id && field === 'sales') {
+          const { error } = await supabase.from('funnel_daily_data').insert({
+            user_id: row.person_id,
+            funnel_id: row.funnel_id,
+            date: periodEnd,
+            sales_count: delta,
+            sales_value: 0,
+            created_by: userId,
+          });
+          if (error) throw error;
+        } else if (row.funnel_id && field === 'revenue') {
+          const { error } = await supabase.from('funnel_daily_data').insert({
+            user_id: row.person_id,
+            funnel_id: row.funnel_id,
+            date: periodEnd,
+            sales_value: delta,
+            created_by: userId,
+          });
+          if (error) throw error;
         } else {
           const { error } = await supabase.from('metrics').insert({
             closer_id: row.person_id,
@@ -105,7 +117,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
             source: 'manual' as const,
             sales: field === 'sales' ? delta : 0,
             calls: 0,
-            revenue: 0,
+            revenue: field === 'revenue' ? delta : 0,
             entries: field === 'entries' ? delta : 0,
             created_by: userId,
           });
@@ -126,8 +138,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['sales-by-person-product'] });
-      queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
+      invalidateQueries();
       toast.success('Valor atualizado!');
     } catch (err) {
       console.error(err);
@@ -161,12 +172,20 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
           disabled={!canEdit}
         />
       </TableCell>
-      <TableCell className="text-right">{formatCurrency(Number(row.total_revenue))}</TableCell>
+      <TableCell className="text-right">
+        <EditableCell
+          value={Number(row.total_revenue)}
+          onSave={(v) => handleSaveField(row, 'revenue', v)}
+          disabled={!canEdit || row.person_type !== 'closer'}
+          formatDisplay={formatCurrency}
+        />
+      </TableCell>
       <TableCell className="text-right">
         <EditableCell
           value={Number(row.total_entries)}
           onSave={(v) => handleSaveField(row, 'entries', v)}
           disabled={!canEdit || row.person_type !== 'closer'}
+          formatDisplay={formatCurrency}
         />
       </TableCell>
       <TableCell className="text-right font-semibold">
@@ -179,10 +198,10 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
 
   const handleSaveAggField = async (
     p: typeof personTotals[0],
-    field: 'sales' | 'entries',
+    field: 'sales' | 'entries' | 'revenue',
     newValue: number
   ) => {
-    const currentValue = field === 'sales' ? p.total_sales : p.total_entries;
+    const currentValue = field === 'sales' ? p.total_sales : field === 'revenue' ? p.total_revenue : p.total_entries;
     const delta = newValue - currentValue;
     if (delta === 0) return;
 
@@ -198,14 +217,13 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
           source: 'manual' as const,
           sales: field === 'sales' ? delta : 0,
           calls: 0,
-          revenue: 0,
+          revenue: field === 'revenue' ? delta : 0,
           entries: field === 'entries' ? delta : 0,
           created_by: userId,
         });
         if (error) throw error;
       } else {
         if (field === 'sales') {
-          // For aggregated SDR, pick first matching funnel or use empty
           const matchingRows = filtered.filter(r => r.person_id === p.person_id);
           const funnelName = matchingRows.length > 0 ? matchingRows[0].funnel_name : '';
           const { error } = await supabase.from('sdr_metrics').insert({
@@ -220,8 +238,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['sales-by-person-product'] });
-      queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
+      invalidateQueries();
       toast.success('Valor atualizado!');
     } catch (err) {
       console.error(err);
@@ -244,12 +261,20 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
           disabled={!canEdit}
         />
       </TableCell>
-      <TableCell className="text-right">{formatCurrency(p.total_revenue)}</TableCell>
+      <TableCell className="text-right">
+        <EditableCell
+          value={p.total_revenue}
+          onSave={(v) => handleSaveAggField(p, 'revenue', v)}
+          disabled={!canEdit || p.person_type !== 'closer'}
+          formatDisplay={formatCurrency}
+        />
+      </TableCell>
       <TableCell className="text-right">
         <EditableCell
           value={p.total_entries}
           onSave={(v) => handleSaveAggField(p, 'entries', v)}
           disabled={!canEdit || p.person_type !== 'closer'}
+          formatDisplay={formatCurrency}
         />
       </TableCell>
       <TableCell className="text-right font-semibold">
@@ -267,7 +292,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
         <TableHead className="text-right">Realizadas</TableHead>
         <TableHead className="text-right">Vendas</TableHead>
         <TableHead className="text-right">Faturamento</TableHead>
-        <TableHead className="text-right">Entrada</TableHead>
+        <TableHead className="text-right">Valor Entrada</TableHead>
         <TableHead className="text-right">Conversão</TableHead>
       </TableRow>
     </TableHeader>
@@ -281,7 +306,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
       <TableCell className="text-right">{grandTotal.done}</TableCell>
       <TableCell className="text-right">{grandTotal.sales}</TableCell>
       <TableCell className="text-right">{formatCurrency(grandTotal.revenue)}</TableCell>
-      <TableCell className="text-right">{grandTotal.entries}</TableCell>
+      <TableCell className="text-right">{formatCurrency(grandTotal.entries)}</TableCell>
       <TableCell className="text-right">
         {grandTotal.done > 0 ? ((grandTotal.sales / grandTotal.done) * 100).toFixed(1) : '0.0'}%
       </TableCell>
