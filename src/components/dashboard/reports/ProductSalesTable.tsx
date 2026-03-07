@@ -177,7 +177,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
           value={Number(row.total_revenue)}
           onSave={(v) => handleSaveField(row, 'revenue', v)}
           disabled={!canEdit || row.person_type !== 'closer'}
-          formatDisplay={formatCurrency}
+          isCurrency
         />
       </TableCell>
       <TableCell className="text-right">
@@ -185,7 +185,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
           value={Number(row.total_entries)}
           onSave={(v) => handleSaveField(row, 'entries', v)}
           disabled={!canEdit || row.person_type !== 'closer'}
-          formatDisplay={formatCurrency}
+          isCurrency
         />
       </TableCell>
       <TableCell className="text-right font-semibold">
@@ -266,7 +266,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
           value={p.total_revenue}
           onSave={(v) => handleSaveAggField(p, 'revenue', v)}
           disabled={!canEdit || p.person_type !== 'closer'}
-          formatDisplay={formatCurrency}
+          isCurrency
         />
       </TableCell>
       <TableCell className="text-right">
@@ -274,7 +274,7 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
           value={p.total_entries}
           onSave={(v) => handleSaveAggField(p, 'entries', v)}
           disabled={!canEdit || p.person_type !== 'closer'}
-          formatDisplay={formatCurrency}
+          isCurrency
         />
       </TableCell>
       <TableCell className="text-right font-semibold">
