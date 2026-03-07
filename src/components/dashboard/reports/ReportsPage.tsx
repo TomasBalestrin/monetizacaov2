@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 
 export function ReportsPage() {
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, hasPermission } = useAuth();
   const canManage = isAdmin || isManager || hasPermission('reports');
 
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()));
