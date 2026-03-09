@@ -1,12 +1,12 @@
 import React from 'react';
-import { Phone, Target, TrendingUp, DollarSign, Zap, Shield, Waves } from 'lucide-react';
+import { Phone, Target, TrendingUp, DollarSign, Zap, Shield, Waves, XCircle } from 'lucide-react';
 import { MetricCard } from './MetricCard';
 import { CombinedMetricCard } from './CombinedMetricCard';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import type { SquadMetrics } from '@/hooks/useMetrics';
+import type { SquadMetrics } from '@/controllers/useCloserController';
 
 interface SquadSectionProps {
   squadMetrics: SquadMetrics;
@@ -48,23 +48,22 @@ export function SquadSection({ squadMetrics, showClosers = true }: SquadSectionP
   const SquadIcon = config.icon;
 
   return (
-    <Card className="glass-card animate-slide-up overflow-hidden border-border/50">
-      {/* Enhanced Header */}
+    <Card className="glass-card animate-slide-up overflow-hidden">
       <CardHeader className={cn('pb-4 bg-gradient-to-r', config.headerBg)}>
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-4">
-            <div className={cn('p-3 rounded-2xl text-white shadow-lg', config.gradient)}>
-              <SquadIcon size={28} />
+          <div className="flex items-center gap-3">
+            <div className={cn('p-2.5 rounded-xl text-white', config.gradient)}>
+              <SquadIcon size={22} />
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-foreground">{squad.name}</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="text-xl font-bold text-foreground tracking-tight">{squad.name}</h3>
+              <p className="text-xs text-muted-foreground">
                 {closers.length} closer{closers.length !== 1 ? 's' : ''} ativos
               </p>
             </div>
           </div>
-          <Badge variant="outline" className={cn('text-sm px-3 py-1', config.badgeClass)}>
-            {totals.conversion.toFixed(1)}% conversão
+          <Badge variant="outline" className={cn('text-xs px-2.5 py-0.5 rounded-lg', config.badgeClass)}>
+            {totals.conversion.toFixed(1)}% conversao
           </Badge>
         </div>
       </CardHeader>
@@ -72,17 +71,17 @@ export function SquadSection({ squadMetrics, showClosers = true }: SquadSectionP
       <CardContent className="space-y-5 pt-4">
         {/* Simple metrics row */}
         <div className="grid grid-cols-3 gap-3">
-          <MetricCard 
-            title="Calls" 
-            value={totals.calls} 
-            icon={Phone} 
+          <MetricCard
+            title="Calls"
+            value={totals.calls}
+            icon={Phone}
             variant={config.variant}
             compact
           />
-          <MetricCard 
-            title="Vendas" 
-            value={totals.sales} 
-            icon={Target} 
+          <MetricCard
+            title="Vendas"
+            value={totals.sales}
+            icon={Target}
             variant={config.variant}
             compact
           />
@@ -99,28 +98,49 @@ export function SquadSection({ squadMetrics, showClosers = true }: SquadSectionP
 
         {/* Financial metrics with trends */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <CombinedMetricCard 
-            title="Faturamento" 
-            value={totals.revenue} 
+          <CombinedMetricCard
+            title="Faturamento"
+            value={totals.revenue}
             trend={totals.revenueTrend}
             icon={DollarSign}
             variant={config.variant}
           />
-          <CombinedMetricCard 
-            title="Entradas" 
-            value={totals.entries} 
+          <CombinedMetricCard
+            title="Entradas"
+            value={totals.entries}
             trend={totals.entriesTrend}
             icon={DollarSign}
             variant={config.variant}
           />
         </div>
 
+        {/* Cancellation summary */}
+        {totals.cancellations > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              title="Cancelamentos"
+              value={totals.cancellations}
+              icon={XCircle}
+              variant="destructive"
+              compact
+            />
+            <MetricCard
+              title="% Cancelamento"
+              value={totals.cancellationRate}
+              icon={TrendingUp}
+              isPercentage
+              variant="destructive"
+              compact
+            />
+          </div>
+        )}
+
         {/* Closers details */}
         {showClosers && closers.length > 0 && (
-          <div className="space-y-4 pt-4 border-t border-border/50">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          <div className="space-y-3 pt-4 border-t border-border/30">
+            <p className="section-label">
               Performance Individual
-            </h4>
+            </p>
             <div className="grid gap-3">
               {closers.map((cm) => (
                 <div

@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import type { SDRMetric } from '@/hooks/useSdrMetrics';
+import type { SDRMetric } from '@/controllers/useSdrController';
 import { cn, parseDateString } from '@/lib/utils';
 
 interface SDRDataTableProps {

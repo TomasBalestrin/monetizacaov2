@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { PeriodFilter } from '@/components/dashboard/PeriodFilter';
-import { useAllFunnelsSummary, useFunnelReport, useSalesByPersonAndProduct, type FunnelSummary } from '@/hooks/useFunnels';
+import { useAllFunnelsSummary, useFunnelReport, useSalesByPersonAndProduct, type FunnelSummary } from '@/controllers/useFunnelController';
 import { MetricCardSkeletonGrid } from '@/components/dashboard/skeletons';
 import { FunnelChart } from './FunnelChart';
 import { ProductSalesTable } from './ProductSalesTable';
@@ -74,6 +74,7 @@ export function ReportsPage() {
       done: displayedSummaries.reduce((s, f) => s + Number(f.total_calls_done), 0),
       sales: displayedSummaries.reduce((s, f) => s + Number(f.total_sales), 0),
       revenue: displayedSummaries.reduce((s, f) => s + Number(f.total_revenue), 0),
+      entries: displayedSummaries.reduce((s, f) => s + Number(f.total_entries || 0), 0),
     };
   }, [displayedSummaries]);
 
@@ -154,13 +155,14 @@ export function ReportsPage() {
           {isLoading ? (
             <MetricCardSkeletonGrid count={6} />
           ) : totals ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
               <SummaryCard icon={Users} title="Leads" value={totals.leads} />
               <SummaryCard icon={Target} title="Qualificados" value={totals.qualified} />
               <SummaryCard icon={Phone} title="Agendadas" value={totals.scheduled} />
               <SummaryCard icon={Phone} title="Realizadas" value={totals.done} />
               <SummaryCard icon={TrendingUp} title="Vendas" value={totals.sales} />
               <SummaryCard icon={DollarSign} title="Faturamento" value={formatCurrency(totals.revenue)} />
+              <SummaryCard icon={DollarSign} title="Entradas" value={formatCurrency(totals.entries)} />
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
@@ -190,6 +192,7 @@ export function ReportsPage() {
                       <TableHead className="text-right">Realizadas</TableHead>
                       <TableHead className="text-right">Vendas</TableHead>
                       <TableHead className="text-right">Faturamento</TableHead>
+                      <TableHead className="text-right">Entradas</TableHead>
                       <TableHead className="text-right">Conversão</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -243,7 +246,7 @@ function FunnelRow({ funnel: f, canEdit, periodStart, periodEnd, formatCurrency 
 }) {
   const queryClient = useQueryClient();
 
-  const handleSave = async (field: 'leads' | 'qualified' | 'scheduled' | 'done' | 'sales' | 'revenue', newValue: number) => {
+  const handleSave = async (field: 'leads' | 'qualified' | 'scheduled' | 'done' | 'sales' | 'revenue' | 'entries', newValue: number) => {
     const currentValues: Record<string, number> = {
       leads: Number(f.total_leads),
       qualified: Number(f.total_qualified),
@@ -251,6 +254,7 @@ function FunnelRow({ funnel: f, canEdit, periodStart, periodEnd, formatCurrency 
       done: Number(f.total_calls_done),
       sales: Number(f.total_sales),
       revenue: Number(f.total_revenue),
+      entries: Number(f.total_entries || 0),
     };
     const delta = newValue - currentValues[field];
     if (delta === 0) return;
@@ -267,6 +271,7 @@ function FunnelRow({ funnel: f, canEdit, periodStart, periodEnd, formatCurrency 
         done: 'calls_done',
         sales: 'sales_count',
         revenue: 'sales_value',
+        entries: 'entries_value',
       };
 
       const insertData: Record<string, unknown> = {
@@ -310,6 +315,9 @@ function FunnelRow({ funnel: f, canEdit, periodStart, periodEnd, formatCurrency 
       </TableCell>
       <TableCell className="text-right">
         <EditableCell value={Number(f.total_revenue)} onSave={(v) => handleSave('revenue', v)} disabled={!canEdit} isCurrency />
+      </TableCell>
+      <TableCell className="text-right">
+        <EditableCell value={Number(f.total_entries || 0)} onSave={(v) => handleSave('entries', v)} disabled={!canEdit} isCurrency />
       </TableCell>
       <TableCell className="text-right font-semibold">{Number(f.conversion_rate).toFixed(1)}%</TableCell>
     </TableRow>

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { MetricsForm, MetricsFormValues } from './MetricsForm';
-import { useCreateMetric, useUpdateMetric, Metric } from '@/hooks/useMetrics';
+import { useCreateMetric, useUpdateMetric, Metric } from '@/controllers/useCloserController';
 
 interface MetricsDialogProps {
   open: boolean;
@@ -33,6 +33,8 @@ export function MetricsDialog({ open, onOpenChange, metric }: MetricsDialogProps
       revenue: values.revenue,
       entries: values.entries,
       source: 'manual',
+      funnel_id: values.funnel_id && values.funnel_id !== 'none' ? values.funnel_id : null,
+      sdr_id: values.sdr_id && values.sdr_id !== 'none' ? values.sdr_id : null,
     };
 
     if (isEditing && metric?.id) {

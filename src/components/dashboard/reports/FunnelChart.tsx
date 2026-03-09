@@ -1,7 +1,7 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { FunnelReport } from '@/hooks/useFunnels';
+import type { FunnelReport } from '@/controllers/useFunnelController';
 
 interface FunnelChartProps {
   report: FunnelReport;

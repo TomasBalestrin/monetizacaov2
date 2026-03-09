@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
-
-type AppRole = Database['public']['Enums']['app_role'];
+import * as authRepo from '@/model/repositories/authRepository';
+import * as userRepo from '@/model/repositories/userRepository';
+import type { AppRole, UserEntityLink, SelectedEntity } from '@/model/entities/user';
 
 interface AuthContextType {
   user: User | null;
@@ -18,9 +18,20 @@ interface AuthContextType {
   isManager: boolean;
   isUser: boolean;
   hasPermission: (module: string) => boolean;
+  // Entity selection
+  entityLinks: UserEntityLink[];
+  selectedEntity: SelectedEntity | null;
+  isTeamAccount: boolean;
+  needsEntitySelection: boolean;
+  selectEntity: (entity: SelectedEntity) => void;
+  clearSelectedEntity: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function getStorageKey(userId: string) {
+  return `selectedEntity_${userId}`;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -28,28 +39,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [entityLinks, setEntityLinks] = useState<UserEntityLink[]>([]);
+  const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .single();
-      
-      if (roleData) {
-        setRole(roleData.role);
-      }
+      const [userRole, userPermissions, links] = await Promise.all([
+        authRepo.fetchUserRole(userId),
+        authRepo.fetchUserPermissions(userId),
+        userRepo.fetchUserEntityLinks(userId),
+      ]);
+      setRole(userRole);
+      setPermissions(userPermissions);
+      setEntityLinks(links);
 
-      // Fetch module permissions
-      const { data: permData } = await supabase
-        .from('module_permissions')
-        .select('module')
-        .eq('user_id', userId);
-      
-      if (permData) {
-        setPermissions(permData.map(p => p.module));
+      // Auto-select if single link
+      if (links.length === 1) {
+        // We don't have the name here, but we'll set entity_name as empty
+        // EntitySelectionScreen or UserDashboard will resolve the name
+        const stored = localStorage.getItem(getStorageKey(userId));
+        if (stored) {
+          try {
+            const parsed: SelectedEntity = JSON.parse(stored);
+            if (links.some(l => l.entity_id === parsed.entity_id)) {
+              setSelectedEntity(parsed);
+              return;
+            }
+          } catch { /* ignore */ }
+        }
+        // For single link, auto-select with empty name (will be resolved by components)
+        setSelectedEntity({
+          entity_id: links[0].entity_id,
+          entity_type: links[0].entity_type,
+          entity_name: '',
+        });
+      } else if (links.length > 1) {
+        // Restore from localStorage
+        const stored = localStorage.getItem(getStorageKey(userId));
+        if (stored) {
+          try {
+            const parsed: SelectedEntity = JSON.parse(stored);
+            // Validate the stored entity still exists in links
+            if (links.some(l => l.entity_id === parsed.entity_id)) {
+              setSelectedEntity(parsed);
+            }
+          } catch { /* ignore */ }
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -62,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           // Defer Supabase calls with setTimeout to prevent deadlock
           setTimeout(() => {
@@ -71,8 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setRole(null);
           setPermissions([]);
+          setEntityLinks([]);
+          setSelectedEntity(null);
         }
-        
+
         setLoading(false);
       }
     );
@@ -81,11 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchUserData(session.user.id);
       }
-      
+
       setLoading(false);
     });
 
@@ -102,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -114,14 +151,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (user) {
+      localStorage.removeItem(getStorageKey(user.id));
+    }
     await supabase.auth.signOut();
     setRole(null);
     setPermissions([]);
+    setEntityLinks([]);
+    setSelectedEntity(null);
   };
 
   const isAdmin = role === 'admin';
   const isManager = role === 'manager';
   const isUser = role === 'user';
+
+  const isTeamAccount = isUser && entityLinks.length > 1;
+  const needsEntitySelection = isTeamAccount && selectedEntity === null;
+
+  const selectEntity = useCallback((entity: SelectedEntity) => {
+    setSelectedEntity(entity);
+    if (user) {
+      localStorage.setItem(getStorageKey(user.id), JSON.stringify(entity));
+    }
+  }, [user]);
+
+  const clearSelectedEntity = useCallback(() => {
+    setSelectedEntity(null);
+    if (user) {
+      localStorage.removeItem(getStorageKey(user.id));
+    }
+  }, [user]);
 
   const hasPermission = (module: string): boolean => {
     if (isAdmin) return true;
@@ -143,6 +202,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isManager,
         isUser,
         hasPermission,
+        entityLinks,
+        selectedEntity,
+        isTeamAccount,
+        needsEntitySelection,
+        selectEntity,
+        clearSelectedEntity,
       }}
     >
       {children}

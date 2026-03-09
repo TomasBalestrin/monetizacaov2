@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import type { CloserMetricRecord } from '@/hooks/useMetrics';
+import type { CloserMetricRecord } from '@/controllers/useCloserController';
 import { cn, parseDateString } from '@/lib/utils';
 
 interface CloserDataTableProps {
@@ -72,6 +72,8 @@ export function CloserDataTable({ metrics, onEditMetric, onDeleteMetric }: Close
           <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
             <TableRow className="hover:bg-transparent border-b border-border">
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Período</TableHead>
+              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funil</TableHead>
+              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">SDR Origem</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Calls</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Vendas</TableHead>
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Conv.</TableHead>
@@ -104,6 +106,24 @@ export function CloserDataTable({ metrics, onEditMetric, onDeleteMetric }: Close
                 >
                   <TableCell className="font-medium text-foreground">
                     {format(parseDateString(metric.period_start), 'dd/MM', { locale: ptBR })} - {format(parseDateString(metric.period_end), 'dd/MM', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell className="text-sm text-foreground">
+                    {metric.funnel?.name || '—'}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {metric.sdr ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-foreground">{metric.sdr.name}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase",
+                          metric.sdr.type === 'social_selling'
+                            ? "bg-violet-500/15 text-violet-500"
+                            : "bg-blue-500/15 text-blue-500"
+                        )}>
+                          {metric.sdr.type === 'social_selling' ? 'SS' : 'SDR'}
+                        </span>
+                      </div>
+                    ) : '—'}
                   </TableCell>
                   <TableCell className="text-right font-medium">{metric.calls}</TableCell>
                   <TableCell className="text-right">

@@ -14,7 +14,7 @@ import {
 import { format, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
-import type { SDRMetric } from '@/hooks/useSdrMetrics';
+import type { SDRMetric } from '@/controllers/useSdrController';
 import { cn, parseDateString } from '@/lib/utils';
 
 interface SDRWeeklyComparisonChartProps {

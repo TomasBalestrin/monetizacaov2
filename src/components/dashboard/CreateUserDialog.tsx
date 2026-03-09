@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useCreateUser } from '@/hooks/useUserManagement';
-import { useClosersForLinking, useSDRsForLinking } from '@/hooks/useUserEntityLinks';
+import { useCreateUser } from '@/controllers/useUserController';
+import { useClosersForLinking, useSDRsForLinking } from '@/controllers/useUserController';
 
 const MODULES = ['dashboard', 'eagles', 'sharks', 'sdrs', 'reports', 'admin'];
 

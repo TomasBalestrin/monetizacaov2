@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { SDRMetric } from '@/hooks/useSdrMetrics';
+import type { SDRMetric } from '@/controllers/useSdrController';
 import { parseDateString } from '@/lib/utils';
 
 interface SDRChartProps {

@@ -4,7 +4,7 @@ import { Phone, Target, TrendingUp, DollarSign, Users, Loader2, XCircle, Plus } 
 import { Button } from '@/components/ui/button';
 import { MetricCard } from './MetricCard';
 import { MonthSelector, getMonthPeriod } from './MonthSelector';
-import { useSquadMetrics } from '@/hooks/useMetrics';
+import { useSquadMetrics } from '@/controllers/useCloserController';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
 import { CloserDetailPage } from './closer/CloserDetailPage';
 import { CloserCard } from './closer/CloserCard';
@@ -17,10 +17,9 @@ interface SquadPageProps {
 export function SquadPage({ squadSlug }: SquadPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const closerId = searchParams.get('closer');
-  
-  // Enable realtime subscriptions for automatic updates
+
   useRealtimeMetrics();
-  
+
   const [selectedMonth, setSelectedMonth] = useState(() => new Date());
   const { periodStart, periodEnd } = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
@@ -42,7 +41,6 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
     setSearchParams({ module: squadSlug });
   }, [setSearchParams, squadSlug]);
 
-  // If a closer is selected, show the detail page
   if (closerId) {
     return (
       <CloserDetailPage
@@ -67,8 +65,8 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
     return (
       <div className="text-center py-20">
         <Users className="mx-auto text-muted-foreground mb-4" size={64} />
-        <h2 className="text-2xl font-bold text-foreground mb-2">Squad não encontrado</h2>
-        <p className="text-muted-foreground">Não foi possível carregar os dados do squad.</p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Squad nao encontrado</h2>
+        <p className="text-muted-foreground">Nao foi possivel carregar os dados do squad.</p>
       </div>
     );
   }
@@ -76,18 +74,18 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
   const { squad, closers, totals } = currentSquad;
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold text-foreground">Squad {squad.name}</h1>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Squad {squad.name}</h1>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsMetricsDialogOpen(true)}
-            className="gap-2"
+            className="gap-2 rounded-xl"
           >
             <Plus size={16} />
-            Adicionar Métrica
+            Adicionar Metrica
           </Button>
         </div>
         <MonthSelector
@@ -96,7 +94,6 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
         />
       </div>
 
-      {/* Dialog for manual metric entry */}
       <SquadMetricsDialog
         open={isMetricsDialogOpen}
         onOpenChange={setIsMetricsDialogOpen}
@@ -104,7 +101,8 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
         selectedMonth={selectedMonth}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Financial metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-3">
           <MetricCard
             title="Valor de Venda Total do Squad"
@@ -114,7 +112,7 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
             isCurrency
           />
           <MetricCard
-            title="Tendência Faturamento"
+            title="Tendencia Faturamento"
             value={totals.revenueTrend}
             icon={TrendingUp}
             isCurrency
@@ -129,7 +127,7 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
             isCurrency
           />
           <MetricCard
-            title="Tendência Entradas"
+            title="Tendencia Entradas"
             value={totals.entriesTrend}
             icon={TrendingUp}
             isCurrency
@@ -137,26 +135,28 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
         </div>
       </div>
 
+      {/* Performance metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard title="Calls Realizadas" value={totals.calls} icon={Phone} />
-        <MetricCard title="Número de Vendas" value={totals.sales} icon={Target} />
+        <MetricCard title="Numero de Vendas" value={totals.sales} icon={Target} />
         <MetricCard
-          title="Taxa de Conversão"
+          title="Taxa de Conversao"
           value={totals.conversion}
           icon={TrendingUp}
           isPercentage
         />
       </div>
 
-      {/* Cancellation Metrics Section */}
+      {/* Cancellation Metrics */}
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-muted-foreground">Cancelamentos</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <p className="section-label px-1">Cancelamentos</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <MetricCard
-            title="Nº de Cancelamentos"
+            title="N de Cancelamentos"
             value={totals.cancellations}
             icon={XCircle}
             variant="destructive"
+            compact
           />
           <MetricCard
             title="% de Cancelamento"
@@ -164,27 +164,31 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
             icon={TrendingUp}
             isPercentage
             variant="destructive"
+            compact
           />
           <MetricCard
-            title="Valor Venda Cancelamento"
+            title="Valor Venda Cancel."
             value={totals.cancellationValue}
             icon={DollarSign}
             isCurrency
             variant="destructive"
+            compact
           />
           <MetricCard
-            title="Valor Entrada Cancelamento"
+            title="Valor Entrada Cancel."
             value={totals.cancellationEntries}
             icon={DollarSign}
             isCurrency
             variant="destructive"
+            compact
           />
         </div>
       </div>
 
+      {/* Closers */}
       {closers.length > 0 ? (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-foreground">Closers</h2>
+        <div className="space-y-3">
+          <p className="section-label px-1">Closers</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {closers.map(({ closer, metrics }) => (
               <CloserCard
@@ -201,10 +205,10 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
           </div>
         </div>
       ) : (
-        <div className="text-center py-10 bg-card rounded-lg border border-border">
+        <div className="text-center py-10 bg-card rounded-2xl border border-border/30">
           <p className="text-muted-foreground">Nenhum closer encontrado neste squad.</p>
           <p className="text-muted-foreground/70 text-sm mt-2">
-            Adicione métricas para visualizar os dados dos closers.
+            Adicione metricas para visualizar os dados dos closers.
           </p>
         </div>
       )}

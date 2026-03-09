@@ -26,8 +26,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useUserFunnels, useCreateFunnelDailyData, type Funnel } from '@/hooks/useFunnels';
-import { useSDRs } from '@/hooks/useSdrMetrics';
+import { useUserFunnels, useCreateFunnelDailyData, type Funnel } from '@/controllers/useFunnelController';
+import { useSDRs } from '@/controllers/useSdrController';
 
 interface CloserFunnelFormProps {
   open: boolean;
@@ -43,6 +43,7 @@ interface FunnelEntry {
   calls_done: number;
   sales_count: number;
   sales_value: number;
+  entries_value: number;
   sdr_id: string;
   leads_count: number;
   qualified_count: number;
@@ -67,6 +68,7 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
           calls_done: 0,
           sales_count: 0,
           sales_value: 0,
+          entries_value: 0,
           sdr_id: '',
           leads_count: 0,
           qualified_count: 0,
@@ -85,7 +87,7 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
 
   const handleSubmit = async () => {
     const nonEmpty = entries.filter(
-      (e) => e.calls_scheduled > 0 || e.calls_done > 0 || e.sales_count > 0 || e.leads_count > 0 || e.qualified_count > 0
+      (e) => e.calls_scheduled > 0 || e.calls_done > 0 || e.sales_count > 0 || e.leads_count > 0 || e.qualified_count > 0 || e.entries_value > 0
     );
 
     if (nonEmpty.length === 0) return;
@@ -100,6 +102,7 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
         calls_done: e.calls_done,
         sales_count: e.sales_count,
         sales_value: e.sales_value,
+        entries_value: e.entries_value,
         sdr_id: e.sdr_id || null,
         leads_count: e.leads_count,
         qualified_count: e.qualified_count,
@@ -212,6 +215,17 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
                       step={0.01}
                       value={entry.sales_value || ''}
                       onChange={(e) => updateEntry(i, 'sales_value', Number(e.target.value))}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Valor de Entrada (R$)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={entry.entries_value || ''}
+                      onChange={(e) => updateEntry(i, 'entries_value', Number(e.target.value))}
                       placeholder="0.00"
                     />
                   </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useActionItems, useAddActionItem, useUpdateActionItem, useDeleteActionItem, useProfiles } from '@/hooks/useMeetings';
+import { useActionItems, useAddActionItem, useUpdateActionItem, useDeleteActionItem, useProfiles } from '@/controllers/useMeetingController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';

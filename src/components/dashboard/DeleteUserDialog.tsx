@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDeleteUserCompletely } from '@/hooks/useUserManagement';
+import { useDeleteUserCompletely } from '@/controllers/useUserController';
 
 interface DeleteUserDialogProps {
   open: boolean;

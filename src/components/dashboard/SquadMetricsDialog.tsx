@@ -8,13 +8,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { SquadMetricsForm, type SquadMetricsFormValues } from './SquadMetricsForm';
-import { useCreateMetric, useUpdateMetric, useSquads, type CloserMetricRecord } from '@/hooks/useMetrics';
-import { useCreateFunnelDailyData } from '@/hooks/useFunnels';
+import { useCreateMetric, useUpdateMetric, useSquads, type CloserMetricRecord } from '@/controllers/useCloserController';
+import { useCreateFunnelDailyData } from '@/controllers/useFunnelController';
 
 interface SquadMetricsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  squadSlug: string;
+  squadSlug?: string;
   defaultCloserId?: string;
   metric?: CloserMetricRecord;
   selectedMonth?: Date;
@@ -33,7 +33,9 @@ export function SquadMetricsDialog({
   const createFunnelData = useCreateFunnelDailyData();
   const { data: squads } = useSquads();
   
-  const squad = squads?.find(s => s.slug.toLowerCase() === squadSlug.toLowerCase());
+  const squad = squadSlug
+    ? squads?.find(s => s.slug.toLowerCase() === squadSlug.toLowerCase())
+    : squads?.[0];
   const isEditing = !!metric?.id;
 
   const handleSubmit = async (
@@ -54,6 +56,8 @@ export function SquadMetricsDialog({
       cancellation_value: values.cancellation_value ?? 0,
       cancellation_entries: values.cancellation_entries ?? 0,
       source: 'manual',
+      funnel_id: values.funnel_id || null,
+      sdr_id: values.sdr_id || null,
     };
 
     if (isEditing) {
@@ -62,8 +66,24 @@ export function SquadMetricsDialog({
       await createMetric.mutateAsync(payload);
     }
 
-    // Save funnel data if funnel_id is provided
-    if (values.funnel_id) {
+    // Save per-funnel breakdown data to funnel_daily_data
+    if (values.funnel_breakdown && values.funnel_breakdown.length > 0) {
+      await createFunnelData.mutateAsync(
+        values.funnel_breakdown.map((fb) => ({
+          user_id: values.closer_id,
+          funnel_id: fb.funnel_id,
+          date: formatDateString(period.start),
+          calls_scheduled: fb.calls,
+          calls_done: fb.calls,
+          sales_count: fb.sales,
+          sales_value: 0,
+          leads_count: 0,
+          qualified_count: 0,
+          sdr_id: fb.sdr_id || null,
+        }))
+      );
+    } else if (values.funnel_id) {
+      // Fallback: save single funnel data if funnel_id is provided
       await createFunnelData.mutateAsync([{
         user_id: values.closer_id,
         funnel_id: values.funnel_id,
@@ -108,14 +128,14 @@ export function SquadMetricsDialog({
             <div>
               <DialogTitle className="text-lg">{isEditing ? 'Editar Métrica' : 'Adicionar Métrica'}</DialogTitle>
               <DialogDescription className="text-sm">
-                Squad {squad.name}
+                {squadSlug ? `Squad ${squad.name}` : 'Selecione um closer'}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
         
         <SquadMetricsForm
-          squadId={squad.id}
+          squadId={squadSlug ? squad.id : undefined}
           defaultCloserId={defaultCloserId}
           defaultMetric={metric}
           selectedMonth={selectedMonth}

@@ -53,6 +53,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           date: string
+          entries_value: number
           funnel_id: string
           id: string
           leads_count: number
@@ -68,6 +69,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date: string
+          entries_value?: number
           funnel_id: string
           id?: string
           leads_count?: number
@@ -83,6 +85,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date?: string
+          entries_value?: number
           funnel_id?: string
           id?: string
           leads_count?: number
@@ -98,6 +101,13 @@ export type Database = {
             columns: ["funnel_id"]
             isOneToOne: false
             referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_daily_data_sdr_id_fkey"
+            columns: ["sdr_id"]
+            isOneToOne: false
+            referencedRelation: "sdrs"
             referencedColumns: ["id"]
           },
         ]
@@ -356,12 +366,14 @@ export type Database = {
           created_by: string | null
           entries: number
           entries_trend: number | null
+          funnel_id: string | null
           id: string
           period_end: string
           period_start: string
           revenue: number
           revenue_trend: number | null
           sales: number
+          sdr_id: string | null
           source: string | null
           updated_at: string
         }
@@ -375,12 +387,14 @@ export type Database = {
           created_by?: string | null
           entries?: number
           entries_trend?: number | null
+          funnel_id?: string | null
           id?: string
           period_end: string
           period_start: string
           revenue?: number
           revenue_trend?: number | null
           sales?: number
+          sdr_id?: string | null
           source?: string | null
           updated_at?: string
         }
@@ -394,12 +408,14 @@ export type Database = {
           created_by?: string | null
           entries?: number
           entries_trend?: number | null
+          funnel_id?: string | null
           id?: string
           period_end?: string
           period_start?: string
           revenue?: number
           revenue_trend?: number | null
           sales?: number
+          sdr_id?: string | null
           source?: string | null
           updated_at?: string
         }
@@ -409,6 +425,20 @@ export type Database = {
             columns: ["closer_id"]
             isOneToOne: false
             referencedRelation: "closers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_sdr_id_fkey"
+            columns: ["sdr_id"]
+            isOneToOne: false
+            referencedRelation: "sdrs"
             referencedColumns: ["id"]
           },
         ]
@@ -593,6 +623,114 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      scheduled_calls: {
+        Row: {
+          id: string
+          sdr_id: string
+          closer_id: string
+          funnel_id: string
+          client_name: string
+          client_phone: string
+          scheduled_time: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sdr_id: string
+          closer_id: string
+          funnel_id: string
+          client_name: string
+          client_phone: string
+          scheduled_time: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          sdr_id?: string
+          closer_id?: string
+          funnel_id?: string
+          client_name?: string
+          client_phone?: string
+          scheduled_time?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_calls_sdr_id_fkey"
+            columns: ["sdr_id"]
+            isOneToOne: false
+            referencedRelation: "sdrs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_calls_closer_id_fkey"
+            columns: ["closer_id"]
+            isOneToOne: false
+            referencedRelation: "closers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_calls_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          title: string
+          message: string
+          data: Json
+          read: boolean
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type?: string
+          title: string
+          message: string
+          data?: Json
+          read?: boolean
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          title?: string
+          message?: string
+          data?: Json
+          read?: boolean
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sdrs: {
         Row: {

@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, Save, Target } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MonthSelector } from '@/components/dashboard/MonthSelector';
-import { useClosers } from '@/hooks/useMetrics';
-import { useSDRs } from '@/hooks/useSdrMetrics';
-import { useAllGoals, useUpsertGoal, CLOSER_METRIC_KEYS, SDR_METRIC_KEYS } from '@/hooks/useGoals';
+import { useClosers, useCloserMetrics } from '@/controllers/useCloserController';
+import { useSDRs, useSDRMetrics } from '@/controllers/useSdrController';
+import { useAllGoals, useUpsertGoal, CLOSER_METRIC_KEYS, SDR_METRIC_KEYS } from '@/controllers/useGoalController';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function GoalsConfig() {
@@ -25,7 +26,44 @@ export function GoalsConfig() {
   const upsertGoal = useUpsertGoal();
 
   const monthStr = format(selectedMonth, 'yyyy-MM-dd');
+  const periodStart = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+  const periodEnd = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
   const { data: existingGoals, isLoading } = useAllGoals(monthStr);
+
+  // Fetch current metrics for the selected entity
+  const { data: closerMetrics } = useCloserMetrics(
+    entityType === 'closer' ? selectedEntityId : '',
+    periodStart,
+    periodEnd
+  );
+  const { data: sdrMetrics } = useSDRMetrics(
+    entityType === 'sdr' ? selectedEntityId : undefined,
+    periodStart,
+    periodEnd
+  );
+
+  // Aggregate current values to show alongside goal inputs
+  const currentValues = useMemo(() => {
+    const vals: Record<string, number> = {};
+    if (entityType === 'closer' && closerMetrics) {
+      vals.calls = closerMetrics.reduce((sum, m) => sum + (m.calls || 0), 0);
+      const grossSales = closerMetrics.reduce((sum, m) => sum + (m.sales || 0), 0);
+      const cancellations = closerMetrics.reduce((sum, m) => sum + (m.cancellations || 0), 0);
+      vals.sales = grossSales - cancellations;
+      const grossRevenue = closerMetrics.reduce((sum, m) => sum + (m.revenue || 0), 0);
+      const cancelValue = closerMetrics.reduce((sum, m) => sum + (m.cancellation_value || 0), 0);
+      vals.revenue = grossRevenue - cancelValue;
+      const grossEntries = closerMetrics.reduce((sum, m) => sum + (m.entries || 0), 0);
+      const cancelEntries = closerMetrics.reduce((sum, m) => sum + (m.cancellation_entries || 0), 0);
+      vals.entries = grossEntries - cancelEntries;
+    } else if (entityType === 'sdr' && sdrMetrics) {
+      vals.activated = sdrMetrics.reduce((sum, m) => sum + (m.activated || 0), 0);
+      vals.scheduled = sdrMetrics.reduce((sum, m) => sum + (m.scheduled || 0), 0);
+      vals.attended = sdrMetrics.reduce((sum, m) => sum + (m.attended || 0), 0);
+      vals.sales = sdrMetrics.reduce((sum, m) => sum + (m.sales || 0), 0);
+    }
+    return vals;
+  }, [entityType, closerMetrics, sdrMetrics]);
 
   // For managers, filter entities by their module permissions
   // Squad slugs (eagles, sharks) map to closer squads; 'sdrs' maps to SDR entities
@@ -164,19 +202,59 @@ export function GoalsConfig() {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {metricKeys.map(({ key, label }) => (
-                    <div key={key} className="space-y-1.5">
-                      <label className="text-sm font-medium text-foreground">{label}</label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="0"
-                        value={values[key] || ''}
-                        onChange={(e) => setValues(prev => ({ ...prev, [key]: e.target.value }))}
-                      />
-                    </div>
-                  ))}
+                  {metricKeys.map(({ key, label }) => {
+                    const current = currentValues[key] || 0;
+                    const target = values[key] ? parseFloat(values[key]) : 0;
+                    const progress = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+                    const isCurrency = key === 'revenue' || key === 'entries';
+                    const formatCurrent = isCurrency
+                      ? `R$ ${current.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : current.toLocaleString('pt-BR');
+
+                    return (
+                      <div key={key} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium text-foreground">{label}</label>
+                          {current > 0 && (
+                            <span className="text-[11px] text-muted-foreground">
+                              Atual: <span className="font-semibold text-foreground">{formatCurrent}</span>
+                            </span>
+                          )}
+                        </div>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                          value={values[key] || ''}
+                          onChange={(e) => setValues(prev => ({ ...prev, [key]: e.target.value }))}
+                        />
+                        {target > 0 && current > 0 && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={cn(
+                                  'h-full rounded-full transition-all duration-500',
+                                  progress >= 100 ? 'bg-green-500' :
+                                  progress >= 70 ? 'bg-amber-500' :
+                                  'bg-red-500'
+                                )}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <span className={cn(
+                              'text-[11px] font-semibold',
+                              progress >= 100 ? 'text-green-500' :
+                              progress >= 70 ? 'text-amber-500' :
+                              'text-red-500'
+                            )}>
+                              {progress.toFixed(0)}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <Button onClick={handleSave} disabled={saving} className="gap-2">

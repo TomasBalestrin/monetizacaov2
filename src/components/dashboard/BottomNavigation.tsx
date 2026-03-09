@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Phone, Users, User } from 'lucide-react';
+import { LayoutDashboard, Phone, Users, User, Share2, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModuleId } from './Sidebar';
 
@@ -10,8 +10,9 @@ interface BottomNavigationProps {
 
 const navItems = [
   { id: 'dashboard' as ModuleId, label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'closers' as ModuleId, label: 'Closers', icon: UserCheck },
   { id: 'sdrs' as ModuleId, label: 'SDRs', icon: Phone },
-  { id: 'eagles' as ModuleId, label: 'Squads', icon: Users },
+  { id: 'social_selling' as ModuleId, label: 'Social', icon: Share2 },
   { id: 'admin' as ModuleId, label: 'Admin', icon: User },
 ];
 

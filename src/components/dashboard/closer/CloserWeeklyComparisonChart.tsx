@@ -14,7 +14,7 @@ import {
 import { format, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
-import type { CloserMetricRecord } from '@/hooks/useMetrics';
+import type { CloserMetricRecord } from '@/controllers/useCloserController';
 import { cn, parseDateString } from '@/lib/utils';
 
 interface CloserWeeklyComparisonChartProps {

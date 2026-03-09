@@ -32,10 +32,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useSquads, useClosers, Metric } from '@/hooks/useMetrics';
+import { useSquads, useClosers, Metric } from '@/controllers/useCloserController';
+import { useUserFunnels } from '@/controllers/useFunnelController';
+import { useSDRs } from '@/controllers/useSdrController';
 
 const metricsFormSchema = z.object({
   closer_id: z.string().min(1, 'Selecione um closer'),
+  funnel_id: z.string().optional(),
+  sdr_id: z.string().optional(),
   period_start: z.date({ required_error: 'Selecione a data de início' }),
   period_end: z.date({ required_error: 'Selecione a data de término' }),
   calls: z.coerce.number().int().min(0, 'Valor deve ser maior ou igual a 0'),
@@ -58,16 +62,19 @@ interface MetricsFormProps {
 export function MetricsForm({ defaultValues, onSubmit, isLoading }: MetricsFormProps) {
   const { data: squads } = useSquads();
   const { data: closers } = useClosers();
+  const { data: sdrs } = useSDRs();
 
   const form = useForm<MetricsFormValues>({
     resolver: zodResolver(metricsFormSchema),
     defaultValues: {
       closer_id: defaultValues?.closer_id || '',
-      period_start: defaultValues?.period_start 
-        ? parseDateString(defaultValues.period_start) 
+      funnel_id: defaultValues?.funnel_id || 'none',
+      sdr_id: defaultValues?.sdr_id || 'none',
+      period_start: defaultValues?.period_start
+        ? parseDateString(defaultValues.period_start)
         : undefined,
-      period_end: defaultValues?.period_end 
-        ? parseDateString(defaultValues.period_end) 
+      period_end: defaultValues?.period_end
+        ? parseDateString(defaultValues.period_end)
         : undefined,
       calls: defaultValues?.calls || 0,
       sales: defaultValues?.sales || 0,
@@ -75,6 +82,10 @@ export function MetricsForm({ defaultValues, onSubmit, isLoading }: MetricsFormP
       entries: defaultValues?.entries || 0,
     },
   });
+
+  // Watch closer_id to load their funnels dynamically
+  const selectedCloserId = form.watch('closer_id');
+  const { data: closerFunnels } = useUserFunnels(selectedCloserId || undefined);
 
   // Group closers by squad
   const closersBySquad = squads?.map(squad => ({
@@ -117,6 +128,65 @@ export function MetricsForm({ defaultValues, onSubmit, isLoading }: MetricsFormP
             </FormItem>
           )}
         />
+
+        {/* Funil e SDR */}
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="funnel_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Funil</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value || 'none'}
+                  disabled={!selectedCloserId}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedCloserId ? "Selecione o funil" : "Selecione um closer primeiro"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {closerFunnels?.map((funnel) => (
+                      <SelectItem key={funnel.id} value={funnel.id}>
+                        {funnel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="sdr_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>SDR de Origem</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o SDR" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {sdrs?.map((sdr) => (
+                      <SelectItem key={sdr.id} value={sdr.id}>
+                        {sdr.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         {/* Period Dates */}
         <div className="grid grid-cols-2 gap-4">

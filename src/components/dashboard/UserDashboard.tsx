@@ -1,28 +1,25 @@
 import React, { useState, useMemo } from 'react';
-import { LogOut, Loader2, TrendingUp, LinkIcon } from 'lucide-react';
+import { LogOut, Loader2, TrendingUp, LinkIcon, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCurrentUserEntityLinks } from '@/hooks/useUserEntityLinks';
-import { useClosers } from '@/hooks/useMetrics';
+import { useClosers } from '@/controllers/useCloserController';
 import { CloserDetailPage } from '@/components/dashboard/closer/CloserDetailPage';
 import { SDRDetailPage } from '@/components/dashboard/sdr/SDRDetailPage';
+import { NotificationPanel } from '@/components/dashboard/NotificationPanel';
 import { Button } from '@/components/ui/button';
 
 export function UserDashboard() {
-  const { signOut, user } = useAuth();
-  const { data: links, isLoading: isLoadingLinks } = useCurrentUserEntityLinks();
+  const { signOut, user, selectedEntity, isTeamAccount, clearSelectedEntity } = useAuth();
   const { data: closers, isLoading: isLoadingClosers } = useClosers();
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
-  const primaryLink = useMemo(() => links?.[0] ?? null, [links]);
-
   // Find squad slug for closer entity
   const closerSquadSlug = useMemo(() => {
-    if (!primaryLink || primaryLink.entity_type !== 'closer' || !closers) return '';
-    const closer = closers.find(c => c.id === primaryLink.entity_id);
+    if (!selectedEntity || selectedEntity.entity_type !== 'closer' || !closers) return '';
+    const closer = closers.find(c => c.id === selectedEntity.entity_id);
     return (closer as any)?.squad?.slug || '';
-  }, [primaryLink, closers]);
+  }, [selectedEntity, closers]);
 
-  const isLoading = isLoadingLinks || (primaryLink?.entity_type === 'closer' && isLoadingClosers);
+  const isLoading = !selectedEntity || (selectedEntity.entity_type === 'closer' && isLoadingClosers);
 
   if (isLoading) {
     return (
@@ -35,7 +32,7 @@ export function UserDashboard() {
     );
   }
 
-  if (!primaryLink) {
+  if (!selectedEntity) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border px-4 py-3 flex items-center justify-between">
@@ -66,8 +63,6 @@ export function UserDashboard() {
     );
   }
 
-  
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border px-4 py-3 flex items-center justify-between">
@@ -76,24 +71,38 @@ export function UserDashboard() {
             <TrendingUp size={16} className="text-primary" />
           </div>
           <span className="font-semibold text-foreground">Monetização</span>
+          {selectedEntity.entity_name && (
+            <span className="text-sm text-muted-foreground">
+              — {selectedEntity.entity_name}
+            </span>
+          )}
         </div>
-        <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-destructive">
-          <LogOut size={16} className="mr-2" />
-          Sair
-        </Button>
+        <div className="flex items-center gap-2">
+          <NotificationPanel />
+          {isTeamAccount && (
+            <Button variant="ghost" size="sm" onClick={clearSelectedEntity}>
+              <Users size={16} className="mr-2" />
+              Trocar
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-destructive">
+            <LogOut size={16} className="mr-2" />
+            Sair
+          </Button>
+        </div>
       </header>
 
       <main className="p-4 md:p-6 lg:p-8">
-        {primaryLink.entity_type === 'closer' ? (
+        {selectedEntity.entity_type === 'closer' ? (
           <CloserDetailPage
-            closerId={primaryLink.entity_id}
+            closerId={selectedEntity.entity_id}
             squadSlug={closerSquadSlug}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
           />
         ) : (
           <SDRDetailPage
-            sdrId={primaryLink.entity_id}
+            sdrId={selectedEntity.entity_id}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
           />

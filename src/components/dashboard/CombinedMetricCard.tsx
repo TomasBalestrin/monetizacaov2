@@ -12,6 +12,7 @@ interface CombinedMetricCardProps {
   value: number;
   trend: number;
   trendLabel?: string;
+  trendContext?: { workedDays: number; totalDays: number };
   icon?: LucideIcon;
   variant?: 'default' | 'eagles' | 'sharks' | 'success' | 'warning';
   className?: string;
@@ -22,6 +23,7 @@ export function CombinedMetricCard({
   value,
   trend,
   trendLabel = 'Tendência',
+  trendContext,
   icon: Icon,
   variant = 'default',
   className,
@@ -123,6 +125,11 @@ export function CombinedMetricCard({
               </TooltipContent>
             </Tooltip>
           </div>
+          {trendContext && trendContext.totalDays > 0 && (
+            <p className="text-[10px] text-muted-foreground/70 mt-1">
+              Projeção · {trendContext.workedDays.toFixed(0)} de {trendContext.totalDays.toFixed(0)} dias úteis
+            </p>
+          )}
         </div>
         {Icon && (
           <div className={cn('p-2.5 rounded-xl bg-background/50 shrink-0', styles.icon)}>

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2, Target } from 'lucide-react';
-import { useUsers, useAssignRole, useTogglePermission } from '@/hooks/useUserManagement';
+import { useUsers, useAssignRole, useTogglePermission } from '@/controllers/useUserController';
 import { DeleteUserDialog } from './DeleteUserDialog';
-import { useAllEntityLinks, useClosersForLinking, useSDRsForLinking } from '@/hooks/useUserEntityLinks';
+import { useAllEntityLinks, useClosersForLinking, useSDRsForLinking } from '@/controllers/useUserController';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

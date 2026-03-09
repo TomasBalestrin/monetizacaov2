@@ -12,7 +12,7 @@
    useCreateEntityLink,
    useDeleteEntityLink,
    UserEntityLink
- } from '@/hooks/useUserEntityLinks';
+ } from '@/controllers/useUserController';
  import { toast } from 'sonner';
  
  interface EditUserLinksDialogProps {

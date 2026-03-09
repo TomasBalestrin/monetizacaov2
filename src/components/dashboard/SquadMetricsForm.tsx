@@ -4,15 +4,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  CalendarIcon, 
-  Phone, 
-  Target, 
-  DollarSign, 
-  TrendingUp, 
-  XCircle, 
+import {
+  CalendarIcon,
+  Phone,
+  Target,
+  DollarSign,
+  TrendingUp,
+  XCircle,
   ChevronDown,
-  User
+  User,
+  Layers
 } from 'lucide-react';
 import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,9 +41,17 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PeriodTypeSelector, type PeriodType } from './PeriodTypeSelector';
 import { MonthSelector } from './MonthSelector';
-import { useClosers, type CloserMetricRecord } from '@/hooks/useMetrics';
-import { useUserFunnels } from '@/hooks/useFunnels';
-import { useSDRs } from '@/hooks/useSdrMetrics';
+import { useClosers, type CloserMetricRecord } from '@/controllers/useCloserController';
+import { useUserFunnels } from '@/controllers/useFunnelController';
+import { useSDRs } from '@/controllers/useSdrController';
+
+const funnelBreakdownSchema = z.object({
+  funnel_id: z.string(),
+  funnel_name: z.string(),
+  calls: z.coerce.number().int().min(0),
+  sales: z.coerce.number().int().min(0),
+  sdr_id: z.string().optional(),
+});
 
 const squadMetricsSchema = z.object({
   period_type: z.enum(['day', 'week', 'month']),
@@ -61,12 +70,13 @@ const squadMetricsSchema = z.object({
   leads_count: z.coerce.number().int().min(0).optional(),
   qualified_count: z.coerce.number().int().min(0).optional(),
   sdr_id: z.string().optional(),
+  funnel_breakdown: z.array(funnelBreakdownSchema).optional(),
 });
 
 export type SquadMetricsFormValues = z.infer<typeof squadMetricsSchema>;
 
 interface SquadMetricsFormProps {
-  squadId: string;
+  squadId?: string;
   defaultCloserId?: string;
   defaultMetric?: CloserMetricRecord;
   selectedMonth?: Date;
@@ -246,6 +256,42 @@ export function SquadMetricsForm({
   const selectedCloser = closers?.find(c => c.id === selectedCloserId);
   const { data: userFunnels } = useUserFunnels(selectedCloserId || undefined);
 
+  // Funnel breakdown state
+  interface FunnelBreakdownEntry {
+    funnel_id: string;
+    funnel_name: string;
+    calls: number;
+    sales: number;
+    sdr_id: string;
+  }
+
+  const [funnelBreakdown, setFunnelBreakdown] = useState<FunnelBreakdownEntry[]>([]);
+
+  // Initialize funnel breakdown when funnels load or closer changes
+  useEffect(() => {
+    if (userFunnels && userFunnels.length > 0) {
+      setFunnelBreakdown(
+        userFunnels.map((f) => ({
+          funnel_id: f.id,
+          funnel_name: f.name,
+          calls: 0,
+          sales: 0,
+          sdr_id: '',
+        }))
+      );
+    } else {
+      setFunnelBreakdown([]);
+    }
+  }, [userFunnels]);
+
+  const updateFunnelEntry = (index: number, field: keyof FunnelBreakdownEntry, value: number | string) => {
+    setFunnelBreakdown((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
   // Quick date setters
   const setQuickDate = (type: 'today' | 'yesterday' | 'thisWeek') => {
     const today = new Date();
@@ -267,7 +313,16 @@ export function SquadMetricsForm({
 
   const handleSubmit = async (values: SquadMetricsFormValues) => {
     const period = calculatePeriod(values.selected_date, values.period_type);
-    await onSubmit(values, period);
+    // Attach funnel breakdown data
+    const nonEmptyBreakdown = funnelBreakdown.filter(f => f.calls > 0 || f.sales > 0);
+    const valuesWithBreakdown = {
+      ...values,
+      funnel_breakdown: nonEmptyBreakdown.length > 0 ? nonEmptyBreakdown : undefined,
+      // If only one funnel has data, set it as the main funnel_id/sdr_id
+      funnel_id: nonEmptyBreakdown.length === 1 ? nonEmptyBreakdown[0].funnel_id : values.funnel_id,
+      sdr_id: nonEmptyBreakdown.length === 1 ? (nonEmptyBreakdown[0].sdr_id || values.sdr_id) : values.sdr_id,
+    };
+    await onSubmit(valuesWithBreakdown, period);
   };
 
   return (
@@ -507,131 +562,87 @@ export function SquadMetricsForm({
           </div>
         </div>
 
-        {/* Funnel Data Section (optional) */}
-        {userFunnels && userFunnels.length > 0 && (
+        {/* Per-Funnel Breakdown */}
+        {funnelBreakdown.length > 0 && (
           <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-violet-500/20">
-                <Target className="h-4 w-4 text-violet-400" />
+                <Layers className="h-4 w-4 text-violet-400" />
               </div>
-              <h4 className="text-sm font-semibold text-violet-400">Dados do Funil</h4>
-              <span className="text-xs text-muted-foreground">(opcional)</span>
+              <h4 className="text-sm font-semibold text-violet-400">Detalhamento por Produto/Funil</h4>
             </div>
 
-            <FormField
-              control={form.control}
-              name="funnel_id"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput
-                    icon={Target}
-                    label="Funil"
-                    iconBgColor="bg-violet-500/20"
-                    iconColor="text-violet-400"
-                  >
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <FormControl>
-                        <SelectTrigger className="bg-background/50 border-border/50">
-                          <SelectValue placeholder="Selecione um funil" />
-                        </SelectTrigger>
-                      </FormControl>
+            {funnelBreakdown.map((entry, i) => (
+              <div key={entry.funnel_id} className="rounded-md border border-border/40 bg-background/30 p-3 space-y-3">
+                <h5 className="text-sm font-semibold text-foreground">{entry.funnel_name}</h5>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Phone className="h-3 w-3 text-blue-400" />
+                      <span className="text-xs text-muted-foreground">Calls</span>
+                    </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={entry.calls || ''}
+                      onChange={(e) => updateFunnelEntry(i, 'calls', Number(e.target.value))}
+                      placeholder="0"
+                      className="h-9 bg-background/50 border-border/50 text-center"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Target className="h-3 w-3 text-emerald-400" />
+                      <span className="text-xs text-muted-foreground">Vendas</span>
+                    </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={entry.sales || ''}
+                      onChange={(e) => updateFunnelEntry(i, 'sales', Number(e.target.value))}
+                      placeholder="0"
+                      className="h-9 bg-background/50 border-border/50 text-center"
+                    />
+                  </div>
+                </div>
+
+                {/* SDR de Origem per funnel - show when sales > 0 */}
+                {entry.sales > 0 && sdrs && sdrs.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <User className="h-3 w-3 text-violet-400" />
+                      <span className="text-xs text-muted-foreground">SDR que agendou</span>
+                    </div>
+                    <Select
+                      value={entry.sdr_id || 'none'}
+                      onValueChange={(v) => updateFunnelEntry(i, 'sdr_id', v === 'none' ? '' : v)}
+                    >
+                      <SelectTrigger className="h-9 bg-background/50 border-border/50">
+                        <SelectValue placeholder="Selecione o SDR" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {userFunnels.map((funnel) => (
-                          <SelectItem key={funnel.id} value={funnel.id}>
-                            {funnel.name}
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {sdrs.map((sdr) => (
+                          <SelectItem key={sdr.id} value={sdr.id}>
+                            {sdr.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  </div>
+                )}
+              </div>
+            ))}
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="leads_count"
-                render={({ field }) => (
-                  <FormItem>
-                    <MetricInput
-                      icon={User}
-                      label="Leads"
-                      iconBgColor="bg-violet-500/20"
-                      iconColor="text-violet-400"
-                    >
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          className="bg-background/50 border-border/50"
-                          {...field}
-                        />
-                      </FormControl>
-                    </MetricInput>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="qualified_count"
-                render={({ field }) => (
-                  <FormItem>
-                    <MetricInput
-                      icon={User}
-                      label="Qualificados"
-                      iconBgColor="bg-violet-500/20"
-                      iconColor="text-violet-400"
-                    >
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          className="bg-background/50 border-border/50"
-                          {...field}
-                        />
-                      </FormControl>
-                    </MetricInput>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* SDR de Origem - only when sales > 0 */}
-            {(salesValue ?? 0) > 0 && sdrs && sdrs.length > 0 && (
-              <FormField
-                control={form.control}
-                name="sdr_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <MetricInput
-                      icon={User}
-                      label="SDR de Origem"
-                      iconBgColor="bg-violet-500/20"
-                      iconColor="text-violet-400"
-                    >
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger className="bg-background/50 border-border/50">
-                            <SelectValue placeholder="Selecione o SDR" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {sdrs.map((sdr) => (
-                            <SelectItem key={sdr.id} value={sdr.id}>
-                              {sdr.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </MetricInput>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Summary of per-funnel totals */}
+            {funnelBreakdown.some(f => f.calls > 0 || f.sales > 0) && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-md bg-violet-500/10 border border-violet-500/20">
+                <span className="text-xs font-medium text-violet-400">Total por funil:</span>
+                <div className="flex items-center gap-4 text-xs font-semibold text-foreground">
+                  <span>{funnelBreakdown.reduce((s, f) => s + f.calls, 0)} calls</span>
+                  <span>{funnelBreakdown.reduce((s, f) => s + f.sales, 0)} vendas</span>
+                </div>
+              </div>
             )}
           </div>
         )}

@@ -24,14 +24,19 @@ import { SDRMetricCard } from './SDRMetricCard';
 import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
 import { SDRDataTable } from './SDRDataTable';
 import { SDRMetricsDialog } from './SDRMetricsDialog';
-import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/hooks/useSdrMetrics';
+import { ScheduledCallsTable } from './ScheduledCallsTable';
+import { EditScheduledCallDialog } from './EditScheduledCallDialog';
+import { useScheduledCalls, useDeleteScheduledCall, useSendCallReminder } from '@/controllers/useScheduledCallController';
+import type { ScheduledCall } from '@/model/entities/scheduledCall';
+import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/controllers/useSdrController';
 import { useAuth } from '@/contexts/AuthContext';
 import { SDRFunnelManager } from './SDRFunnelManager';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeSDRMetrics } from '@/hooks/useRealtimeMetrics';
-import { useGoals, getGoalTarget } from '@/hooks/useGoals';
+import { useGoals, getGoalTarget } from '@/controllers/useGoalController';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
+import { EntityNotifications } from '@/components/dashboard/EntityNotifications';
 
 interface SDRDetailPageProps {
   sdrId: string;
@@ -126,8 +131,14 @@ export function SDRDetailPage({
   const [showMetricsDialog, setShowMetricsDialog] = useState(false);
   const [editingMetric, setEditingMetric] = useState<SDRMetric | null>(null);
   const [deletingMetricId, setDeletingMetricId] = useState<string | null>(null);
-  
+
+  // Scheduled calls states
+  const [editingCall, setEditingCall] = useState<ScheduledCall | null>(null);
+  const [deletingCallId, setDeletingCallId] = useState<string | null>(null);
+
   const deleteMetric = useDeleteSDRMetric();
+  const deleteCall = useDeleteScheduledCall();
+  const sendReminder = useSendCallReminder();
   
   // Enable realtime subscriptions for automatic data refresh
   useRealtimeSDRMetrics();
@@ -147,6 +158,7 @@ export function SDRDetailPage({
     hasFunnels || false
   );
   const { data: goals } = useGoals('sdr', sdrId, monthStr);
+  const { data: scheduledCalls, isLoading: isLoadingCalls } = useScheduledCalls(sdrId, periodStart, periodEnd);
 
   const sdr = sdrs?.find((s) => s.id === sdrId);
   
@@ -245,6 +257,26 @@ export function SDRDetailPage({
       setEditingMetric(null);
     }
   }, []);
+
+  // Scheduled call handlers
+  const handleEditCall = useCallback((call: ScheduledCall) => {
+    setEditingCall(call);
+  }, []);
+
+  const handleDeleteCall = useCallback((call: ScheduledCall) => {
+    setDeletingCallId(call.id);
+  }, []);
+
+  const confirmDeleteCall = useCallback(async () => {
+    if (deletingCallId) {
+      await deleteCall.mutateAsync(deletingCallId);
+      setDeletingCallId(null);
+    }
+  }, [deletingCallId, deleteCall]);
+
+  const handleSendReminder = useCallback((call: ScheduledCall) => {
+    sendReminder.mutate(call);
+  }, [sendReminder]);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
@@ -461,13 +493,45 @@ export function SDRDetailPage({
         {isLoadingMetrics ? (
           <TableSkeleton rows={5} columns={8} />
         ) : (
-          <SDRDataTable 
-            metrics={weekFilteredMetrics || []} 
+          <SDRDataTable
+            metrics={weekFilteredMetrics || []}
             showFunnelColumn={!selectedFunnel && hasFunnels}
             onEditMetric={isAggregatedView ? undefined : handleEditMetric}
             onDeleteMetric={isAggregatedView ? undefined : handleDeleteMetric}
           />
         )}
+
+        {/* Notifications Section (admin only) */}
+        {isAdmin && sdr && (
+          <EntityNotifications
+            entityId={sdrId}
+            entityType="sdr"
+            entityName={sdr.name}
+          />
+        )}
+
+        {/* Scheduled Calls Section */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Calls Agendadas</h2>
+            {scheduledCalls && scheduledCalls.length > 0 && (
+              <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                {scheduledCalls.length}
+              </span>
+            )}
+          </div>
+
+          {isLoadingCalls ? (
+            <TableSkeleton rows={3} columns={6} />
+          ) : (
+            <ScheduledCallsTable
+              calls={scheduledCalls || []}
+              onEdit={handleEditCall}
+              onDelete={handleDeleteCall}
+              onReminder={handleSendReminder}
+            />
+          )}
+        </div>
       </div>
 
       {/* Add Metrics Dialog */}
@@ -487,7 +551,7 @@ export function SDRDetailPage({
         editingMetric={editingMetric}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Metric Confirmation Dialog */}
       <AlertDialog open={!!deletingMetricId} onOpenChange={(open) => !open && setDeletingMetricId(null)}>
         <AlertDialogContent className="bg-background border-border">
           <AlertDialogHeader>
@@ -503,6 +567,37 @@ export function SDRDetailPage({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteMetric.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Scheduled Call Dialog */}
+      {editingCall && (
+        <EditScheduledCallDialog
+          open={!!editingCall}
+          onOpenChange={(open) => !open && setEditingCall(null)}
+          sdrType={sdr?.type || 'sdr'}
+          call={editingCall}
+        />
+      )}
+
+      {/* Delete Call Confirmation Dialog */}
+      <AlertDialog open={!!deletingCallId} onOpenChange={(open) => !open && setDeletingCallId(null)}>
+        <AlertDialogContent className="bg-background border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Call</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta call agendada? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteCall}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCall.isPending ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

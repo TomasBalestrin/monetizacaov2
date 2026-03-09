@@ -8,7 +8,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { SDRMetricsForm, type SDRMetricsFormValues } from './SDRMetricsForm';
-import { useCreateSDRMetric, useUpdateSDRMetric, type SDRMetric } from '@/hooks/useSdrMetrics';
+import { useCreateSDRMetric, useUpdateSDRMetric, type SDRMetric } from '@/controllers/useSdrController';
 import { toast } from 'sonner';
 import { formatDateString } from '@/lib/utils';
 

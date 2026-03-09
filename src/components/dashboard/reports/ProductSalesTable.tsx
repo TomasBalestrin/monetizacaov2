@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { type PersonProductSales } from '@/hooks/useFunnels';
+import { type PersonProductSales } from '@/controllers/useFunnelController';
 import { MetricCardSkeletonGrid } from '@/components/dashboard/skeletons';
 import { EditableCell } from './EditableCell';
 import { supabase } from '@/integrations/supabase/client';

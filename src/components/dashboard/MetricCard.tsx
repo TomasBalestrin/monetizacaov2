@@ -63,17 +63,17 @@ export function MetricCard({
   const getIconBackground = () => {
     switch (variant) {
       case 'eagles':
-        return 'bg-eagles/20 text-eagles';
+        return 'bg-eagles/10 text-eagles';
       case 'sharks':
-        return 'bg-sharks/20 text-sharks';
+        return 'bg-sharks/10 text-sharks';
       case 'success':
-        return 'bg-success/20 text-success';
+        return 'bg-success/10 text-success';
       case 'warning':
-        return 'bg-warning/20 text-warning';
+        return 'bg-warning/10 text-warning';
       case 'destructive':
-        return 'bg-destructive/20 text-destructive';
+        return 'bg-destructive/10 text-destructive';
       default:
-        return 'bg-primary/10 text-primary';
+        return 'bg-primary/8 text-primary';
     }
   };
 
@@ -102,7 +102,7 @@ export function MetricCard({
   const valueElement = (
     <h3
       className={cn(
-        'font-bold text-card-foreground',
+        'font-bold text-card-foreground tracking-tight',
         large ? 'text-2xl sm:text-3xl md:text-4xl' : compact ? 'text-lg sm:text-xl' : 'text-lg sm:text-xl md:text-2xl'
       )}
     >
@@ -114,14 +114,15 @@ export function MetricCard({
     return (
       <div
         className={cn(
-          'p-3 sm:p-4 rounded-xl bg-card/60 border border-border/40 transition-all duration-200 hover:bg-card/80',
+          'p-3 sm:p-4 rounded-2xl bg-card border border-border/30 transition-all duration-300',
           className
         )}
+        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}
       >
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <p className="text-muted-foreground text-xs font-medium">{title}</p>
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <p className="section-label">{title}</p>
           {Icon && (
-            <div className={cn('p-1.5 rounded-lg shrink-0', getIconBackground())}>
+            <div className={cn('p-1.5 rounded-full shrink-0', getIconBackground())}>
               <Icon size={14} />
             </div>
           )}
@@ -140,7 +141,7 @@ export function MetricCard({
         )}
         {showProgress && isPercentage && (
           <div className="mt-2">
-            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
               <div
                 className={cn('h-full rounded-full transition-all duration-500', getProgressColor())}
                 style={{ width: `${progressValue}%` }}
@@ -158,15 +159,15 @@ export function MetricCard({
   return (
     <Card
       className={cn(
-        'glass-card transition-all duration-200 hover:shadow-lg hover:scale-[1.02] animate-fade-in',
+        'glass-card transition-all duration-300 animate-fade-in',
         large && 'glass-card-elevated',
         className
       )}
     >
-      <CardContent className={cn('p-4 sm:p-6', large && 'p-6 sm:p-8')}>
-        <div className="flex items-start justify-between gap-2">
+      <CardContent className={cn('p-5 sm:p-6', large && 'p-6 sm:p-8')}>
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-muted-foreground text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">{title}</p>
+            <p className="section-label mb-2 sm:mb-3">{title}</p>
             {needsTooltip ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -181,7 +182,7 @@ export function MetricCard({
             )}
             {showProgress && isPercentage && (
               <div className="mt-3">
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
                     className={cn('h-full rounded-full transition-all duration-500', getProgressColor())}
                     style={{ width: `${progressValue}%` }}
@@ -215,7 +216,7 @@ export function MetricCard({
             )}
           </div>
           {Icon && (
-            <div className={cn('p-2 sm:p-3 rounded-xl shrink-0', getIconBackground())}>
+            <div className={cn('p-2.5 sm:p-3 rounded-full shrink-0', getIconBackground())}>
               <Icon size={large ? 24 : 20} className="sm:w-6 sm:h-6" />
             </div>
           )}

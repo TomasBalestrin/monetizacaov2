@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useCreateMeeting, useProfiles } from '@/hooks/useMeetings';
+import { useCreateMeeting, useProfiles } from '@/controllers/useMeetingController';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 

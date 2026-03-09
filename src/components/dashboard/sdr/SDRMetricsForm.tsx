@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useSDRs, useSDRFunnels, type SDRMetric } from '@/hooks/useSdrMetrics';
+import { useSDRs, useSDRFunnels, type SDRMetric } from '@/controllers/useSdrController';
 
 const sdrMetricsSchema = z.object({
   sdr_id: z.string().min(1, 'Selecione um SDR'),

@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { useSDRFunnels, useAddSDRFunnel, useDeleteSDRFunnel } from '@/hooks/useSdrMetrics';
+import { useSDRFunnels, useAddSDRFunnel, useDeleteSDRFunnel } from '@/controllers/useSdrController';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SDRFunnelManagerProps {

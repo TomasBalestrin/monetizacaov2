@@ -24,13 +24,17 @@ import { CloserWeeklyComparisonChart } from './CloserWeeklyComparisonChart';
 import { CloserDataTable } from './CloserDataTable';
 import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
 import { CloserFunnelForm } from './CloserFunnelForm';
-import { useClosers, useCloserMetrics, useDeleteMetric, type CloserMetricRecord } from '@/hooks/useMetrics';
-import { useCloserFunnelData, useUserFunnels, type FunnelDailyData } from '@/hooks/useFunnels';
+import { ActiveCallBanner } from './ActiveCallBanner';
+import { useClosers, useCloserMetrics, useCloserMetricsByFunnel, useDeleteMetric, type CloserMetricRecord } from '@/controllers/useCloserController';
+import { useCloserFunnelData, useUserFunnels, useFunnels, type FunnelDailyData } from '@/controllers/useFunnelController';
+import { calculateTrendDetailed } from '@/model/services/trendService';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
-import { useGoals, getGoalTarget } from '@/hooks/useGoals';
+import { useGoals, getGoalTarget } from '@/controllers/useGoalController';
 import { MetricCardSkeletonGrid, ChartSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { cn } from '@/lib/utils';
+import { EntityNotifications } from '@/components/dashboard/EntityNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Select,
   SelectContent,
@@ -110,6 +114,7 @@ export function CloserDetailPage({
   onBack,
 }: CloserDetailPageProps) {
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const [, setSearchParams] = useSearchParams();
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
   const [isFunnelFormOpen, setIsFunnelFormOpen] = useState(false);
@@ -136,6 +141,7 @@ export function CloserDetailPage({
   );
   const { data: goals } = useGoals('closer', closerId, monthStr);
   const { data: closerFunnels } = useUserFunnels(closerId);
+  const { data: allFunnels } = useFunnels();
   const { data: funnelData, isLoading: isLoadingFunnelData } = useCloserFunnelData(
     closerId,
     selectedFunnel || undefined,
@@ -143,10 +149,42 @@ export function CloserDetailPage({
     selectedFunnel ? periodEnd : undefined
   );
 
+  // Fetch metrics filtered by funnel_id (from metrics table)
+  const { data: funnelMetricsData, isLoading: isLoadingFunnelMetrics } = useCloserMetricsByFunnel(
+    closerId,
+    selectedFunnel || undefined,
+    selectedFunnel ? periodStart : undefined,
+    selectedFunnel ? periodEnd : undefined
+  );
+
+  // Build available funnels list: merge user-assigned funnels with funnels found in metrics
+  const availableFunnels = useMemo(() => {
+    const funnelMap = new Map<string, { id: string; name: string }>();
+
+    // Add user-assigned funnels
+    (closerFunnels || []).forEach(f => funnelMap.set(f.id, { id: f.id, name: f.name }));
+
+    // Add funnels found in metrics data
+    (metrics || []).forEach(m => {
+      if (m.funnel_id && m.funnel && !funnelMap.has(m.funnel_id)) {
+        funnelMap.set(m.funnel_id, { id: m.funnel.id, name: m.funnel.name });
+      }
+    });
+
+    // If we still have no funnels, try from all funnels list
+    if (funnelMap.size === 0 && allFunnels) {
+      allFunnels.forEach(f => funnelMap.set(f.id, { id: f.id, name: f.name }));
+    }
+
+    return Array.from(funnelMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [closerFunnels, metrics, allFunnels]);
+
   // Map funnel_daily_data to CloserMetricRecord format
   const mappedFunnelMetrics: CloserMetricRecord[] = useMemo(() => {
-    if (!funnelData || !selectedFunnel) return [];
-    return funnelData.map((fd: FunnelDailyData) => ({
+    if (!selectedFunnel) return [];
+
+    // Map funnel_daily_data records
+    const fromFunnelData = (funnelData || []).map((fd: FunnelDailyData) => ({
       id: fd.id,
       closer_id: fd.user_id,
       period_start: fd.date,
@@ -154,7 +192,7 @@ export function CloserDetailPage({
       calls: fd.calls_done,
       sales: fd.sales_count,
       revenue: fd.sales_value,
-      entries: 0,
+      entries: fd.entries_value || 0,
       revenue_trend: 0,
       entries_trend: 0,
       cancellations: 0,
@@ -164,8 +202,20 @@ export function CloserDetailPage({
       updated_at: fd.created_at,
       created_by: fd.created_by,
       source: 'funnel',
+      funnel_id: fd.funnel_id,
+      sdr_id: fd.sdr_id,
+      funnel: fd.funnel || null,
+      sdr: fd.sdr || null,
     }));
-  }, [funnelData, selectedFunnel]);
+
+    // Include metrics records that have this funnel_id
+    const fromMetrics = (funnelMetricsData || []).map((m) => ({
+      ...m,
+      source: 'metrics',
+    }));
+
+    return [...fromFunnelData, ...fromMetrics];
+  }, [funnelData, funnelMetricsData, selectedFunnel]);
 
   // Filter closers by current squad
   const squadClosers = useMemo(() => {
@@ -180,7 +230,7 @@ export function CloserDetailPage({
     return selectedFunnel ? mappedFunnelMetrics : (metrics || []);
   }, [selectedFunnel, mappedFunnelMetrics, metrics]);
 
-  const isLoadingActiveMetrics = selectedFunnel ? isLoadingFunnelData : isLoadingMetrics;
+  const isLoadingActiveMetrics = selectedFunnel ? (isLoadingFunnelData || isLoadingFunnelMetrics) : isLoadingMetrics;
 
   // Week filtering
   const weekFilteredMetrics = useMemo(() => {
@@ -195,6 +245,13 @@ export function CloserDetailPage({
   }, [activeMetrics, selectedWeek, selectedMonth]);
 
   const aggregatedMetrics = weekFilteredMetrics.length > 0 ? calculateAggregatedMetrics(weekFilteredMetrics, squadSlug) : null;
+
+  // Compute trend context (working days info) for trend cards
+  const trendContext = useMemo(() => {
+    const refDate = periodStart ? parseDateString(periodStart) : new Date();
+    const result = calculateTrendDetailed(0, refDate); // value doesn't matter, we just need days
+    return { workedDays: result.workedDays, totalDays: result.totalDays };
+  }, [periodStart]);
 
   // Swipe navigation between closers in the same squad
   const handleNavigateToCloser = useCallback((id: string) => {
@@ -343,18 +400,18 @@ export function CloserDetailPage({
               </Button>
             )}
 
-            {closerFunnels && closerFunnels.length > 0 && (
+            {availableFunnels.length > 0 && (
               <Select
                 value={selectedFunnel || 'all'}
                 onValueChange={(v) => setSelectedFunnel(v === 'all' ? null : v)}
               >
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="w-[180px] h-9">
                   <Filter size={14} className="mr-1 text-muted-foreground" />
-                  <SelectValue placeholder="Funil" />
+                  <SelectValue placeholder="Filtrar por Funil" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os Funis</SelectItem>
-                  {closerFunnels.map((f) => (
+                  <SelectItem value="all">Visão Geral</SelectItem>
+                  {availableFunnels.map((f) => (
                     <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -427,6 +484,18 @@ export function CloserDetailPage({
           </p>
         )}
 
+        {/* Active Call Banner */}
+        <ActiveCallBanner closerId={closerId} />
+
+        {/* Notifications Section (admin only) */}
+        {isAdmin && closer && (
+          <EntityNotifications
+            entityId={closerId}
+            entityType="closer"
+            entityName={closer.name}
+          />
+        )}
+
         {/* Metrics - Hierarchical Grid */}
         {isLoadingActiveMetrics ? (
           <MetricCardSkeletonGrid count={7} />
@@ -474,6 +543,7 @@ export function CloserDetailPage({
                 value={aggregatedMetrics?.revenueTrend || 0}
                 icon={TrendingUp}
                 isCurrency
+                trendWarning={trendContext.totalDays > 0 ? `Projeção · ${trendContext.workedDays.toFixed(0)} de ${trendContext.totalDays.toFixed(0)} dias úteis` : undefined}
               />
               <MetricCard
                 title="Valor de Entrada"
@@ -487,6 +557,7 @@ export function CloserDetailPage({
                 value={aggregatedMetrics?.entriesTrend || 0}
                 icon={TrendingUp}
                 isCurrency
+                trendWarning={trendContext.totalDays > 0 ? `Projeção · ${trendContext.workedDays.toFixed(0)} de ${trendContext.totalDays.toFixed(0)} dias úteis` : undefined}
               />
               <MetricCard
                 title="Nº de Cancelamentos"

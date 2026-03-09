@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMetrics, useDeleteMetric, useSquads, Metric } from '@/hooks/useMetrics';
+import { useMetrics, useDeleteMetric, useSquads, Metric } from '@/controllers/useCloserController';
 import { MetricsDialog } from './MetricsDialog';
 
 export function MetricsTable() {

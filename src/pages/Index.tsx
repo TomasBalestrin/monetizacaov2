@@ -5,14 +5,17 @@ import { Sidebar, ModuleId } from '@/components/dashboard/Sidebar';
 import { Header } from '@/components/dashboard/Header';
 import { BottomNavigation } from '@/components/dashboard/BottomNavigation';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { SaleCelebrationOverlay } from '@/components/dashboard/SaleCelebrationOverlay';
 import { Loader2 } from 'lucide-react';
 
 // P2: Lazy load heavy page components
 const DashboardOverview = lazy(() => import('@/components/dashboard/DashboardOverview').then(m => ({ default: m.DashboardOverview })));
 const SquadPage = lazy(() => import('@/components/dashboard/SquadPage').then(m => ({ default: m.SquadPage })));
 const AdminPanel = lazy(() => import('@/components/dashboard/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const ClosersDashboard = lazy(() => import('@/components/dashboard/closer').then(m => ({ default: m.ClosersDashboard })));
 const SDRDashboard = lazy(() => import('@/components/dashboard/sdr').then(m => ({ default: m.SDRDashboard })));
 const UserDashboard = lazy(() => import('@/components/dashboard/UserDashboard').then(m => ({ default: m.UserDashboard })));
+const EntitySelectionScreen = lazy(() => import('@/components/dashboard/EntitySelectionScreen').then(m => ({ default: m.EntitySelectionScreen })));
 const GoalsConfig = lazy(() => import('@/components/dashboard/GoalsConfig').then(m => ({ default: m.GoalsConfig })));
 const MeetingsPage = lazy(() => import('@/components/dashboard/meetings').then(m => ({ default: m.MeetingsPage })));
 const ReportsPage = lazy(() => import('@/components/dashboard/reports').then(m => ({ default: m.ReportsPage })));
@@ -27,14 +30,14 @@ function PageLoader() {
 
 const Index = () => {
   const [searchParams] = useSearchParams();
-  const { user, loading, isUser } = useAuth();
+  const { user, loading, isUser, needsEntitySelection } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleId>('dashboard');
 
   // Handle URL module parameter
   useEffect(() => {
     const moduleParam = searchParams.get('module');
-    if (moduleParam && ['dashboard', 'eagles', 'sharks', 'sdrs', 'reports', 'admin', 'goals', 'meetings'].includes(moduleParam)) {
+    if (moduleParam && ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'social_selling', 'reports', 'admin', 'goals', 'meetings'].includes(moduleParam)) {
       setActiveModule(moduleParam as ModuleId);
     }
   }, [searchParams]);
@@ -50,12 +53,24 @@ const Index = () => {
     );
   }
 
+  // Team accounts need to select their entity first
+  if (isUser && needsEntitySelection) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <EntitySelectionScreen />
+      </Suspense>
+    );
+  }
+
   // Role "user" gets a dedicated layout without sidebar
   if (isUser) {
     return (
-      <Suspense fallback={<PageLoader />}>
-        <UserDashboard />
-      </Suspense>
+      <>
+        <Suspense fallback={<PageLoader />}>
+          <UserDashboard />
+        </Suspense>
+        <SaleCelebrationOverlay />
+      </>
     );
   }
 
@@ -63,6 +78,8 @@ const Index = () => {
     switch (activeModule) {
       case 'dashboard':
         return <DashboardOverview />;
+      case 'closers':
+        return <ClosersDashboard />;
       case 'eagles':
         return <SquadPage squadSlug="eagles" />;
       case 'sharks':
@@ -74,7 +91,9 @@ const Index = () => {
       case 'meetings':
         return <MeetingsPage />;
       case 'sdrs':
-        return <SDRDashboard />;
+        return <SDRDashboard sdrType="sdr" />;
+      case 'social_selling':
+        return <SDRDashboard sdrType="social_selling" />;
       case 'reports':
         return <ReportsPage />;
       default:
@@ -108,6 +127,9 @@ const Index = () => {
         activeModule={activeModule}
         onModuleChange={setActiveModule}
       />
+
+      {/* Global sale celebration overlay */}
+      <SaleCelebrationOverlay />
     </div>
   );
 };
