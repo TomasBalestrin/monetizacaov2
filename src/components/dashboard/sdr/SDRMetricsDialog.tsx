@@ -17,6 +17,7 @@ interface SDRMetricsDialogProps {
   onOpenChange: (open: boolean) => void;
   sdrType: 'sdr' | 'social_selling';
   defaultSdrId?: string;
+  defaultFunnel?: string | null;
   editingMetric?: SDRMetric | null;
 }
 
@@ -25,6 +26,7 @@ export function SDRMetricsDialog({
   onOpenChange,
   sdrType,
   defaultSdrId,
+  defaultFunnel,
   editingMetric,
 }: SDRMetricsDialogProps) {
   const createMetric = useCreateSDRMetric();
@@ -101,6 +103,7 @@ export function SDRMetricsDialog({
           key={editingMetric?.id || 'new'}
           sdrType={sdrType}
           defaultSdrId={editingMetric?.sdr_id || defaultSdrId}
+          defaultFunnel={defaultFunnel}
           defaultMetric={editingMetric || undefined}
           onSubmit={handleSubmit}
           isLoading={isLoading}

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus, CalendarPlus } from 'lucide-react';
+import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus, CalendarPlus, Filter } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
 import { parseDateString } from '@/lib/utils';
@@ -11,11 +11,13 @@ import { SDRCard } from './SDRCard';
 import { SDRDetailPage } from './SDRDetailPage';
 import { SDRMetricsDialog } from './SDRMetricsDialog';
 import { ScheduleCallDialog } from './ScheduleCallDialog';
-import { useSDRTotalMetrics, useSDRsWithMetrics } from '@/controllers/useSdrController';
+import { useSDRTotalMetrics, useSDRsWithMetricsRaw } from '@/controllers/useSdrController';
+import { calculateAggregatedMetrics, groupMetricsBySDR } from '@/model/services/sdrService';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { MetricCardSkeletonGrid, SDRCardSkeletonGrid } from '@/components/dashboard/skeletons';
 import { useRealtimeSDRMetrics } from '@/hooks/useRealtimeMetrics';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SDRDashboardProps {
   sdrType: SDRType;
@@ -28,6 +30,7 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
   const [isAddMetricOpen, setIsAddMetricOpen] = useState(false);
   const [isScheduleCallOpen, setIsScheduleCallOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
 
   // Enable realtime subscriptions for automatic updates
   useRealtimeSDRMetrics();
@@ -37,17 +40,35 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
   
   const { periodStart, periodEnd } = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
 
-  const { data: totalMetrics, isLoading: isLoadingTotal } = useSDRTotalMetrics(
+  const { data: totalMetricsRpc, isLoading: isLoadingTotal } = useSDRTotalMetrics(
     sdrType,
     periodStart,
     periodEnd
   );
 
-  const { data: sdrsWithMetrics, isLoading: isLoadingSDRs } = useSDRsWithMetrics(
+  const { data: rawData, isLoading: isLoadingSDRs } = useSDRsWithMetricsRaw(
     sdrType,
     periodStart,
     periodEnd
   );
+
+  const availableFunnels = rawData?.availableFunnels || [];
+
+  const filteredMetrics = useMemo(() => {
+    if (!rawData?.metrics) return [];
+    if (!selectedFunnel) return rawData.metrics;
+    return rawData.metrics.filter(m => m.funnel === selectedFunnel);
+  }, [rawData?.metrics, selectedFunnel]);
+
+  const totalMetrics = useMemo(() => {
+    if (!selectedFunnel) return totalMetricsRpc;
+    return calculateAggregatedMetrics(filteredMetrics);
+  }, [selectedFunnel, totalMetricsRpc, filteredMetrics]);
+
+  const sdrsWithMetrics = useMemo(() => {
+    if (!rawData?.sdrs) return [];
+    return groupMetricsBySDR(rawData.sdrs, filteredMetrics);
+  }, [rawData?.sdrs, filteredMetrics]);
 
   const handleMonthChange = useCallback((month: Date) => {
     setSelectedMonth(month);
@@ -73,7 +94,7 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['sdr-total-metrics'] });
-    await queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics'] });
+    await queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics-raw'] });
   }, [queryClient]);
 
   // If a specific SDR is selected, render the detail page
@@ -132,6 +153,23 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
               selectedWeek={selectedWeek}
               onWeekChange={setSelectedWeek}
             />
+            {availableFunnels.length > 0 && (
+              <Select
+                value={selectedFunnel || 'all'}
+                onValueChange={(v) => setSelectedFunnel(v === 'all' ? null : v)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <Filter size={16} className="mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Todos os Funis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Funis</SelectItem>
+                  {availableFunnels.map((f) => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 
@@ -236,6 +274,7 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
           open={isAddMetricOpen}
           onOpenChange={setIsAddMetricOpen}
           sdrType={sdrType}
+          defaultFunnel={selectedFunnel}
         />
 
         {/* Schedule Call Dialog */}

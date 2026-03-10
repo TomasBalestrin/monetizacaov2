@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as sdrRepo from '@/model/repositories/sdrRepository';
-import { calculateSDRRates, calculatePartialSDRRates, groupMetricsBySDR } from '@/model/services/sdrService';
+import { calculateSDRRates, calculatePartialSDRRates, groupMetricsBySDR, calculateAggregatedMetrics } from '@/model/services/sdrService';
 import type { SDR, SDRMetric, SDRAggregatedMetrics, SDRWithMetrics } from '@/model/entities/sdr';
 
 export function useSDRs(type?: 'sdr' | 'social_selling') {
@@ -99,6 +99,21 @@ export function useSDRsWithMetrics(
       const { sdrs, metrics } = await sdrRepo.fetchSDRsWithMetricsRaw(type, periodStart, periodEnd);
       if (sdrs.length === 0) return [] as SDRWithMetrics[];
       return groupMetricsBySDR(sdrs, metrics);
+    },
+  });
+}
+
+export function useSDRsWithMetricsRaw(
+  type: 'sdr' | 'social_selling',
+  periodStart?: string,
+  periodEnd?: string
+) {
+  return useQuery({
+    queryKey: ['sdrs-with-metrics-raw', type, periodStart, periodEnd],
+    queryFn: async () => {
+      const { sdrs, metrics } = await sdrRepo.fetchSDRsWithMetricsRaw(type, periodStart, periodEnd);
+      const availableFunnels = [...new Set(metrics.map(m => m.funnel).filter(Boolean))].sort();
+      return { sdrs, metrics, availableFunnels };
     },
   });
 }

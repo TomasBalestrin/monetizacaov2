@@ -58,6 +58,7 @@ export type SDRMetricsFormValues = z.infer<typeof sdrMetricsSchema>;
 interface SDRMetricsFormProps {
   sdrType: 'sdr' | 'social_selling';
   defaultSdrId?: string;
+  defaultFunnel?: string | null;
   defaultMetric?: SDRMetric;
   onSubmit: (values: SDRMetricsFormValues) => Promise<void>;
   isLoading?: boolean;
@@ -88,6 +89,7 @@ function MetricInput({ icon: Icon, label, iconColor = 'text-primary', children }
 export function SDRMetricsForm({
   sdrType,
   defaultSdrId,
+  defaultFunnel,
   defaultMetric,
   onSubmit,
   isLoading,
@@ -103,7 +105,7 @@ export function SDRMetricsForm({
     defaultValues: {
       sdr_id: defaultMetric?.sdr_id || defaultSdrId || '',
       date: defaultMetric ? parseDateString(defaultMetric.date) : new Date(),
-      funnel: defaultMetric?.funnel || 'none',
+      funnel: defaultMetric?.funnel || defaultFunnel || 'none',
       activated: defaultMetric?.activated ?? 0,
       scheduled: defaultMetric?.scheduled ?? 0,
       scheduled_follow_up: defaultMetric?.scheduled_follow_up ?? 0,
