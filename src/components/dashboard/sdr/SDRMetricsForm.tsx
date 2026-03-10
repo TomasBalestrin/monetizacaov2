@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useSDRs, useSDRFunnels, type SDRMetric } from '@/controllers/useSdrController';
+import { useFunnels } from '@/controllers/useFunnelController';
 
 const sdrMetricsSchema = z.object({
   sdr_id: z.string().min(1, 'Selecione um SDR'),
@@ -118,6 +119,12 @@ export function SDRMetricsForm({
   // Watch the selected SDR to fetch its funnels
   const selectedSdrId = form.watch('sdr_id');
   const { data: sdrFunnels, isLoading: isLoadingFunnels } = useSDRFunnels(selectedSdrId);
+  const { data: allFunnels } = useFunnels();
+
+  // Use SDR-specific funnels if available, otherwise show all global funnels
+  const displayFunnels = sdrFunnels && sdrFunnels.length > 0
+    ? sdrFunnels
+    : (allFunnels || []).map(f => f.name);
 
   // Reset funnel when SDR changes, but NOT on first render (to preserve pre-selected SDR's funnel)
   const isFirstRender = useRef(true);
@@ -144,7 +151,7 @@ export function SDRMetricsForm({
     form.setValue('date', date);
   };
 
-  const hasFunnels = sdrFunnels && sdrFunnels.length > 0;
+  const hasFunnels = displayFunnels.length > 0;
 
   return (
     <Form {...form}>
@@ -281,7 +288,7 @@ export function SDRMetricsForm({
                   <SelectItem value="none" className="cursor-pointer">
                     <span className="text-muted-foreground">Nenhum</span>
                   </SelectItem>
-                  {hasFunnels && sdrFunnels.map((funnel) => (
+                  {hasFunnels && displayFunnels.map((funnel) => (
                     <SelectItem key={funnel} value={funnel} className="cursor-pointer">
                       {funnel}
                     </SelectItem>
@@ -290,7 +297,7 @@ export function SDRMetricsForm({
               </Select>
               {selectedSdrId && !isLoadingFunnels && !hasFunnels && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Nenhum funil cadastrado para este SDR
+                  Nenhum funil disponivel
                 </p>
               )}
               <FormMessage />
