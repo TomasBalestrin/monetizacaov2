@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Settings, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +9,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSDRFunnels, useAddSDRFunnel, useDeleteSDRFunnel } from '@/controllers/useSdrController';
+import { useFunnels } from '@/controllers/useFunnelController';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SDRFunnelManagerProps {
@@ -21,28 +22,28 @@ interface SDRFunnelManagerProps {
 
 export function SDRFunnelManager({ sdrId, sdrName, trigger }: SDRFunnelManagerProps) {
   const { isAdmin, isManager } = useAuth();
-  const [newFunnel, setNewFunnel] = useState('');
+  const [selectedFunnel, setSelectedFunnel] = useState('');
   const [open, setOpen] = useState(false);
 
-  const { data: funnels, isLoading } = useSDRFunnels(sdrId);
+  const { data: sdrFunnels, isLoading } = useSDRFunnels(sdrId);
+  const { data: allFunnels } = useFunnels();
   const addFunnel = useAddSDRFunnel();
   const deleteFunnel = useDeleteSDRFunnel();
+
+  // Filter out funnels already assigned to this SDR
+  const availableFunnels = useMemo(() => {
+    if (!allFunnels) return [];
+    const assigned = new Set(sdrFunnels || []);
+    return allFunnels.filter(f => !assigned.has(f.name));
+  }, [allFunnels, sdrFunnels]);
 
   if (!isAdmin && !isManager) return null;
 
   const handleAdd = () => {
-    const trimmed = newFunnel.trim();
-    if (!trimmed) return;
-    addFunnel.mutate({ sdrId, funnelName: trimmed }, {
-      onSuccess: () => setNewFunnel(''),
+    if (!selectedFunnel) return;
+    addFunnel.mutate({ sdrId, funnelName: selectedFunnel }, {
+      onSuccess: () => setSelectedFunnel(''),
     });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAdd();
-    }
   };
 
   return (
@@ -65,16 +66,23 @@ export function SDRFunnelManager({ sdrId, sdrName, trigger }: SDRFunnelManagerPr
         <div className="space-y-4">
           {/* Add funnel */}
           <div className="flex gap-2">
-            <Input
-              placeholder="Nome do funil"
-              value={newFunnel}
-              onChange={(e) => setNewFunnel(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={addFunnel.isPending}
-            />
+            <Select value={selectedFunnel} onValueChange={setSelectedFunnel}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Selecione um funil" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableFunnels.length > 0 ? (
+                  availableFunnels.map((f) => (
+                    <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="_none" disabled>Nenhum funil disponivel</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
             <Button
               onClick={handleAdd}
-              disabled={!newFunnel.trim() || addFunnel.isPending}
+              disabled={!selectedFunnel || addFunnel.isPending}
               size="icon"
             >
               <Plus size={16} />
@@ -85,8 +93,8 @@ export function SDRFunnelManager({ sdrId, sdrName, trigger }: SDRFunnelManagerPr
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {isLoading ? (
               <p className="text-sm text-muted-foreground">Carregando...</p>
-            ) : funnels && funnels.length > 0 ? (
-              funnels.map((funnel) => (
+            ) : sdrFunnels && sdrFunnels.length > 0 ? (
+              sdrFunnels.map((funnel) => (
                 <div
                   key={funnel}
                   className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border"
