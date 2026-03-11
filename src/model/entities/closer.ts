@@ -28,6 +28,7 @@ export interface Metric {
   cancellation_entries?: number;
   funnel_id?: string | null;
   sdr_id?: string | null;
+  funnel?: { id: string; name: string } | null;
   closer?: Closer;
 }
 

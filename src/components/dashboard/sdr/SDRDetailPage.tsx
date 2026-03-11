@@ -22,6 +22,7 @@ import { parseDateString } from '@/lib/utils';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { SDRMetricCard } from './SDRMetricCard';
 import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
+import { SDRFunnelComparisonChart } from './SDRFunnelComparisonChart';
 import { SDRDataTable } from './SDRDataTable';
 import { SDRMetricsDialog } from './SDRMetricsDialog';
 import { ScheduledCallsTable } from './ScheduledCallsTable';
@@ -396,10 +397,11 @@ export function SDRDetailPage({
               <Button
                 onClick={() => setShowMetricsDialog(true)}
                 size="sm"
-                className="gap-1.5"
+                variant="outline"
+                className="rounded-xl h-8 text-xs gap-1.5"
               >
-                <Plus size={16} />
-                <span className="hidden sm:inline">Adicionar</span>
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Metrica</span>
               </Button>
             )}
           </div>
@@ -487,6 +489,11 @@ export function SDRDetailPage({
           <ChartSkeleton height={350} />
         ) : (
           <SDRWeeklyComparisonChart metrics={displayMetrics || []} activeWeekKey={selectedWeek} />
+        )}
+
+        {/* Funnel Comparison Chart - shows when SDR has multiple funnels */}
+        {!isLoadingMetrics && !selectedFunnel && hasFunnels && rawMetrics && (
+          <SDRFunnelComparisonChart metrics={rawMetrics.filter(m => m.funnel !== '')} />
         )}
 
         {/* Data Table with Edit/Delete actions */}

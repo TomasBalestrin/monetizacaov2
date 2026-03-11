@@ -382,10 +382,10 @@ export function CloserDetailPage({
               variant="outline"
               size="sm"
               onClick={() => setIsMetricsDialogOpen(true)}
-              className="gap-2"
+              className="rounded-xl h-8 text-xs gap-1.5"
             >
-              <Plus size={16} />
-              Adicionar
+              <Plus className="h-3.5 w-3.5" />
+              Metrica
             </Button>
 
             {closerFunnels && closerFunnels.length > 0 && (
@@ -393,9 +393,9 @@ export function CloserDetailPage({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsFunnelFormOpen(true)}
-                className="gap-2"
+                className="rounded-xl h-8 text-xs gap-1.5"
               >
-                <Layers size={16} />
+                <Layers className="h-3.5 w-3.5" />
                 Por Funil
               </Button>
             )}

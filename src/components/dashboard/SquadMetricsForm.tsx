@@ -42,7 +42,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PeriodTypeSelector, type PeriodType } from './PeriodTypeSelector';
 import { MonthSelector } from './MonthSelector';
 import { useClosers, type CloserMetricRecord } from '@/controllers/useCloserController';
-import { useUserFunnels } from '@/controllers/useFunnelController';
+import { useFunnels, useUserFunnels } from '@/controllers/useFunnelController';
 import { useSDRs } from '@/controllers/useSdrController';
 
 const funnelBreakdownSchema = z.object({
@@ -187,6 +187,7 @@ export function SquadMetricsForm({
   submitLabel = 'Adicionar Métrica'
 }: SquadMetricsFormProps) {
   const { data: closers } = useClosers(squadId);
+  const { data: allFunnels } = useFunnels();
   const { data: sdrs } = useSDRs();
   const [showCancellations, setShowCancellations] = useState(
     !!defaultMetric && (
@@ -216,6 +217,7 @@ export function SquadMetricsForm({
       cancellations: defaultMetric?.cancellations ?? 0,
       cancellation_value: defaultMetric?.cancellation_value ?? 0,
       cancellation_entries: defaultMetric?.cancellation_entries ?? 0,
+      funnel_id: defaultMetric?.funnel_id || '',
     },
   });
 
@@ -235,6 +237,7 @@ export function SquadMetricsForm({
         cancellations: defaultMetric.cancellations ?? 0,
         cancellation_value: defaultMetric.cancellation_value ?? 0,
         cancellation_entries: defaultMetric.cancellation_entries ?? 0,
+        funnel_id: defaultMetric.funnel_id || '',
       });
       
       // Open cancellations section if there's data
@@ -315,11 +318,13 @@ export function SquadMetricsForm({
     const period = calculatePeriod(values.selected_date, values.period_type);
     // Attach funnel breakdown data
     const nonEmptyBreakdown = funnelBreakdown.filter(f => f.calls > 0 || f.sales > 0);
+    // Clean funnel_id if 'none' was selected
+    const cleanFunnelId = values.funnel_id === 'none' ? undefined : values.funnel_id;
     const valuesWithBreakdown = {
       ...values,
       funnel_breakdown: nonEmptyBreakdown.length > 0 ? nonEmptyBreakdown : undefined,
       // If only one funnel has data, set it as the main funnel_id/sdr_id
-      funnel_id: nonEmptyBreakdown.length === 1 ? nonEmptyBreakdown[0].funnel_id : values.funnel_id,
+      funnel_id: nonEmptyBreakdown.length === 1 ? nonEmptyBreakdown[0].funnel_id : cleanFunnelId,
       sdr_id: nonEmptyBreakdown.length === 1 ? (nonEmptyBreakdown[0].sdr_id || values.sdr_id) : values.sdr_id,
     };
     await onSubmit(valuesWithBreakdown, period);
@@ -378,6 +383,40 @@ export function SquadMetricsForm({
             </FormItem>
           )}
         />
+
+        {/* Funnel Selector */}
+        {allFunnels && allFunnels.length > 0 && (
+          <FormField
+            control={form.control}
+            name="funnel_id"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="p-1.5 rounded-md bg-violet-500/20">
+                    <Layers className="h-3.5 w-3.5 text-violet-400" />
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">Funil / Produto</span>
+                </div>
+                <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                  <FormControl>
+                    <SelectTrigger className="h-11 bg-muted/30 border-border/50">
+                      <SelectValue placeholder="Selecione o funil" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum (geral)</SelectItem>
+                    {allFunnels.map((funnel) => (
+                      <SelectItem key={funnel.id} value={funnel.id}>
+                        {funnel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Period Type Selector */}
         <FormField

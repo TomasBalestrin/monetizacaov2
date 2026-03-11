@@ -29,7 +29,7 @@ export async function fetchClosers(squadId?: string): Promise<Closer[]> {
 export async function fetchMetrics(periodStart?: string, periodEnd?: string): Promise<Metric[]> {
   let query = supabase
     .from('metrics')
-    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, closer:closers(id, name, squad_id, squad:squads(id, name, slug))');
+    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, funnel_id, funnel:funnels(id, name), closer:closers(id, name, squad_id, squad:squads(id, name, slug))');
 
   if (periodStart) {
     query = query.gte('period_start', periodStart);

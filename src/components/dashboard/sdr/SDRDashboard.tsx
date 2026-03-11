@@ -1,23 +1,23 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus, CalendarPlus, Filter } from 'lucide-react';
+import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus, CalendarPlus, Filter, ChevronRight } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
 import { parseDateString } from '@/lib/utils';
 import type { SDRType } from './SDRTypeToggle';
 import { SDRMetricCard } from './SDRMetricCard';
-import { SDRCard } from './SDRCard';
 import { SDRDetailPage } from './SDRDetailPage';
 import { SDRMetricsDialog } from './SDRMetricsDialog';
 import { ScheduleCallDialog } from './ScheduleCallDialog';
 import { useSDRTotalMetrics, useSDRsWithMetricsRaw } from '@/controllers/useSdrController';
 import { calculateAggregatedMetrics, groupMetricsBySDR } from '@/model/services/sdrService';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
-import { MetricCardSkeletonGrid, SDRCardSkeletonGrid } from '@/components/dashboard/skeletons';
+import { MetricCardSkeletonGrid } from '@/components/dashboard/skeletons';
 import { useRealtimeSDRMetrics } from '@/hooks/useRealtimeMetrics';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SDRFunnelKanban } from './SDRFunnelKanban';
 
 interface SDRDashboardProps {
   sdrType: SDRType;
@@ -136,12 +136,12 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setIsAddMetricOpen(true)} size="sm" className="rounded-xl">
-              <Plus className="mr-1.5 h-4 w-4" />
-              Adicionar Metrica
+            <Button onClick={() => setIsAddMetricOpen(true)} size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Metrica
             </Button>
-            <Button onClick={() => setIsScheduleCallOpen(true)} size="sm" variant="outline" className="rounded-xl">
-              <CalendarPlus className="mr-1.5 h-4 w-4" />
+            <Button onClick={() => setIsScheduleCallOpen(true)} size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
+              <CalendarPlus className="h-3.5 w-3.5" />
               Agendar Call
             </Button>
             <MonthSelector
@@ -238,36 +238,35 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
           </div>
         )}
 
-        {/* SDR List */}
-        <div>
-          <p className="section-label mb-4">
-            {sdrType === 'sdr' ? 'SDRs' : 'Social Selling'} Individuais
-          </p>
+        {/* Funnel Kanban */}
+        {!isLoading && !selectedFunnel && rawData?.sdrs && rawData?.metrics && (
+          <SDRFunnelKanban sdrs={rawData.sdrs} metrics={rawData.metrics} />
+        )}
 
-          {isLoading ? (
-            <SDRCardSkeletonGrid count={6} />
-          ) : sdrsWithMetrics && sdrsWithMetrics.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sdrsWithMetrics.map((sdr) => (
-                <SDRCard
-                  key={sdr.id}
-                  sdr={sdr}
-                  onClick={() => handleSDRClick(sdr.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 bg-card rounded-2xl border border-border/30">
-              <Phone size={48} className="text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Nenhum {sdrType === 'sdr' ? 'SDR' : 'Social Selling'} cadastrado
-              </h3>
-               <p className="text-muted-foreground text-center max-w-md">
-                 Adicione métricas usando o botão acima para visualizar os dados.
-               </p>
-            </div>
-          )}
-        </div>
+        {/* SDR Selector */}
+        {!isLoading && sdrsWithMetrics && sdrsWithMetrics.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mr-1">
+              {sdrType === 'sdr' ? 'SDRs' : 'Social Selling'}:
+            </p>
+            {sdrsWithMetrics.map((sdr) => (
+              <button
+                key={sdr.id}
+                onClick={() => handleSDRClick(sdr.id)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/40 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all text-sm font-medium text-foreground group"
+              >
+                {sdr.type === 'sdr' ? (
+                  <Phone size={12} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                ) : (
+                  <Users size={12} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                )}
+                {sdr.name}
+                <span className="text-xs text-success font-bold">{sdr.metrics.totalSales}v</span>
+                <ChevronRight size={12} className="text-muted-foreground/40 group-hover:text-primary transition-colors" />
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Add Metric Dialog */}
         <SDRMetricsDialog

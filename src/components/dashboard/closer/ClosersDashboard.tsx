@@ -1,16 +1,19 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { UserCheck, Plus } from 'lucide-react';
+import { UserCheck, Plus, Filter } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
-import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
+import { WeekSelector } from '@/components/dashboard/WeekSelector';
 import { CloserCard } from './CloserCard';
 import { CloserDetailPage } from './CloserDetailPage';
+import { CloserFunnelKanban } from './CloserFunnelKanban';
 import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
-import { useSquadMetrics } from '@/controllers/useCloserController';
+import { useSquadMetrics, useMetrics } from '@/controllers/useCloserController';
+import { useFunnels } from '@/controllers/useFunnelController';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function ClosersDashboard() {
   const queryClient = useQueryClient();
@@ -18,12 +21,17 @@ export function ClosersDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date());
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
 
   useRealtimeMetrics();
 
   const selectedCloserId = searchParams.get('closer');
   const { periodStart, periodEnd } = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
-  const { squadMetrics, isLoading, error } = useSquadMetrics(periodStart, periodEnd);
+  const { squadMetrics, isLoading } = useSquadMetrics(periodStart, periodEnd);
+  const { data: rawMetrics } = useMetrics(periodStart, periodEnd);
+  const { data: allFunnels } = useFunnels();
+
+  const availableFunnels = allFunnels || [];
 
   const handleMonthChange = useCallback((month: Date) => {
     setSelectedMonth(month);
@@ -45,7 +53,6 @@ export function ClosersDashboard() {
 
   // If a specific closer is selected, render the detail page
   if (selectedCloserId) {
-    // Find which squad slug this closer belongs to
     let closerSquadSlug = 'eagles';
     for (const sm of squadMetrics) {
       if (sm.closers.some(c => c.closer.id === selectedCloserId)) {
@@ -90,9 +97,9 @@ export function ClosersDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setIsMetricsDialogOpen(true)} size="sm" className="rounded-xl">
-              <Plus className="mr-1.5 h-4 w-4" />
-              Adicionar Metrica
+            <Button onClick={() => setIsMetricsDialogOpen(true)} size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Metrica
             </Button>
             <MonthSelector
               selectedMonth={selectedMonth}
@@ -103,8 +110,33 @@ export function ClosersDashboard() {
               selectedWeek={selectedWeek}
               onWeekChange={setSelectedWeek}
             />
+            {availableFunnels.length > 0 && (
+              <Select
+                value={selectedFunnel || 'all'}
+                onValueChange={(v) => setSelectedFunnel(v === 'all' ? null : v)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <Filter size={16} className="mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Todos os Funis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Funis</SelectItem>
+                  {availableFunnels.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
+
+        {/* Funnel Kanban */}
+        {!isLoading && !selectedFunnel && rawMetrics && allClosers.length > 0 && (
+          <CloserFunnelKanban
+            closers={allClosers}
+            metrics={rawMetrics}
+          />
+        )}
 
         {/* Closers List */}
         <div>

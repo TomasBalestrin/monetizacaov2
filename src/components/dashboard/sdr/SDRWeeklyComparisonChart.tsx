@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  LabelList,
   Cell,
 } from 'recharts';
 import { format, startOfWeek } from 'date-fns';
@@ -41,6 +39,20 @@ interface WeeklyComparison {
     sales: number | null;
   };
 }
+
+const COLORS = {
+  activated: '#6366f1',  // indigo
+  scheduled: '#06b6d4',  // cyan
+  attended: '#f59e0b',   // amber
+  sales: '#10b981',      // emerald
+};
+
+const LABELS: Record<string, string> = {
+  activated: 'Ativados',
+  scheduled: 'Agendados',
+  attended: 'Realizados',
+  sales: 'Vendas',
+};
 
 function groupMetricsByWeek(metrics: SDRMetric[]): WeeklyData[] {
   const weeklyMap = new Map<string, WeeklyData>();
@@ -80,10 +92,10 @@ function calculateChange(current: number, previous: number): number | null {
 function ChangeIndicator({ value, label, color }: { value: number | null; label: string; color: string }) {
   if (value === null) {
     return (
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/50">
-        <Minus className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="text-xs text-muted-foreground">--</span>
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40">
+        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-[11px] text-muted-foreground">{label}</span>
+        <Minus className="h-3 w-3 text-muted-foreground" />
       </div>
     );
   }
@@ -93,32 +105,22 @@ function ChangeIndicator({ value, label, color }: { value: number | null; label:
   const Icon = isPositive ? TrendingUp : isNeutral ? Minus : TrendingDown;
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all",
-        isPositive && "bg-green-500/10",
-        isNeutral && "bg-muted/50",
-        !isPositive && !isNeutral && "bg-red-500/10"
-      )}
-    >
-      <div 
-        className="w-2 h-2 rounded-full" 
-        style={{ backgroundColor: color }}
-      />
-      <span className="text-xs font-medium text-foreground">{label}</span>
-      <Icon 
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40">
+      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <Icon
         className={cn(
-          "h-3.5 w-3.5",
-          isPositive && "text-green-500",
-          isNeutral && "text-muted-foreground",
-          !isPositive && !isNeutral && "text-red-500"
-        )} 
+          'h-3 w-3',
+          isPositive && 'text-emerald-500',
+          isNeutral && 'text-muted-foreground',
+          !isPositive && !isNeutral && 'text-red-500'
+        )}
       />
       <span className={cn(
-        "text-xs font-bold",
-        isPositive && "text-green-500",
-        isNeutral && "text-muted-foreground",
-        !isPositive && !isNeutral && "text-red-500"
+        'text-[11px] font-semibold',
+        isPositive && 'text-emerald-500',
+        isNeutral && 'text-muted-foreground',
+        !isPositive && !isNeutral && 'text-red-500'
       )}>
         {isPositive ? '+' : ''}{value.toFixed(0)}%
       </span>
@@ -126,30 +128,29 @@ function ChangeIndicator({ value, label, color }: { value: number | null; label:
   );
 }
 
-// Custom label renderer for bar values
-const renderCustomLabel = (props: any) => {
-  const { x, y, width, value } = props;
-  if (!value || value === 0) return null;
-  
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+
   return (
-    <text 
-      x={x + width / 2} 
-      y={y - 6} 
-      fill="hsl(var(--foreground))" 
-      textAnchor="middle" 
-      fontSize={10}
-      fontWeight={600}
-    >
-      {value}
-    </text>
+    <div className="bg-popover border border-border rounded-lg px-3 py-2.5 shadow-lg">
+      <p className="text-xs font-semibold text-foreground mb-1.5">{label}</p>
+      {payload.map((entry: any) => (
+        <div key={entry.dataKey} className="flex items-center justify-between gap-4 py-0.5">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: entry.color || entry.fill }} />
+            <span className="text-[11px] text-muted-foreground">{LABELS[entry.dataKey] || entry.dataKey}</span>
+          </div>
+          <span className="text-[11px] font-semibold text-foreground tabular-nums">{entry.value}</span>
+        </div>
+      ))}
+    </div>
   );
-};
+}
 
 export function SDRWeeklyComparisonChart({ metrics, activeWeekKey }: SDRWeeklyComparisonChartProps) {
   const weeklyData = useMemo(() => groupMetricsByWeek(metrics), [metrics]);
 
   const comparison: WeeklyComparison = useMemo(() => {
-    // If a specific week is selected, use it as "current"
     if (activeWeekKey) {
       const activeIndex = weeklyData.findIndex(w => w.weekKey === activeWeekKey);
       if (activeIndex >= 0) {
@@ -191,155 +192,83 @@ export function SDRWeeklyComparisonChart({ metrics, activeWeekKey }: SDRWeeklyCo
     };
   }, [weeklyData, activeWeekKey]);
 
-  // Add opacity data for active week highlighting
-  const chartData = useMemo((): (WeeklyData & { opacity: number })[] => {
+  const chartData = useMemo(() => {
     if (!activeWeekKey) return weeklyData.map(w => ({ ...w, opacity: 1 }));
     return weeklyData.map(w => ({
       ...w,
-      opacity: w.weekKey === activeWeekKey ? 1 : 0.35,
+      opacity: w.weekKey === activeWeekKey ? 1 : 0.3,
     }));
   }, [weeklyData, activeWeekKey]);
 
-  // Vibrant color palette
-  const chartColors = {
-    activated: 'hsl(217, 91%, 60%)',
-    scheduled: 'hsl(152, 69%, 45%)',
-    attended: 'hsl(38, 92%, 50%)',
-    sales: 'hsl(270, 70%, 60%)',
-  };
-
   if (weeklyData.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-[350px] bg-card rounded-xl border border-border gap-3">
-        <BarChart3 className="h-12 w-12 text-muted-foreground/50" />
-        <p className="text-muted-foreground">Nenhum dado disponível para o período</p>
+      <div className="flex flex-col items-center justify-center h-[300px] bg-card rounded-2xl border border-border/40 gap-3">
+        <BarChart3 className="h-10 w-10 text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">Nenhum dado disponivel para o periodo</p>
       </div>
     );
   }
 
   return (
-    <div className="p-5 bg-card rounded-xl border border-border space-y-5">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <BarChart3 className="h-5 w-5 text-primary" />
-            </div>
-            <h3 className="text-base font-semibold text-foreground">Comparativo Semanal</h3>
-          </div>
+    <div className="bg-card rounded-2xl border border-border/40 overflow-hidden">
+      <div className="px-5 pt-5 pb-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Comparativo Semanal</h3>
         </div>
-        
-        {/* Week-over-week comparison indicators */}
+
         {comparison.previous && (
-          <div className="flex flex-wrap gap-2">
-            <ChangeIndicator value={comparison.changes.activated} label="Ativados" color={chartColors.activated} />
-            <ChangeIndicator value={comparison.changes.scheduled} label="Agendados" color={chartColors.scheduled} />
-            <ChangeIndicator value={comparison.changes.attended} label="Realizados" color={chartColors.attended} />
-            <ChangeIndicator value={comparison.changes.sales} label="Vendas" color={chartColors.sales} />
+          <div className="flex flex-wrap gap-1.5">
+            <ChangeIndicator value={comparison.changes.activated} label="Ativados" color={COLORS.activated} />
+            <ChangeIndicator value={comparison.changes.scheduled} label="Agendados" color={COLORS.scheduled} />
+            <ChangeIndicator value={comparison.changes.attended} label="Realizados" color={COLORS.attended} />
+            <ChangeIndicator value={comparison.changes.sales} label="Vendas" color={COLORS.sales} />
           </div>
         )}
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={chartData} barCategoryGap="15%" barGap={2}>
-          <defs>
-            <linearGradient id="gradientActivated" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chartColors.activated} stopOpacity={1} />
-              <stop offset="100%" stopColor={chartColors.activated} stopOpacity={0.7} />
-            </linearGradient>
-            <linearGradient id="gradientScheduled" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chartColors.scheduled} stopOpacity={1} />
-              <stop offset="100%" stopColor={chartColors.scheduled} stopOpacity={0.7} />
-            </linearGradient>
-            <linearGradient id="gradientAttended" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chartColors.attended} stopOpacity={1} />
-              <stop offset="100%" stopColor={chartColors.attended} stopOpacity={0.7} />
-            </linearGradient>
-            <linearGradient id="gradientSales" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chartColors.sales} stopOpacity={1} />
-              <stop offset="100%" stopColor={chartColors.sales} stopOpacity={0.7} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-          <XAxis
-            dataKey="weekLabel"
-            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickLine={false}
-            width={40}
-          />
-          <Tooltip
-            cursor={{ fill: 'hsl(var(--muted) / 0.3)' }}
-            contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              boxShadow: '0 10px 40px -10px hsl(var(--foreground) / 0.1)',
-            }}
-            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, marginBottom: '8px' }}
-            itemStyle={{ color: 'hsl(var(--foreground))', padding: '2px 0' }}
-          />
-          <Legend
-            iconType="circle"
-            wrapperStyle={{ paddingTop: '20px' }}
-            formatter={(value) => (
-              <span style={{ color: 'hsl(var(--foreground))', fontSize: '12px', fontWeight: 500 }}>
-                {value}
-              </span>
-            )}
-          />
-          <Bar
-            dataKey="activated"
-            name="Ativados"
-            fill="url(#gradientActivated)"
-            radius={[6, 6, 0, 0]}
-          >
-            {activeWeekKey && chartData.map((entry, index) => (
-              <Cell key={`cell-act-${index}`} fillOpacity={entry.opacity} />
+      {/* Legend */}
+      <div className="flex items-center gap-4 px-5 pb-3">
+        {Object.entries(COLORS).map(([key, color]) => (
+          <div key={key} className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+            <span className="text-[11px] text-muted-foreground">{LABELS[key]}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="px-2 pb-4">
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={chartData} barCategoryGap="20%" barGap={3}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" vertical={false} />
+            <XAxis
+              dataKey="weekLabel"
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              width={35}
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} />
+            {(['activated', 'scheduled', 'attended', 'sales'] as const).map((key) => (
+              <Bar
+                key={key}
+                dataKey={key}
+                fill={COLORS[key]}
+                radius={[4, 4, 0, 0]}
+              >
+                {activeWeekKey && chartData.map((entry, index) => (
+                  <Cell key={`cell-${key}-${index}`} fillOpacity={entry.opacity} />
+                ))}
+              </Bar>
             ))}
-            <LabelList dataKey="activated" content={renderCustomLabel} />
-          </Bar>
-          <Bar
-            dataKey="scheduled"
-            name="Agendados"
-            fill="url(#gradientScheduled)"
-            radius={[6, 6, 0, 0]}
-          >
-            {activeWeekKey && chartData.map((entry, index) => (
-              <Cell key={`cell-sch-${index}`} fillOpacity={entry.opacity} />
-            ))}
-            <LabelList dataKey="scheduled" content={renderCustomLabel} />
-          </Bar>
-          <Bar
-            dataKey="attended"
-            name="Realizados"
-            fill="url(#gradientAttended)"
-            radius={[6, 6, 0, 0]}
-          >
-            {activeWeekKey && chartData.map((entry, index) => (
-              <Cell key={`cell-att-${index}`} fillOpacity={entry.opacity} />
-            ))}
-            <LabelList dataKey="attended" content={renderCustomLabel} />
-          </Bar>
-          <Bar
-            dataKey="sales"
-            name="Vendas"
-            fill="url(#gradientSales)"
-            radius={[6, 6, 0, 0]}
-          >
-            {activeWeekKey && chartData.map((entry, index) => (
-              <Cell key={`cell-sal-${index}`} fillOpacity={entry.opacity} />
-            ))}
-            <LabelList dataKey="sales" content={renderCustomLabel} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
