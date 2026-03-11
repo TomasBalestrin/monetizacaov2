@@ -3,17 +3,19 @@ import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserCheck, Plus, Filter } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
-import { WeekSelector } from '@/components/dashboard/WeekSelector';
+import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
 import { CloserCard } from './CloserCard';
 import { CloserDetailPage } from './CloserDetailPage';
 import { CloserFunnelKanban } from './CloserFunnelKanban';
 import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
-import { useSquadMetrics, useMetrics } from '@/controllers/useCloserController';
+import { useSquadMetrics, useSquads, useMetrics } from '@/controllers/useCloserController';
 import { useFunnels } from '@/controllers/useFunnelController';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { aggregateSquadMetrics } from '@/model/services/closerService';
+import { parseDateString } from '@/lib/utils';
 
 export function ClosersDashboard() {
   const queryClient = useQueryClient();
@@ -31,7 +33,39 @@ export function ClosersDashboard() {
   const { data: rawMetrics } = useMetrics(periodStart, periodEnd);
   const { data: allFunnels } = useFunnels();
 
+  const { data: squads } = useSquads();
   const availableFunnels = allFunnels || [];
+
+  // Week filter
+  const weekFilter = useMemo(() => {
+    if (!selectedWeek) return null;
+    const weeks = getWeeksOfMonth(selectedMonth);
+    return weeks.find(w => w.weekKey === selectedWeek) || null;
+  }, [selectedWeek, selectedMonth]);
+
+  // Filter raw metrics by week and funnel, then re-aggregate
+  const filteredSquadMetrics = useMemo(() => {
+    if (!weekFilter && !selectedFunnel) return squadMetrics;
+    if (!rawMetrics || !squads) return squadMetrics;
+
+    let filtered = rawMetrics;
+
+    if (weekFilter) {
+      const weekStart = weekFilter.startDate;
+      const weekEnd = weekFilter.endDate;
+      filtered = filtered.filter(m => {
+        const date = parseDateString(m.period_start);
+        return date >= weekStart && date <= weekEnd;
+      });
+    }
+
+    if (selectedFunnel) {
+      filtered = filtered.filter(m => m.funnel_id === selectedFunnel);
+    }
+
+    const referenceDate = periodStart ? parseDateString(periodStart) : new Date();
+    return aggregateSquadMetrics(squads, filtered, referenceDate);
+  }, [weekFilter, selectedFunnel, squadMetrics, rawMetrics, squads, periodStart]);
 
   const handleMonthChange = useCallback((month: Date) => {
     setSelectedMonth(month);
@@ -54,7 +88,7 @@ export function ClosersDashboard() {
   // If a specific closer is selected, render the detail page
   if (selectedCloserId) {
     let closerSquadSlug = 'eagles';
-    for (const sm of squadMetrics) {
+    for (const sm of filteredSquadMetrics) {
       if (sm.closers.some(c => c.closer.id === selectedCloserId)) {
         closerSquadSlug = sm.squad.slug;
         break;
@@ -73,7 +107,7 @@ export function ClosersDashboard() {
   }
 
   // Aggregate all closers from all squads
-  const allClosers = squadMetrics.flatMap(sm =>
+  const allClosers = filteredSquadMetrics.flatMap(sm =>
     sm.closers.map(({ closer, metrics }) => ({
       ...closer,
       squadName: sm.squad.name,
@@ -134,7 +168,10 @@ export function ClosersDashboard() {
         {!isLoading && !selectedFunnel && rawMetrics && allClosers.length > 0 && (
           <CloserFunnelKanban
             closers={allClosers}
-            metrics={rawMetrics}
+            metrics={weekFilter ? rawMetrics.filter(m => {
+              const date = parseDateString(m.period_start);
+              return date >= weekFilter.startDate && date <= weekFilter.endDate;
+            }) : rawMetrics}
           />
         )}
 

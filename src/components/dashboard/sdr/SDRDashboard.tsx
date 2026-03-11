@@ -56,9 +56,25 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
 
   const filteredMetrics = useMemo(() => {
     if (!rawData?.metrics) return [];
-    if (!selectedFunnel) return rawData.metrics;
-    return rawData.metrics.filter(m => m.funnel === selectedFunnel);
-  }, [rawData?.metrics, selectedFunnel]);
+    let metrics = rawData.metrics;
+
+    // Filter by week
+    if (weekFilter) {
+      const weekStart = weekFilter.startDate;
+      const weekEnd = weekFilter.endDate;
+      metrics = metrics.filter(m => {
+        const date = parseDateString(m.date);
+        return date >= weekStart && date <= weekEnd;
+      });
+    }
+
+    // Filter by funnel
+    if (selectedFunnel) {
+      metrics = metrics.filter(m => m.funnel === selectedFunnel);
+    }
+
+    return metrics;
+  }, [rawData?.metrics, selectedFunnel, weekFilter]);
 
   const totalMetrics = useMemo(() => {
     if (!selectedFunnel) return totalMetricsRpc;
@@ -240,7 +256,10 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
 
         {/* Funnel Kanban */}
         {!isLoading && !selectedFunnel && rawData?.sdrs && rawData?.metrics && (
-          <SDRFunnelKanban sdrs={rawData.sdrs} metrics={rawData.metrics} />
+          <SDRFunnelKanban sdrs={rawData.sdrs} metrics={weekFilter ? rawData.metrics.filter(m => {
+            const date = parseDateString(m.date);
+            return date >= weekFilter.startDate && date <= weekFilter.endDate;
+          }) : rawData.metrics} />
         )}
 
         {/* SDR Selector */}
