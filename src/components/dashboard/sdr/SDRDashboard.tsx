@@ -56,6 +56,13 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
 
   const availableFunnels = rawData?.availableFunnels || [];
 
+  // Get week boundaries for filtering (must be before filteredMetrics)
+  const weekFilter = useMemo(() => {
+    if (!selectedWeek) return null;
+    const weeks = getWeeksOfMonth(selectedMonth);
+    return weeks.find(w => w.weekKey === selectedWeek) || null;
+  }, [selectedWeek, selectedMonth]);
+
   const filteredMetrics = useMemo(() => {
     if (!rawData?.metrics) return [];
     let metrics = rawData.metrics;
@@ -79,9 +86,9 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
   }, [rawData?.metrics, selectedFunnel, weekFilter]);
 
   const totalMetrics = useMemo(() => {
-    if (!selectedFunnel) return totalMetricsRpc;
+    if (!selectedFunnel && !weekFilter) return totalMetricsRpc;
     return calculateAggregatedMetrics(filteredMetrics);
-  }, [selectedFunnel, totalMetricsRpc, filteredMetrics]);
+  }, [selectedFunnel, weekFilter, totalMetricsRpc, filteredMetrics]);
 
   const sdrsWithMetrics = useMemo(() => {
     if (!rawData?.sdrs) return [];
@@ -92,13 +99,6 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
     setSelectedMonth(month);
     setSelectedWeek(null); // Reset week when month changes
   }, []);
-
-  // Get week boundaries for filtering
-  const weekFilter = useMemo(() => {
-    if (!selectedWeek) return null;
-    const weeks = getWeeksOfMonth(selectedMonth);
-    return weeks.find(w => w.weekKey === selectedWeek) || null;
-  }, [selectedWeek, selectedMonth]);
 
   const moduleName = sdrType === 'sdr' ? 'sdrs' : 'social_selling';
 
