@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2, Target } from 'lucide-react';
+import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2, Target, Filter } from 'lucide-react';
 import { useUsers, useAssignRole, useTogglePermission } from '@/controllers/useUserController';
 import { DeleteUserDialog } from './DeleteUserDialog';
 import { useAllEntityLinks, useClosersForLinking, useSDRsForLinking } from '@/controllers/useUserController';
@@ -12,6 +12,7 @@ import { MetricsTable } from './MetricsTable';
 import { CreateUserDialog } from './CreateUserDialog';
 import { EditUserLinksDialog } from './EditUserLinksDialog';
 import { GoalsConfig } from './GoalsConfig';
+import { FunnelManagerAdmin } from './FunnelManagerAdmin';
 
 const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'reports', 'admin'];
 
@@ -60,6 +61,10 @@ export function AdminPanel() {
           <TabsTrigger value="goals" className="data-[state=active]:bg-background gap-2 px-4 py-2">
             <Target className="h-4 w-4" />
             Metas
+          </TabsTrigger>
+          <TabsTrigger value="funnels" className="data-[state=active]:bg-background gap-2 px-4 py-2">
+            <Filter className="h-4 w-4" />
+            Funis / Produtos
           </TabsTrigger>
         </TabsList>
 
@@ -199,6 +204,11 @@ export function AdminPanel() {
         {/* Goals Tab */}
         <TabsContent value="goals" className="space-y-6">
           <GoalsConfig />
+        </TabsContent>
+
+        {/* Funnels Tab */}
+        <TabsContent value="funnels" className="space-y-6">
+          <FunnelManagerAdmin />
         </TabsContent>
       </Tabs>
 

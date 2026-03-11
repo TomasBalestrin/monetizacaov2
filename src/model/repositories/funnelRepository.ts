@@ -11,6 +11,44 @@ export async function fetchFunnels(): Promise<Funnel[]> {
   return data as Funnel[];
 }
 
+export async function fetchAllFunnelsIncludingInactive(): Promise<Funnel[]> {
+  const { data, error } = await supabase
+    .from('funnels')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data as Funnel[];
+}
+
+export async function createFunnel(name: string, category?: string): Promise<Funnel> {
+  const { data, error } = await supabase
+    .from('funnels')
+    .insert({ name, category: category || null, is_active: true })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Funnel;
+}
+
+export async function updateFunnel(id: string, updates: { name?: string; category?: string | null; is_active?: boolean }): Promise<Funnel> {
+  const { data, error } = await supabase
+    .from('funnels')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Funnel;
+}
+
+export async function deleteFunnel(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('funnels')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
 export async function fetchUserFunnels(userId: string): Promise<Funnel[]> {
   const { data, error } = await supabase
     .from('user_funnels')

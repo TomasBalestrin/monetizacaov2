@@ -88,6 +88,63 @@ export function useSalesByPersonAndProduct(periodStart?: string, periodEnd?: str
   });
 }
 
+export function useAllFunnelsAdmin() {
+  return useQuery({
+    queryKey: ['funnels-admin'],
+    queryFn: funnelRepo.fetchAllFunnelsIncludingInactive,
+  });
+}
+
+export function useCreateFunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, category }: { name: string; category?: string }) =>
+      funnelRepo.createFunnel(name, category),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funnels'] });
+      queryClient.invalidateQueries({ queryKey: ['funnels-admin'] });
+      toast.success('Funil criado com sucesso!');
+    },
+    onError: (error: any) => {
+      console.error('Error creating funnel:', error);
+      toast.error('Erro ao criar funil');
+    },
+  });
+}
+
+export function useUpdateFunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...updates }: { id: string; name?: string; category?: string | null; is_active?: boolean }) =>
+      funnelRepo.updateFunnel(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funnels'] });
+      queryClient.invalidateQueries({ queryKey: ['funnels-admin'] });
+      toast.success('Funil atualizado!');
+    },
+    onError: (error: any) => {
+      console.error('Error updating funnel:', error);
+      toast.error('Erro ao atualizar funil');
+    },
+  });
+}
+
+export function useDeleteFunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => funnelRepo.deleteFunnel(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funnels'] });
+      queryClient.invalidateQueries({ queryKey: ['funnels-admin'] });
+      toast.success('Funil removido!');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting funnel:', error);
+      toast.error('Erro ao remover funil. Verifique se não há dados vinculados.');
+    },
+  });
+}
+
 export function useDeleteFunnelDailyData() {
   const queryClient = useQueryClient();
 
