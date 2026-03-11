@@ -64,6 +64,7 @@ interface SDRMetricsFormProps {
   onSubmit: (values: SDRMetricsFormValues) => Promise<void>;
   isLoading?: boolean;
   submitLabel?: string;
+  lockSdr?: boolean;
 }
 
 interface MetricInputProps {
@@ -95,6 +96,7 @@ export function SDRMetricsForm({
   onSubmit,
   isLoading,
   submitLabel = 'Adicionar Métrica',
+  lockSdr,
 }: SDRMetricsFormProps) {
   const { data: sdrs } = useSDRs(sdrType);
   
@@ -165,9 +167,9 @@ export function SDRMetricsForm({
               <FormLabel className="text-xs font-medium text-muted-foreground">
                 {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}
               </FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select onValueChange={field.onChange} value={field.value} disabled={lockSdr}>
                 <FormControl>
-                  <SelectTrigger className="h-11 bg-card border-border/50 hover:border-primary/50 transition-colors">
+                  <SelectTrigger className={cn("h-11 bg-card border-border/50 hover:border-primary/50 transition-colors", lockSdr && "opacity-70 cursor-not-allowed")}>
                     <SelectValue placeholder={`Selecione um ${sdrType === 'sdr' ? 'SDR' : 'Social Selling'}`} />
                   </SelectTrigger>
                 </FormControl>

@@ -173,11 +173,17 @@ export function useUpdateSDRMetric() {
     }) => {
       const calculatedRates = calculatePartialSDRRates(updates);
 
-      if (updates.funnel === null || updates.funnel === undefined) {
+      // Only normalize funnel if it was explicitly passed (null → ''), not when undefined (omitted)
+      if (updates.funnel === null) {
         updates.funnel = '';
       }
 
-      return sdrRepo.updateSDRMetric(id, { ...updates, ...calculatedRates });
+      // Remove undefined fields so we don't accidentally overwrite with empty values
+      const cleanUpdates = Object.fromEntries(
+        Object.entries({ ...updates, ...calculatedRates }).filter(([, v]) => v !== undefined)
+      );
+
+      return sdrRepo.updateSDRMetric(id, cleanUpdates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sdr-metrics'] });

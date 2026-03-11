@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TableIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { TableIcon, MoreHorizontal, Edit, Trash2, Check, X } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -20,11 +20,15 @@ import { Button } from '@/components/ui/button';
 import type { SDRMetric } from '@/controllers/useSdrController';
 import { cn, parseDateString } from '@/lib/utils';
 
+type EditableField = 'activated' | 'scheduled' | 'scheduled_follow_up' | 'scheduled_same_day' | 'attended' | 'sales';
+
 interface SDRDataTableProps {
   metrics: SDRMetric[];
   showFunnelColumn?: boolean;
   onEditMetric?: (metric: SDRMetric) => void;
   onDeleteMetric?: (metricId: string) => void;
+  onUpdateField?: (metricId: string, field: EditableField, value: number) => void;
+  canInlineEdit?: boolean;
 }
 
 function getPercentageColor(value: number): string {
@@ -39,13 +43,123 @@ function getPercentageBg(value: number): string {
   return 'bg-red-500/10';
 }
 
+// Inline editable cell component
+function EditableCell({ 
+  value, 
+  metricId, 
+  field, 
+  onSave, 
+  canEdit,
+  highlight = false,
+}: { 
+  value: number; 
+  metricId: string; 
+  field: EditableField; 
+  onSave: (metricId: string, field: EditableField, value: number) => void;
+  canEdit: boolean;
+  highlight?: boolean;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = useCallback(() => {
+    const num = parseInt(editValue, 10);
+    if (!isNaN(num) && num >= 0 && num !== value) {
+      onSave(metricId, field, num);
+    }
+    setIsEditing(false);
+  }, [editValue, value, metricId, field, onSave]);
+
+  const handleCancel = useCallback(() => {
+    setEditValue(String(value));
+    setIsEditing(false);
+  }, [value]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  }, [handleSave, handleCancel]);
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1 justify-end">
+        <input
+          ref={inputRef}
+          type="number"
+          min={0}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          className="w-16 h-7 text-right text-sm font-medium bg-background border border-primary rounded px-1.5 outline-none focus:ring-1 focus:ring-primary"
+        />
+      </div>
+    );
+  }
+
+  if (highlight) {
+    return (
+      <div
+        className={cn(
+          "text-right",
+          canEdit && "cursor-pointer group"
+        )}
+        onClick={() => {
+          if (canEdit) {
+            setEditValue(String(value));
+            setIsEditing(true);
+          }
+        }}
+      >
+        <span className={cn(
+          "px-2.5 py-1 rounded-lg bg-primary/15 text-primary font-bold text-sm inline-block",
+          canEdit && "group-hover:ring-1 group-hover:ring-primary/40 transition-all"
+        )}>
+          {value}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "text-right font-medium",
+        canEdit && "cursor-pointer hover:text-primary hover:bg-primary/5 rounded px-1 -mx-1 transition-colors"
+      )}
+      onClick={() => {
+        if (canEdit) {
+          setEditValue(String(value));
+          setIsEditing(true);
+        }
+      }}
+    >
+      {value}
+    </div>
+  );
+}
+
 export function SDRDataTable({ 
   metrics, 
   showFunnelColumn = false,
   onEditMetric,
   onDeleteMetric,
+  onUpdateField,
+  canInlineEdit = false,
 }: SDRDataTableProps) {
   const hasActions = onEditMetric || onDeleteMetric;
+  const editable = canInlineEdit && !!onUpdateField;
 
   if (metrics.length === 0) {
     return (
@@ -68,6 +182,11 @@ export function SDRDataTable({
           <TableIcon className="h-4 w-4 text-primary" />
         </div>
         <h3 className="text-sm font-semibold text-foreground">Dados Detalhados</h3>
+        {editable && (
+          <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-auto">
+            Clique nos valores para editar
+          </span>
+        )}
       </div>
       <div className="overflow-x-auto">
         <Table>
@@ -103,6 +222,8 @@ export function SDRDataTable({
                 ? (metric.sales / metric.attended) * 100
                 : 0;
 
+              const canEditRow = editable && !!metric.id;
+
               return (
                 <TableRow 
                   key={metric.id || `${metric.date}-${index}`} 
@@ -120,9 +241,19 @@ export function SDRDataTable({
                       {metric.funnel || '-'}
                     </TableCell>
                   )}
-                  <TableCell className="text-right font-medium">{metric.activated}</TableCell>
-                  <TableCell className="text-right font-medium">{metric.scheduled}</TableCell>
-                  <TableCell className="text-right font-medium">{metric.scheduled_follow_up || 0}</TableCell>
+                  
+                  {/* Editable cells */}
+                  <TableCell>
+                    <EditableCell value={metric.activated} metricId={metric.id} field="activated" onSave={onUpdateField!} canEdit={canEditRow} />
+                  </TableCell>
+                  <TableCell>
+                    <EditableCell value={metric.scheduled} metricId={metric.id} field="scheduled" onSave={onUpdateField!} canEdit={canEditRow} />
+                  </TableCell>
+                  <TableCell>
+                    <EditableCell value={metric.scheduled_follow_up || 0} metricId={metric.id} field="scheduled_follow_up" onSave={onUpdateField!} canEdit={canEditRow} />
+                  </TableCell>
+                  
+                  {/* Percentage - auto calculated */}
                   <TableCell className="text-right">
                     <span className={cn(
                       "px-2 py-0.5 rounded-md text-xs font-bold",
@@ -132,8 +263,15 @@ export function SDRDataTable({
                       {scheduledRate.toFixed(1)}%
                     </span>
                   </TableCell>
-                  <TableCell className="text-right font-medium">{metric.scheduled_same_day}</TableCell>
-                  <TableCell className="text-right font-medium">{metric.attended}</TableCell>
+                  
+                  <TableCell>
+                    <EditableCell value={metric.scheduled_same_day} metricId={metric.id} field="scheduled_same_day" onSave={onUpdateField!} canEdit={canEditRow} />
+                  </TableCell>
+                  <TableCell>
+                    <EditableCell value={metric.attended} metricId={metric.id} field="attended" onSave={onUpdateField!} canEdit={canEditRow} />
+                  </TableCell>
+                  
+                  {/* Percentage - auto calculated */}
                   <TableCell className="text-right">
                     <span className={cn(
                       "px-2 py-0.5 rounded-md text-xs font-bold",
@@ -143,11 +281,12 @@ export function SDRDataTable({
                       {attendanceRate.toFixed(1)}%
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <span className="px-2.5 py-1 rounded-lg bg-primary/15 text-primary font-bold text-sm">
-                      {metric.sales}
-                    </span>
+                  
+                  <TableCell>
+                    <EditableCell value={metric.sales} metricId={metric.id} field="sales" onSave={onUpdateField!} canEdit={canEditRow} highlight />
                   </TableCell>
+                  
+                  {/* Percentage - auto calculated */}
                   <TableCell className="text-right">
                     <span className={cn(
                       "px-2 py-0.5 rounded-md text-xs font-bold",
@@ -157,6 +296,7 @@ export function SDRDataTable({
                       {conversionRate.toFixed(1)}%
                     </span>
                   </TableCell>
+                  
                   {hasActions && (
                     <TableCell>
                       <DropdownMenu>

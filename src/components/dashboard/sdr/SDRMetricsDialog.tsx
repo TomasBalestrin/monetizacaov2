@@ -19,6 +19,7 @@ interface SDRMetricsDialogProps {
   defaultSdrId?: string;
   defaultFunnel?: string | null;
   editingMetric?: SDRMetric | null;
+  lockSdr?: boolean;
 }
 
 export function SDRMetricsDialog({
@@ -28,6 +29,7 @@ export function SDRMetricsDialog({
   defaultSdrId,
   defaultFunnel,
   editingMetric,
+  lockSdr,
 }: SDRMetricsDialogProps) {
   const createMetric = useCreateSDRMetric();
   const updateMetric = useUpdateSDRMetric();
@@ -108,6 +110,7 @@ export function SDRMetricsDialog({
           onSubmit={handleSubmit}
           isLoading={isLoading}
           submitLabel={isEditing ? 'Salvar Alterações' : 'Adicionar Métrica'}
+          lockSdr={lockSdr}
         />
       </DialogContent>
     </Dialog>

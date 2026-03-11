@@ -25,11 +25,12 @@ import { SDRWeeklyComparisonChart } from './SDRWeeklyComparisonChart';
 import { SDRFunnelComparisonChart } from './SDRFunnelComparisonChart';
 import { SDRDataTable } from './SDRDataTable';
 import { SDRMetricsDialog } from './SDRMetricsDialog';
+import { ScheduleCallDialog } from './ScheduleCallDialog';
 import { ScheduledCallsTable } from './ScheduledCallsTable';
 import { EditScheduledCallDialog } from './EditScheduledCallDialog';
 import { useScheduledCalls, useDeleteScheduledCall, useSendCallReminder } from '@/controllers/useScheduledCallController';
 import type { ScheduledCall } from '@/model/entities/scheduledCall';
-import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/controllers/useSdrController';
+import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, useUpdateSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/controllers/useSdrController';
 import { useAuth } from '@/contexts/AuthContext';
 import { SDRFunnelManager } from './SDRFunnelManager';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -123,13 +124,14 @@ export function SDRDetailPage({
   onBack,
 }: SDRDetailPageProps) {
   const queryClient = useQueryClient();
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, selectedEntity } = useAuth();
   const [, setSearchParams] = useSearchParams();
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   
   // Dialog states
   const [showMetricsDialog, setShowMetricsDialog] = useState(false);
+  const [showScheduleCallDialog, setShowScheduleCallDialog] = useState(false);
   const [editingMetric, setEditingMetric] = useState<SDRMetric | null>(null);
   const [deletingMetricId, setDeletingMetricId] = useState<string | null>(null);
 
@@ -137,7 +139,12 @@ export function SDRDetailPage({
   const [editingCall, setEditingCall] = useState<ScheduledCall | null>(null);
   const [deletingCallId, setDeletingCallId] = useState<string | null>(null);
 
+  // Check if the logged-in user is the owner of this SDR profile
+  const isOwner = selectedEntity?.entity_id === sdrId;
+  const canAddMetrics = isOwner || isAdmin || isManager;
+
   const deleteMetric = useDeleteSDRMetric();
+  const updateMetric = useUpdateSDRMetric();
   const deleteCall = useDeleteScheduledCall();
   const sendReminder = useSendCallReminder();
   
@@ -279,6 +286,11 @@ export function SDRDetailPage({
     sendReminder.mutate(call);
   }, [sendReminder]);
 
+  // Inline update handler for table cells
+  const handleUpdateField = useCallback((metricId: string, field: string, value: number) => {
+    updateMetric.mutate({ id: metricId, [field]: value });
+  }, [updateMetric]);
+
   return (
     <PullToRefresh onRefresh={handleRefresh}>
       <div
@@ -393,17 +405,24 @@ export function SDRDetailPage({
               onWeekChange={setSelectedWeek}
             />
 
-            {!isAggregatedView && (
-              <Button
-                onClick={() => setShowMetricsDialog(true)}
-                size="sm"
-                variant="outline"
-                className="rounded-xl h-8 text-xs gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Metrica</span>
-              </Button>
-            )}
+            <Button
+              onClick={() => setShowMetricsDialog(true)}
+              size="sm"
+              variant="outline"
+              className="rounded-xl h-8 text-xs gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Metrica</span>
+            </Button>
+            <Button
+              onClick={() => setShowScheduleCallDialog(true)}
+              size="sm"
+              variant="outline"
+              className="rounded-xl h-8 text-xs gap-1.5"
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Agendar Call</span>
+            </Button>
           </div>
         </div>
 
@@ -484,6 +503,20 @@ export function SDRDetailPage({
           </div>
         )}
 
+        {/* Data Table with Edit/Delete actions */}
+        {isLoadingMetrics ? (
+          <TableSkeleton rows={5} columns={8} />
+        ) : (
+          <SDRDataTable
+            metrics={weekFilteredMetrics || []}
+            showFunnelColumn={!selectedFunnel && hasFunnels}
+            onEditMetric={canAddMetrics ? handleEditMetric : undefined}
+            onDeleteMetric={canAddMetrics ? handleDeleteMetric : undefined}
+            onUpdateField={handleUpdateField}
+            canInlineEdit={canAddMetrics}
+          />
+        )}
+
         {/* Chart */}
         {isLoadingMetrics ? (
           <ChartSkeleton height={350} />
@@ -494,18 +527,6 @@ export function SDRDetailPage({
         {/* Funnel Comparison Chart - shows when SDR has multiple funnels */}
         {!isLoadingMetrics && !selectedFunnel && hasFunnels && rawMetrics && (
           <SDRFunnelComparisonChart metrics={rawMetrics.filter(m => m.funnel !== '')} />
-        )}
-
-        {/* Data Table with Edit/Delete actions */}
-        {isLoadingMetrics ? (
-          <TableSkeleton rows={5} columns={8} />
-        ) : (
-          <SDRDataTable
-            metrics={weekFilteredMetrics || []}
-            showFunnelColumn={!selectedFunnel && hasFunnels}
-            onEditMetric={isAggregatedView ? undefined : handleEditMetric}
-            onDeleteMetric={isAggregatedView ? undefined : handleDeleteMetric}
-          />
         )}
 
         {/* Notifications Section (admin only) */}
@@ -547,6 +568,15 @@ export function SDRDetailPage({
         onOpenChange={setShowMetricsDialog}
         sdrType={sdr?.type || 'sdr'}
         defaultSdrId={sdrId}
+        lockSdr
+      />
+
+      {/* Schedule Call Dialog */}
+      <ScheduleCallDialog
+        open={showScheduleCallDialog}
+        onOpenChange={setShowScheduleCallDialog}
+        sdrType={sdr?.type || 'sdr'}
+        defaultSdrId={sdrId}
       />
 
       {/* Edit Metrics Dialog */}
@@ -556,6 +586,7 @@ export function SDRDetailPage({
         sdrType={sdr?.type || 'sdr'}
         defaultSdrId={sdrId}
         editingMetric={editingMetric}
+        lockSdr
       />
 
       {/* Delete Metric Confirmation Dialog */}

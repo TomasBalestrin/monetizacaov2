@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus, CalendarPlus, Filter, ChevronRight } from 'lucide-react';
+import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, CalendarPlus, Filter, ChevronRight } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
 import { parseDateString } from '@/lib/utils';
@@ -18,7 +18,6 @@ import { SDRFunnelKanban } from './SDRFunnelKanban';
 
 // Lazy load heavy sub-pages/dialogs to avoid circular chunk initialization
 const SDRDetailPage = lazy(() => import('./SDRDetailPage').then(m => ({ default: m.SDRDetailPage })));
-const SDRMetricsDialog = lazy(() => import('./SDRMetricsDialog').then(m => ({ default: m.SDRMetricsDialog })));
 const ScheduleCallDialog = lazy(() => import('./ScheduleCallDialog').then(m => ({ default: m.ScheduleCallDialog })));
 
 interface SDRDashboardProps {
@@ -29,7 +28,6 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMonth, setSelectedMonth] = useState(() => new Date());
-  const [isAddMetricOpen, setIsAddMetricOpen] = useState(false);
   const [isScheduleCallOpen, setIsScheduleCallOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
@@ -156,10 +154,6 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setIsAddMetricOpen(true)} size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
-              <Plus className="h-3.5 w-3.5" />
-              Metrica
-            </Button>
             <Button onClick={() => setIsScheduleCallOpen(true)} size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
               <CalendarPlus className="h-3.5 w-3.5" />
               Agendar Call
@@ -289,18 +283,6 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
               </button>
             ))}
           </div>
-        )}
-
-        {/* Add Metric Dialog */}
-        {isAddMetricOpen && (
-          <Suspense fallback={null}>
-            <SDRMetricsDialog
-              open={isAddMetricOpen}
-              onOpenChange={setIsAddMetricOpen}
-              sdrType={sdrType}
-              defaultFunnel={selectedFunnel}
-            />
-          </Suspense>
         )}
 
         {/* Schedule Call Dialog */}
