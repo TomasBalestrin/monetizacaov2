@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, Plus, CalendarPlus, Filter, ChevronRight } from 'lucide-react';
@@ -7,9 +7,6 @@ import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelect
 import { parseDateString } from '@/lib/utils';
 import type { SDRType } from './SDRTypeToggle';
 import { SDRMetricCard } from './SDRMetricCard';
-import { SDRDetailPage } from './SDRDetailPage';
-import { SDRMetricsDialog } from './SDRMetricsDialog';
-import { ScheduleCallDialog } from './ScheduleCallDialog';
 import { useSDRTotalMetrics, useSDRsWithMetricsRaw } from '@/controllers/useSdrController';
 import { calculateAggregatedMetrics, groupMetricsBySDR } from '@/model/services/sdrService';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
@@ -18,6 +15,11 @@ import { useRealtimeSDRMetrics } from '@/hooks/useRealtimeMetrics';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SDRFunnelKanban } from './SDRFunnelKanban';
+
+// Lazy load heavy sub-pages/dialogs to avoid circular chunk initialization
+const SDRDetailPage = lazy(() => import('./SDRDetailPage').then(m => ({ default: m.SDRDetailPage })));
+const SDRMetricsDialog = lazy(() => import('./SDRMetricsDialog').then(m => ({ default: m.SDRMetricsDialog })));
+const ScheduleCallDialog = lazy(() => import('./ScheduleCallDialog').then(m => ({ default: m.ScheduleCallDialog })));
 
 interface SDRDashboardProps {
   sdrType: SDRType;
@@ -116,12 +118,14 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
   // If a specific SDR is selected, render the detail page
   if (selectedSdrId) {
     return (
-      <SDRDetailPage
-        sdrId={selectedSdrId}
-        selectedMonth={selectedMonth}
-        onMonthChange={handleMonthChange}
-        onBack={handleBackToDashboard}
-      />
+      <Suspense fallback={<MetricCardSkeletonGrid count={8} />}>
+        <SDRDetailPage
+          sdrId={selectedSdrId}
+          selectedMonth={selectedMonth}
+          onMonthChange={handleMonthChange}
+          onBack={handleBackToDashboard}
+        />
+      </Suspense>
     );
   }
 
@@ -288,19 +292,27 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
         )}
 
         {/* Add Metric Dialog */}
-        <SDRMetricsDialog
-          open={isAddMetricOpen}
-          onOpenChange={setIsAddMetricOpen}
-          sdrType={sdrType}
-          defaultFunnel={selectedFunnel}
-        />
+        {isAddMetricOpen && (
+          <Suspense fallback={null}>
+            <SDRMetricsDialog
+              open={isAddMetricOpen}
+              onOpenChange={setIsAddMetricOpen}
+              sdrType={sdrType}
+              defaultFunnel={selectedFunnel}
+            />
+          </Suspense>
+        )}
 
         {/* Schedule Call Dialog */}
-        <ScheduleCallDialog
-          open={isScheduleCallOpen}
-          onOpenChange={setIsScheduleCallOpen}
-          sdrType={sdrType}
-        />
+        {isScheduleCallOpen && (
+          <Suspense fallback={null}>
+            <ScheduleCallDialog
+              open={isScheduleCallOpen}
+              onOpenChange={setIsScheduleCallOpen}
+              sdrType={sdrType}
+            />
+          </Suspense>
+        )}
       </div>
     </PullToRefresh>
   );
