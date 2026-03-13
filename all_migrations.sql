@@ -1863,3 +1863,344 @@ BEGIN
     EXECUTE format('ALTER TABLE public.funnel_daily_data DROP CONSTRAINT %I', fk_name);
   END IF;
 END $$;
+-- =============================================================================
+-- Migration: Separar Funis (origem do lead) de Produtos (tipo de venda)
+-- =============================================================================
+
+-- 1. Criar tabela products
+CREATE TABLE public.products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can view products"
+  ON public.products FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Admins can manage products"
+  ON public.products FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+-- Seed initial products
+INSERT INTO public.products (name) VALUES
+  ('Mentoria Julia'),
+  ('Elite Premium'),
+  ('Implementação de IA'),
+  ('Implementação Comercial');
+
+-- 2. Add product_id to funnel_daily_data
+ALTER TABLE public.funnel_daily_data
+  ADD COLUMN product_id UUID REFERENCES public.products(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_funnel_daily_data_product_id ON public.funnel_daily_data(product_id);
+
+-- 3. Add product_id to metrics
+ALTER TABLE public.metrics
+  ADD COLUMN product_id UUID REFERENCES public.products(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_metrics_product_id ON public.metrics(product_id);
+
+-- 4. Update get_all_funnels_summary to include metrics table data + entries
+CREATE OR REPLACE FUNCTION public.get_all_funnels_summary(
+  p_period_start date DEFAULT NULL::date,
+  p_period_end date DEFAULT NULL::date
+)
+RETURNS json
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT COALESCE(json_agg(funnel_data), '[]'::json)
+  FROM (
+    SELECT
+      f.id as funnel_id,
+      f.name as funnel_name,
+      f.category,
+      COALESCE(closer_fdd.total_leads, 0) + COALESCE(sdr.total_activated, 0) as total_leads,
+      COALESCE(closer_fdd.total_qualified, 0) as total_qualified,
+      COALESCE(closer_fdd.total_calls_scheduled, 0) + COALESCE(sdr.total_scheduled, 0) as total_calls_scheduled,
+      COALESCE(closer_fdd.total_calls_done, 0) + COALESCE(sdr.total_attended, 0) as total_calls_done,
+      COALESCE(closer_fdd.total_sales, 0) + COALESCE(sdr.total_sales, 0) + COALESCE(closer_m.total_sales, 0) as total_sales,
+      COALESCE(closer_fdd.total_revenue, 0) + COALESCE(closer_m.total_revenue, 0) as total_revenue,
+      COALESCE(closer_fdd.total_entries, 0) + COALESCE(closer_m.total_entries, 0) as total_entries,
+      CASE
+        WHEN (COALESCE(closer_fdd.total_leads, 0) + COALESCE(sdr.total_activated, 0)) > 0
+        THEN ROUND(COALESCE(closer_fdd.total_qualified, 0)::numeric
+          / (COALESCE(closer_fdd.total_leads, 0) + COALESCE(sdr.total_activated, 0)) * 100, 2)
+        ELSE 0
+      END as leads_to_qualified_rate,
+      CASE
+        WHEN (COALESCE(closer_fdd.total_calls_done, 0) + COALESCE(sdr.total_attended, 0)) > 0
+        THEN ROUND(
+          (COALESCE(closer_fdd.total_sales, 0) + COALESCE(sdr.total_sales, 0) + COALESCE(closer_m.total_sales, 0))::numeric
+          / (COALESCE(closer_fdd.total_calls_done, 0) + COALESCE(sdr.total_attended, 0)) * 100, 2)
+        ELSE 0
+      END as conversion_rate
+    FROM funnels f
+    LEFT JOIN LATERAL (
+      SELECT
+        SUM(fdd.leads_count) as total_leads,
+        SUM(fdd.qualified_count) as total_qualified,
+        SUM(fdd.calls_scheduled) as total_calls_scheduled,
+        SUM(fdd.calls_done) as total_calls_done,
+        SUM(fdd.sales_count) as total_sales,
+        SUM(fdd.sales_value) as total_revenue,
+        SUM(fdd.entries_value) as total_entries
+      FROM funnel_daily_data fdd
+      WHERE fdd.funnel_id = f.id
+        AND (p_period_start IS NULL OR fdd.date >= p_period_start)
+        AND (p_period_end IS NULL OR fdd.date <= p_period_end)
+    ) closer_fdd ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        SUM(m.sales) as total_sales,
+        SUM(m.revenue) as total_revenue,
+        SUM(COALESCE(m.entries, 0)) as total_entries
+      FROM metrics m
+      WHERE m.funnel_id = f.id
+        AND (p_period_start IS NULL OR m.period_start >= p_period_start)
+        AND (p_period_end IS NULL OR m.period_end <= p_period_end)
+    ) closer_m ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        SUM(sm.activated) as total_activated,
+        SUM(sm.scheduled) as total_scheduled,
+        SUM(sm.attended) as total_attended,
+        SUM(sm.sales) as total_sales
+      FROM sdr_metrics sm
+      WHERE sm.funnel = f.name
+        AND sm.funnel != ''
+        AND (p_period_start IS NULL OR sm.date >= p_period_start)
+        AND (p_period_end IS NULL OR sm.date <= p_period_end)
+    ) sdr ON true
+    WHERE f.is_active = true
+    ORDER BY f.name
+  ) funnel_data;
+$function$;
+
+-- 5. Update get_funnel_report to include metrics table data
+CREATE OR REPLACE FUNCTION public.get_funnel_report(
+  p_funnel_id uuid,
+  p_period_start date DEFAULT NULL::date,
+  p_period_end date DEFAULT NULL::date
+)
+RETURNS json
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT json_build_object(
+    'funnel_id', p_funnel_id,
+    'funnel_name', (SELECT name FROM funnels WHERE id = p_funnel_id),
+    'total_leads', COALESCE(closer.total_leads, 0) + COALESCE(sdr.total_activated, 0),
+    'total_qualified', COALESCE(closer.total_qualified, 0),
+    'total_calls_scheduled', COALESCE(closer.total_calls_scheduled, 0) + COALESCE(sdr.total_scheduled, 0),
+    'total_calls_done', COALESCE(closer.total_calls_done, 0) + COALESCE(sdr.total_attended, 0),
+    'total_sales', COALESCE(closer.total_sales, 0) + COALESCE(sdr.total_sales, 0) + COALESCE(closer_m.total_sales, 0),
+    'total_revenue', COALESCE(closer.total_revenue, 0) + COALESCE(closer_m.total_revenue, 0),
+    'total_entries', COALESCE(closer.total_entries, 0) + COALESCE(closer_m.total_entries, 0),
+    'leads_to_qualified_rate', CASE
+      WHEN (COALESCE(closer.total_leads, 0) + COALESCE(sdr.total_activated, 0)) > 0
+      THEN ROUND(COALESCE(closer.total_qualified, 0)::numeric / (COALESCE(closer.total_leads, 0) + COALESCE(sdr.total_activated, 0)) * 100, 2)
+      ELSE 0
+    END,
+    'qualified_to_scheduled_rate', CASE
+      WHEN COALESCE(closer.total_qualified, 0) > 0
+      THEN ROUND((COALESCE(closer.total_calls_scheduled, 0) + COALESCE(sdr.total_scheduled, 0))::numeric / COALESCE(closer.total_qualified, 0) * 100, 2)
+      ELSE 0
+    END,
+    'scheduled_to_done_rate', CASE
+      WHEN (COALESCE(closer.total_calls_scheduled, 0) + COALESCE(sdr.total_scheduled, 0)) > 0
+      THEN ROUND((COALESCE(closer.total_calls_done, 0) + COALESCE(sdr.total_attended, 0))::numeric / (COALESCE(closer.total_calls_scheduled, 0) + COALESCE(sdr.total_scheduled, 0)) * 100, 2)
+      ELSE 0
+    END,
+    'done_to_sales_rate', CASE
+      WHEN (COALESCE(closer.total_calls_done, 0) + COALESCE(sdr.total_attended, 0)) > 0
+      THEN ROUND((COALESCE(closer.total_sales, 0) + COALESCE(sdr.total_sales, 0) + COALESCE(closer_m.total_sales, 0))::numeric / (COALESCE(closer.total_calls_done, 0) + COALESCE(sdr.total_attended, 0)) * 100, 2)
+      ELSE 0
+    END
+  )
+  FROM (
+    SELECT
+      SUM(fdd.leads_count) as total_leads,
+      SUM(fdd.qualified_count) as total_qualified,
+      SUM(fdd.calls_scheduled) as total_calls_scheduled,
+      SUM(fdd.calls_done) as total_calls_done,
+      SUM(fdd.sales_count) as total_sales,
+      SUM(fdd.sales_value) as total_revenue,
+      SUM(fdd.entries_value) as total_entries
+    FROM funnel_daily_data fdd
+    WHERE fdd.funnel_id = p_funnel_id
+      AND (p_period_start IS NULL OR fdd.date >= p_period_start)
+      AND (p_period_end IS NULL OR fdd.date <= p_period_end)
+  ) closer,
+  (
+    SELECT
+      SUM(sm.activated) as total_activated,
+      SUM(sm.scheduled) as total_scheduled,
+      SUM(sm.attended) as total_attended,
+      SUM(sm.sales) as total_sales
+    FROM sdr_metrics sm
+    WHERE sm.funnel = (SELECT name FROM funnels WHERE id = p_funnel_id)
+      AND sm.funnel != ''
+      AND (p_period_start IS NULL OR sm.date >= p_period_start)
+      AND (p_period_end IS NULL OR sm.date <= p_period_end)
+  ) sdr,
+  (
+    SELECT
+      SUM(m.sales) as total_sales,
+      SUM(m.revenue) as total_revenue,
+      SUM(COALESCE(m.entries, 0)) as total_entries
+    FROM metrics m
+    WHERE m.funnel_id = p_funnel_id
+      AND (p_period_start IS NULL OR m.period_start >= p_period_start)
+      AND (p_period_end IS NULL OR m.period_end <= p_period_end)
+  ) closer_m;
+$function$;
+
+-- 6. Update get_sales_by_person_and_product to include product info and fix NOT EXISTS
+CREATE OR REPLACE FUNCTION public.get_sales_by_person_and_product(
+  p_period_start date DEFAULT NULL::date,
+  p_period_end date DEFAULT NULL::date
+)
+RETURNS json
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT COALESCE(json_agg(row_data ORDER BY person_name, funnel_name), '[]'::json)
+  FROM (
+    -- Closers from funnel_daily_data (granular per-funnel)
+    SELECT
+      c.id::text as person_id,
+      c.name as person_name,
+      'closer' as person_type,
+      f.id::text as funnel_id,
+      f.name as funnel_name,
+      COALESCE(p.id::text, null) as product_id,
+      COALESCE(p.name, '') as product_name,
+      SUM(fdd.sales_count)::integer as total_sales,
+      SUM(fdd.sales_value)::numeric as total_revenue,
+      SUM(fdd.leads_count)::integer as total_leads,
+      SUM(fdd.qualified_count)::integer as total_qualified,
+      SUM(fdd.calls_scheduled)::integer as total_scheduled,
+      SUM(fdd.calls_done)::integer as total_done,
+      SUM(fdd.entries_value)::numeric as total_entries
+    FROM funnel_daily_data fdd
+    JOIN closers c ON fdd.user_id = c.id
+    JOIN funnels f ON fdd.funnel_id = f.id
+    LEFT JOIN products p ON fdd.product_id = p.id
+    WHERE (p_period_start IS NULL OR fdd.date >= p_period_start)
+      AND (p_period_end IS NULL OR fdd.date <= p_period_end)
+    GROUP BY c.id, c.name, f.id, f.name, p.id, p.name
+
+    UNION ALL
+
+    -- Closers from metrics table (always included, not just fallback)
+    SELECT
+      c.id::text as person_id,
+      c.name as person_name,
+      'closer' as person_type,
+      COALESCE(f.id::text, null) as funnel_id,
+      COALESCE(f.name, 'Geral') as funnel_name,
+      COALESCE(p.id::text, null) as product_id,
+      COALESCE(p.name, '') as product_name,
+      SUM(m.sales)::integer as total_sales,
+      SUM(m.revenue)::numeric as total_revenue,
+      0::integer as total_leads,
+      0::integer as total_qualified,
+      SUM(m.calls)::integer as total_scheduled,
+      SUM(m.calls)::integer as total_done,
+      SUM(COALESCE(m.entries, 0))::numeric as total_entries
+    FROM metrics m
+    JOIN closers c ON m.closer_id = c.id
+    LEFT JOIN funnels f ON m.funnel_id = f.id
+    LEFT JOIN products p ON m.product_id = p.id
+    WHERE (p_period_start IS NULL OR m.period_start >= p_period_start)
+      AND (p_period_end IS NULL OR m.period_end <= p_period_end)
+    GROUP BY c.id, c.name, f.id, f.name, p.id, p.name
+
+    UNION ALL
+
+    -- SDRs from sdr_metrics
+    SELECT
+      s.id::text as person_id,
+      s.name as person_name,
+      s.type as person_type,
+      null::text as funnel_id,
+      sm.funnel as funnel_name,
+      null::text as product_id,
+      '' as product_name,
+      SUM(sm.sales)::integer as total_sales,
+      0::numeric as total_revenue,
+      SUM(sm.activated)::integer as total_leads,
+      0::integer as total_qualified,
+      SUM(sm.scheduled)::integer as total_scheduled,
+      SUM(sm.attended)::integer as total_done,
+      0::numeric as total_entries
+    FROM sdr_metrics sm
+    JOIN sdrs s ON sm.sdr_id = s.id
+    WHERE sm.funnel != ''
+      AND (p_period_start IS NULL OR sm.date >= p_period_start)
+      AND (p_period_end IS NULL OR sm.date <= p_period_end)
+    GROUP BY s.id, s.name, s.type, sm.funnel
+  ) row_data;
+$function$;
+
+-- 7. Create get_product_summary RPC
+CREATE OR REPLACE FUNCTION public.get_product_summary(
+  p_period_start date DEFAULT NULL::date,
+  p_period_end date DEFAULT NULL::date
+)
+RETURNS json
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT COALESCE(json_agg(product_data ORDER BY product_name), '[]'::json)
+  FROM (
+    SELECT
+      p.id::text as product_id,
+      p.name as product_name,
+      SUM(total_sales)::integer as total_sales,
+      SUM(total_revenue)::numeric as total_revenue,
+      SUM(total_entries)::numeric as total_entries,
+      SUM(total_calls)::integer as total_calls
+    FROM (
+      -- From funnel_daily_data
+      SELECT
+        fdd.product_id,
+        SUM(fdd.sales_count) as total_sales,
+        SUM(fdd.sales_value) as total_revenue,
+        SUM(fdd.entries_value) as total_entries,
+        SUM(fdd.calls_done) as total_calls
+      FROM funnel_daily_data fdd
+      WHERE fdd.product_id IS NOT NULL
+        AND (p_period_start IS NULL OR fdd.date >= p_period_start)
+        AND (p_period_end IS NULL OR fdd.date <= p_period_end)
+      GROUP BY fdd.product_id
+
+      UNION ALL
+
+      -- From metrics table
+      SELECT
+        m.product_id,
+        SUM(m.sales) as total_sales,
+        SUM(m.revenue) as total_revenue,
+        SUM(COALESCE(m.entries, 0)) as total_entries,
+        SUM(m.calls) as total_calls
+      FROM metrics m
+      WHERE m.product_id IS NOT NULL
+        AND (p_period_start IS NULL OR m.period_start >= p_period_start)
+        AND (p_period_end IS NULL OR m.period_end <= p_period_end)
+      GROUP BY m.product_id
+    ) combined
+    JOIN products p ON combined.product_id = p.id
+    WHERE p.is_active = true
+    GROUP BY p.id, p.name
+  ) product_data;
+$function$;

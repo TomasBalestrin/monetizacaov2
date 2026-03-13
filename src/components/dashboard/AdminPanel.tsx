@@ -13,6 +13,7 @@ import { CreateUserDialog } from './CreateUserDialog';
 import { EditUserLinksDialog } from './EditUserLinksDialog';
 import { GoalsConfig } from './GoalsConfig';
 import { FunnelManagerAdmin } from './FunnelManagerAdmin';
+import { ProductManagerAdmin } from './ProductManagerAdmin';
 
 const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'reports', 'admin'];
 
@@ -64,7 +65,11 @@ export function AdminPanel() {
           </TabsTrigger>
           <TabsTrigger value="funnels" className="data-[state=active]:bg-background gap-2 px-4 py-2">
             <Filter className="h-4 w-4" />
-            Funis / Produtos
+            Funis
+          </TabsTrigger>
+          <TabsTrigger value="products" className="data-[state=active]:bg-background gap-2 px-4 py-2">
+            <Settings className="h-4 w-4" />
+            Produtos
           </TabsTrigger>
         </TabsList>
 
@@ -209,6 +214,11 @@ export function AdminPanel() {
         {/* Funnels Tab */}
         <TabsContent value="funnels" className="space-y-6">
           <FunnelManagerAdmin />
+        </TabsContent>
+
+        {/* Products Tab */}
+        <TabsContent value="products" className="space-y-6">
+          <ProductManagerAdmin />
         </TabsContent>
       </Tabs>
 

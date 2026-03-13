@@ -160,7 +160,7 @@ export async function createSDRMetric(metric: {
 }): Promise<unknown> {
   const { data, error } = await supabase
     .from('sdr_metrics')
-    .upsert(metric, { onConflict: 'sdr_id,date,funnel' })
+    .insert(metric)
     .select()
     .single();
 

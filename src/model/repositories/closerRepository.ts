@@ -29,7 +29,7 @@ export async function fetchClosers(squadId?: string): Promise<Closer[]> {
 export async function fetchMetrics(periodStart?: string, periodEnd?: string): Promise<Metric[]> {
   let query = supabase
     .from('metrics')
-    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, funnel_id, funnel:funnels(id, name), closer:closers(id, name, squad_id, squad:squads(id, name, slug))');
+    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, funnel_id, product_id, funnel:funnels(id, name), product:products(id, name), closer:closers(id, name, squad_id, squad:squads(id, name, slug))');
 
   if (periodStart) {
     query = query.gte('period_start', periodStart);
@@ -50,7 +50,7 @@ export async function fetchCloserMetrics(
 ): Promise<CloserMetricRecord[]> {
   let query = supabase
     .from('metrics')
-    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, funnel_id, sdr_id, funnel:funnels(id, name), sdr:sdrs(id, name, type)')
+    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, funnel_id, sdr_id, product_id, funnel:funnels(id, name), sdr:sdrs(id, name, type), product:products(id, name)')
     .eq('closer_id', closerId)
     .order('period_start', { ascending: true });
 
@@ -74,7 +74,7 @@ export async function fetchCloserMetricsByFunnel(
 ): Promise<CloserMetricRecord[]> {
   let query = supabase
     .from('metrics')
-    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, funnel_id, sdr_id, funnel:funnels(id, name), sdr:sdrs(id, name, type)')
+    .select('id, closer_id, period_start, period_end, calls, sales, revenue, entries, source, revenue_trend, entries_trend, cancellations, cancellation_value, cancellation_entries, funnel_id, sdr_id, product_id, funnel:funnels(id, name), sdr:sdrs(id, name, type), product:products(id, name)')
     .eq('closer_id', closerId)
     .eq('funnel_id', funnelId)
     .order('period_start', { ascending: true });

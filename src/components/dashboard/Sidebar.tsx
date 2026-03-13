@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -13,11 +13,13 @@ import {
   Target,
   CalendarDays,
   UserCheck,
+  ChevronRight,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { useClosers } from '@/controllers/useCloserController';
+import { useSDRs } from '@/controllers/useSdrController';
 
 export type ModuleId = 'dashboard' | 'closers' | 'eagles' | 'sharks' | 'sdrs' | 'social_selling' | 'reports' | 'admin' | 'goals' | 'meetings';
 
@@ -27,6 +29,7 @@ interface MenuItem {
   icon: React.ElementType;
   permission: string;
   color?: string;
+  expandable?: boolean;
 }
 
 const squadItems: MenuItem[] = [
@@ -36,9 +39,9 @@ const squadItems: MenuItem[] = [
 
 const mainItems: MenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard' },
-  { id: 'closers', label: 'Closers', icon: UserCheck, permission: 'closers' },
-  { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs' },
-  { id: 'social_selling', label: 'Social Selling', icon: Users, permission: 'sdrs' },
+  { id: 'closers', label: 'Closers', icon: UserCheck, permission: 'closers', expandable: true },
+  { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs', expandable: true },
+  { id: 'social_selling', label: 'Social Selling', icon: Users, permission: 'sdrs', expandable: true },
   { id: 'meetings', label: 'Reuniões', icon: CalendarDays, permission: 'meetings' },
   { id: 'goals', label: 'Metas', icon: Target, permission: 'goals' },
   { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'reports' },
@@ -57,9 +60,32 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: SidebarProps) {
   const { signOut, hasPermission, isAdmin, isManager } = useAuth();
+  const [, setSearchParams] = useSearchParams();
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  const { data: closers } = useClosers();
+  const { data: sdrs } = useSDRs('sdr');
+  const { data: socialSellers } = useSDRs('social_selling');
 
   const handleLogout = async () => {
     await signOut();
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const getExpandableProfiles = (itemId: ModuleId) => {
+    switch (itemId) {
+      case 'closers':
+        return closers?.map((c) => ({ id: c.id, name: c.name })) || [];
+      case 'sdrs':
+        return sdrs?.map((s) => ({ id: s.id, name: s.name })) || [];
+      case 'social_selling':
+        return socialSellers?.map((s) => ({ id: s.id, name: s.name })) || [];
+      default:
+        return [];
+    }
   };
 
   const filterItems = (items: MenuItem[]) => {
@@ -77,6 +103,91 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
 
   const renderMenuItem = (item: MenuItem) => {
     const isActive = activeModule === item.id;
+    const isExpanded = expandedItems[item.id] || false;
+    const profiles = item.expandable ? getExpandableProfiles(item.id) : [];
+
+    if (item.expandable) {
+      return (
+        <div key={item.id}>
+          <div className="flex items-center">
+            <button
+              onClick={() => {
+                setSearchParams({ module: item.id });
+                onModuleChange(item.id);
+                if (window.innerWidth < 768) onClose();
+              }}
+              className={cn(
+                'flex-1 flex items-center gap-3 px-3 py-2.5 rounded-l-xl transition-all duration-200',
+                'group relative',
+                isActive
+                  ? 'bg-sidebar-primary/15 text-sidebar-primary font-semibold'
+                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+              )}
+            >
+              {isActive && (
+                <div className="absolute left-0 inset-y-1.5 w-[3px] rounded-r-full bg-sidebar-primary" />
+              )}
+              <item.icon
+                size={18}
+                className={cn(
+                  'transition-colors shrink-0',
+                  isActive ? 'text-sidebar-primary' : item.color || 'text-sidebar-foreground/50'
+                )}
+              />
+              <span className="text-sm">{item.label}</span>
+            </button>
+            <button
+              onClick={() => toggleExpand(item.id)}
+              className={cn(
+                'px-2 py-2.5 rounded-r-xl transition-all duration-200',
+                isActive
+                  ? 'bg-sidebar-primary/15 text-sidebar-primary'
+                  : 'text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+              )}
+            >
+              <ChevronRight
+                size={14}
+                className={cn(
+                  'transition-transform duration-200',
+                  isExpanded && 'rotate-90'
+                )}
+              />
+            </button>
+          </div>
+          <div
+            className={cn(
+              'overflow-hidden transition-all duration-200',
+              isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+            )}
+          >
+            <div className="mt-1 space-y-0.5">
+              {profiles.map((profile) => (
+                <button
+                  key={profile.id}
+                  onClick={() => {
+                    const paramKey = item.id === 'closers' ? 'closer' : 'sdr';
+                    const moduleName = item.id === 'social_selling' ? 'social_selling' : item.id;
+                    setSearchParams({ module: moduleName, [paramKey]: profile.id });
+                    onModuleChange(item.id);
+                    if (window.innerWidth < 768) onClose();
+                  }}
+                  className="w-full flex items-center gap-3 pl-9 pr-3 py-1.5 rounded-xl text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-all duration-150"
+                >
+                  <item.icon size={14} className="text-sidebar-foreground/35 shrink-0" />
+                  <span className="text-[13px] truncate">{profile.name}</span>
+                </button>
+              ))}
+              {profiles.length === 0 && (
+                <p className="pl-9 pr-3 py-1.5 text-xs text-sidebar-foreground/30 italic">
+                  Nenhum perfil
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <button
         key={item.id}

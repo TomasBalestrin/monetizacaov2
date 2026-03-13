@@ -31,23 +31,15 @@ export function EditScheduledCallDialog({
   const scheduledDate = d
     ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     : '';
-  const scheduledTime = d
-    ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    : '';
 
   const handleSubmit = async (values: ScheduleCallFormValues) => {
-    // Build a local Date and convert to ISO with timezone offset
-    const localDate = new Date(`${values.scheduled_date}T${values.scheduled_time}:00`);
-    const scheduledTimeISO = localDate.toISOString();
+    const scheduledTime = new Date(`${values.scheduled_date}T12:00:00`).toISOString();
 
     await updateCall.mutateAsync({
       id: call.id,
-      sdr_id: values.sdr_id,
       closer_id: values.closer_id,
       funnel_id: values.funnel_id,
-      client_name: values.client_name,
-      client_phone: values.client_phone,
-      scheduled_time: scheduledTimeISO,
+      scheduled_time: scheduledTime,
     });
 
     onOpenChange(false);
@@ -71,15 +63,12 @@ export function EditScheduledCallDialog({
         </DialogHeader>
 
         <ScheduleCallForm
-          key={`${call.id}-${call.scheduled_time}-${call.client_name}`}
+          key={`${call.id}-${call.scheduled_time}`}
           sdrType={sdrType}
           defaultValues={{
-            sdr_id: call.sdr_id,
-            client_name: call.client_name,
-            client_phone: call.client_phone,
+            num_calls: 1,
             funnel_id: call.funnel_id,
             scheduled_date: scheduledDate,
-            scheduled_time: scheduledTime,
             closer_id: call.closer_id,
           }}
           onSubmit={handleSubmit}

@@ -154,7 +154,7 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setIsScheduleCallOpen(true)} size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
+            <Button onClick={() => setIsScheduleCallOpen(true)} size="sm" variant="outline" className="hidden rounded-xl h-8 text-xs gap-1.5">
               <CalendarPlus className="h-3.5 w-3.5" />
               Agendar Call
             </Button>

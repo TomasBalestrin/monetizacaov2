@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TableIcon, MoreHorizontal, Edit, Trash2, Check, X } from 'lucide-react';
+import { TableIcon, MoreHorizontal, Edit, Trash2, Check, X, ChevronRight, ChevronDown } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -31,6 +31,19 @@ interface SDRDataTableProps {
   canInlineEdit?: boolean;
 }
 
+interface DateGroup {
+  date: string;
+  metrics: SDRMetric[];
+  totals: {
+    activated: number;
+    scheduled: number;
+    scheduled_follow_up: number;
+    scheduled_same_day: number;
+    attended: number;
+    sales: number;
+  };
+}
+
 function getPercentageColor(value: number): string {
   if (value >= 50) return 'text-green-500';
   if (value >= 30) return 'text-amber-500';
@@ -43,18 +56,25 @@ function getPercentageBg(value: number): string {
   return 'bg-red-500/10';
 }
 
+function summarizeFunnels(metrics: SDRMetric[]): string {
+  const values = [...new Set(metrics.map(m => m.funnel).filter(Boolean))];
+  if (values.length === 0) return '-';
+  if (values.length === 1) return values[0]!;
+  return `${values.length} funis`;
+}
+
 // Inline editable cell component
-function EditableCell({ 
-  value, 
-  metricId, 
-  field, 
-  onSave, 
+function EditableCell({
+  value,
+  metricId,
+  field,
+  onSave,
   canEdit,
   highlight = false,
-}: { 
-  value: number; 
-  metricId: string; 
-  field: EditableField; 
+}: {
+  value: number;
+  metricId: string;
+  field: EditableField;
   onSave: (metricId: string, field: EditableField, value: number) => void;
   canEdit: boolean;
   highlight?: boolean;
@@ -150,8 +170,8 @@ function EditableCell({
   );
 }
 
-export function SDRDataTable({ 
-  metrics, 
+export function SDRDataTable({
+  metrics,
   showFunnelColumn = false,
   onEditMetric,
   onDeleteMetric,
@@ -160,6 +180,47 @@ export function SDRDataTable({
 }: SDRDataTableProps) {
   const hasActions = onEditMetric || onDeleteMetric;
   const editable = canInlineEdit && !!onUpdateField;
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+
+  const groups = useMemo(() => {
+    if (!metrics || metrics.length === 0) return [];
+
+    const map = new Map<string, SDRMetric[]>();
+    for (const m of metrics) {
+      const arr = map.get(m.date) || [];
+      arr.push(m);
+      map.set(m.date, arr);
+    }
+
+    const result: DateGroup[] = [];
+    for (const [date, items] of map) {
+      result.push({
+        date,
+        metrics: items,
+        totals: {
+          activated: items.reduce((s, m) => s + m.activated, 0),
+          scheduled: items.reduce((s, m) => s + m.scheduled, 0),
+          scheduled_follow_up: items.reduce((s, m) => s + (m.scheduled_follow_up || 0), 0),
+          scheduled_same_day: items.reduce((s, m) => s + m.scheduled_same_day, 0),
+          attended: items.reduce((s, m) => s + m.attended, 0),
+          sales: items.reduce((s, m) => s + m.sales, 0),
+        },
+      });
+    }
+
+    return result.sort(
+      (a, b) => parseDateString(b.date).getTime() - parseDateString(a.date).getTime()
+    );
+  }, [metrics]);
+
+  const toggleDate = (date: string) => {
+    setExpandedDates(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
 
   if (metrics.length === 0) {
     return (
@@ -170,10 +231,213 @@ export function SDRDataTable({
     );
   }
 
-  // Sort by date descending
-  const sortedMetrics = [...metrics].sort(
-    (a, b) => parseDateString(b.date).getTime() - parseDateString(a.date).getTime()
-  );
+  const renderMetricRow = (metric: SDRMetric, index: number, isSubRow: boolean) => {
+    const scheduledRate = metric.activated > 0
+      ? (metric.scheduled / metric.activated) * 100
+      : 0;
+    const attendanceRate = metric.scheduled_same_day > 0
+      ? (metric.attended / metric.scheduled_same_day) * 100
+      : 0;
+    const conversionRate = metric.attended > 0
+      ? (metric.sales / metric.attended) * 100
+      : 0;
+
+    const canEditRow = editable && !!metric.id;
+
+    return (
+      <TableRow
+        key={metric.id || `${metric.date}-${index}`}
+        className={cn(
+          "transition-colors",
+          isSubRow
+            ? "bg-primary/[0.03] border-l-2 border-l-primary/30"
+            : index % 2 === 0 ? "bg-transparent" : "bg-muted/30",
+          "hover:bg-primary/5"
+        )}
+      >
+        <TableCell className={cn("font-medium text-foreground", isSubRow && "pl-10")}>
+          {isSubRow ? (
+            <span className="text-sm text-muted-foreground">{metric.funnel || '-'}</span>
+          ) : (
+            format(parseDateString(metric.date), 'dd/MM/yyyy', { locale: ptBR })
+          )}
+        </TableCell>
+        {showFunnelColumn && (
+          <TableCell className="text-muted-foreground text-sm">
+            {metric.funnel || '-'}
+          </TableCell>
+        )}
+
+        {/* Editable cells */}
+        <TableCell>
+          <EditableCell value={metric.activated} metricId={metric.id} field="activated" onSave={onUpdateField!} canEdit={canEditRow} />
+        </TableCell>
+        <TableCell>
+          <EditableCell value={metric.scheduled} metricId={metric.id} field="scheduled" onSave={onUpdateField!} canEdit={canEditRow} />
+        </TableCell>
+        <TableCell>
+          <EditableCell value={metric.scheduled_follow_up || 0} metricId={metric.id} field="scheduled_follow_up" onSave={onUpdateField!} canEdit={canEditRow} />
+        </TableCell>
+
+        {/* Percentage - auto calculated */}
+        <TableCell className="text-right">
+          <span className={cn(
+            "px-2 py-0.5 rounded-md text-xs font-bold",
+            getPercentageColor(scheduledRate),
+            getPercentageBg(scheduledRate)
+          )}>
+            {scheduledRate.toFixed(1)}%
+          </span>
+        </TableCell>
+
+        <TableCell>
+          <EditableCell value={metric.scheduled_same_day} metricId={metric.id} field="scheduled_same_day" onSave={onUpdateField!} canEdit={canEditRow} />
+        </TableCell>
+        <TableCell>
+          <EditableCell value={metric.attended} metricId={metric.id} field="attended" onSave={onUpdateField!} canEdit={canEditRow} />
+        </TableCell>
+
+        {/* Percentage - auto calculated */}
+        <TableCell className="text-right">
+          <span className={cn(
+            "px-2 py-0.5 rounded-md text-xs font-bold",
+            getPercentageColor(attendanceRate),
+            getPercentageBg(attendanceRate)
+          )}>
+            {attendanceRate.toFixed(1)}%
+          </span>
+        </TableCell>
+
+        <TableCell>
+          <EditableCell value={metric.sales} metricId={metric.id} field="sales" onSave={onUpdateField!} canEdit={canEditRow} highlight />
+        </TableCell>
+
+        {/* Percentage - auto calculated */}
+        <TableCell className="text-right">
+          <span className={cn(
+            "px-2 py-0.5 rounded-md text-xs font-bold",
+            getPercentageColor(conversionRate),
+            getPercentageBg(conversionRate)
+          )}>
+            {conversionRate.toFixed(1)}%
+          </span>
+        </TableCell>
+
+        {hasActions && (
+          <TableCell>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover border-border">
+                {onEditMetric && (
+                  <DropdownMenuItem onClick={() => onEditMetric(metric)} className="cursor-pointer">
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
+                )}
+                {onDeleteMetric && (
+                  <DropdownMenuItem
+                    onClick={() => onDeleteMetric(metric.id)}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        )}
+      </TableRow>
+    );
+  };
+
+  const renderGroupRow = (group: DateGroup, index: number) => {
+    const isExpanded = expandedDates.has(group.date);
+    const t = group.totals;
+    const scheduledRate = t.activated > 0 ? (t.scheduled / t.activated) * 100 : 0;
+    const attendanceRate = t.scheduled_same_day > 0 ? (t.attended / t.scheduled_same_day) * 100 : 0;
+    const conversionRate = t.attended > 0 ? (t.sales / t.attended) * 100 : 0;
+    const colSpan = showFunnelColumn ? 1 : 1;
+
+    return (
+      <TableRow
+        key={group.date}
+        className={cn(
+          "transition-colors cursor-pointer",
+          index % 2 === 0 ? "bg-transparent" : "bg-muted/30",
+          "hover:bg-primary/5"
+        )}
+        onClick={() => toggleDate(group.date)}
+      >
+        <TableCell className="font-medium text-foreground">
+          <div className="flex items-center gap-1.5">
+            {isExpanded
+              ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            }
+            <div>
+              <span>{format(parseDateString(group.date), 'dd/MM/yyyy', { locale: ptBR })}</span>
+              {!showFunnelColumn && (
+                <div className="text-xs text-muted-foreground">{summarizeFunnels(group.metrics)}</div>
+              )}
+            </div>
+            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground">
+              {group.metrics.length}
+            </span>
+          </div>
+        </TableCell>
+        {showFunnelColumn && (
+          <TableCell className="text-muted-foreground text-sm">
+            {summarizeFunnels(group.metrics)}
+          </TableCell>
+        )}
+        <TableCell className="text-right font-medium">{t.activated}</TableCell>
+        <TableCell className="text-right font-medium">{t.scheduled}</TableCell>
+        <TableCell className="text-right font-medium">{t.scheduled_follow_up}</TableCell>
+        <TableCell className="text-right">
+          <span className={cn(
+            "px-2 py-0.5 rounded-md text-xs font-bold",
+            getPercentageColor(scheduledRate),
+            getPercentageBg(scheduledRate)
+          )}>
+            {scheduledRate.toFixed(1)}%
+          </span>
+        </TableCell>
+        <TableCell className="text-right font-medium">{t.scheduled_same_day}</TableCell>
+        <TableCell className="text-right font-medium">{t.attended}</TableCell>
+        <TableCell className="text-right">
+          <span className={cn(
+            "px-2 py-0.5 rounded-md text-xs font-bold",
+            getPercentageColor(attendanceRate),
+            getPercentageBg(attendanceRate)
+          )}>
+            {attendanceRate.toFixed(1)}%
+          </span>
+        </TableCell>
+        <TableCell>
+          <div className="text-right">
+            <span className="px-2.5 py-1 rounded-lg bg-primary/15 text-primary font-bold text-sm inline-block">
+              {t.sales}
+            </span>
+          </div>
+        </TableCell>
+        <TableCell className="text-right">
+          <span className={cn(
+            "px-2 py-0.5 rounded-md text-xs font-bold",
+            getPercentageColor(conversionRate),
+            getPercentageBg(conversionRate)
+          )}>
+            {conversionRate.toFixed(1)}%
+          </span>
+        </TableCell>
+        {hasActions && <TableCell />}
+      </TableRow>
+    );
+  };
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -211,121 +475,19 @@ export function SDRDataTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedMetrics.map((metric, index) => {
-              const scheduledRate = metric.activated > 0
-                ? (metric.scheduled / metric.activated) * 100
-                : 0;
-              const attendanceRate = metric.scheduled_same_day > 0
-                ? (metric.attended / metric.scheduled_same_day) * 100
-                : 0;
-              const conversionRate = metric.attended > 0
-                ? (metric.sales / metric.attended) * 100
-                : 0;
+            {groups.map((group, gi) => {
+              if (group.metrics.length === 1) {
+                // Single metric - render as normal row
+                return renderMetricRow(group.metrics[0], gi, false);
+              }
 
-              const canEditRow = editable && !!metric.id;
-
+              // Multiple metrics - render group row + expandable sub-rows
+              const isExpanded = expandedDates.has(group.date);
               return (
-                <TableRow 
-                  key={metric.id || `${metric.date}-${index}`} 
-                  className={cn(
-                    "transition-colors",
-                    index % 2 === 0 ? "bg-transparent" : "bg-muted/30",
-                    "hover:bg-primary/5"
-                  )}
-                >
-                  <TableCell className="font-medium text-foreground">
-                    {format(parseDateString(metric.date), 'dd/MM/yyyy', { locale: ptBR })}
-                  </TableCell>
-                  {showFunnelColumn && (
-                    <TableCell className="text-muted-foreground text-sm">
-                      {metric.funnel || '-'}
-                    </TableCell>
-                  )}
-                  
-                  {/* Editable cells */}
-                  <TableCell>
-                    <EditableCell value={metric.activated} metricId={metric.id} field="activated" onSave={onUpdateField!} canEdit={canEditRow} />
-                  </TableCell>
-                  <TableCell>
-                    <EditableCell value={metric.scheduled} metricId={metric.id} field="scheduled" onSave={onUpdateField!} canEdit={canEditRow} />
-                  </TableCell>
-                  <TableCell>
-                    <EditableCell value={metric.scheduled_follow_up || 0} metricId={metric.id} field="scheduled_follow_up" onSave={onUpdateField!} canEdit={canEditRow} />
-                  </TableCell>
-                  
-                  {/* Percentage - auto calculated */}
-                  <TableCell className="text-right">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-md text-xs font-bold",
-                      getPercentageColor(scheduledRate),
-                      getPercentageBg(scheduledRate)
-                    )}>
-                      {scheduledRate.toFixed(1)}%
-                    </span>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <EditableCell value={metric.scheduled_same_day} metricId={metric.id} field="scheduled_same_day" onSave={onUpdateField!} canEdit={canEditRow} />
-                  </TableCell>
-                  <TableCell>
-                    <EditableCell value={metric.attended} metricId={metric.id} field="attended" onSave={onUpdateField!} canEdit={canEditRow} />
-                  </TableCell>
-                  
-                  {/* Percentage - auto calculated */}
-                  <TableCell className="text-right">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-md text-xs font-bold",
-                      getPercentageColor(attendanceRate),
-                      getPercentageBg(attendanceRate)
-                    )}>
-                      {attendanceRate.toFixed(1)}%
-                    </span>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <EditableCell value={metric.sales} metricId={metric.id} field="sales" onSave={onUpdateField!} canEdit={canEditRow} highlight />
-                  </TableCell>
-                  
-                  {/* Percentage - auto calculated */}
-                  <TableCell className="text-right">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-md text-xs font-bold",
-                      getPercentageColor(conversionRate),
-                      getPercentageBg(conversionRate)
-                    )}>
-                      {conversionRate.toFixed(1)}%
-                    </span>
-                  </TableCell>
-                  
-                  {hasActions && (
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover border-border">
-                          {onEditMetric && (
-                            <DropdownMenuItem onClick={() => onEditMetric(metric)} className="cursor-pointer">
-                              <Edit className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                          )}
-                          {onDeleteMetric && (
-                            <DropdownMenuItem 
-                              onClick={() => onDeleteMetric(metric.id)} 
-                              className="cursor-pointer text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Excluir
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  )}
-                </TableRow>
+                <React.Fragment key={group.date}>
+                  {renderGroupRow(group, gi)}
+                  {isExpanded && group.metrics.map((m, mi) => renderMetricRow(m, mi, true))}
+                </React.Fragment>
               );
             })}
           </TableBody>

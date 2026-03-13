@@ -1,19 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, subDays } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   CalendarIcon,
-  Phone,
-  Target,
   DollarSign,
-  TrendingUp,
-  XCircle,
-  ChevronDown,
+  Target,
   User,
-  Layers
+  Layers,
+  CheckCircle2,
+  XIcon,
+  Hash,
+  Filter,
+  Phone,
 } from 'lucide-react';
 import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -38,29 +39,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { PeriodTypeSelector, type PeriodType } from './PeriodTypeSelector';
-import { MonthSelector } from './MonthSelector';
+import type { PeriodType } from './PeriodTypeSelector';
 import { useClosers, type CloserMetricRecord } from '@/controllers/useCloserController';
-import { useFunnels, useUserFunnels } from '@/controllers/useFunnelController';
+import { useProducts, useFunnels } from '@/controllers/useFunnelController';
 import { useSDRs } from '@/controllers/useSdrController';
 
-const funnelBreakdownSchema = z.object({
-  funnel_id: z.string(),
-  funnel_name: z.string(),
-  calls: z.coerce.number().int().min(0),
-  sales: z.coerce.number().int().min(0),
-  sdr_id: z.string().optional(),
+const callEntrySchema = z.object({
+  had_sale: z.boolean(),
+  product_id: z.string().optional(),
+  revenue: z.coerce.number().min(0),
+  entries: z.coerce.number().min(0),
 });
 
 const squadMetricsSchema = z.object({
-  period_type: z.enum(['day', 'week', 'month']),
   closer_id: z.string().min(1, 'Selecione um closer'),
   selected_date: z.date({ required_error: 'Selecione uma data' }),
   calls: z.coerce.number().int().min(0),
-  sales: z.coerce.number().int().min(0),
+
+  // Campos para call única (calls <= 1)
+  had_sale: z.boolean(),
+  product_id: z.string().optional(),
   revenue: z.coerce.number().min(0),
   entries: z.coerce.number().min(0),
+
+  // Entradas individuais (calls > 1)
+  call_entries: z.array(callEntrySchema).optional(),
+
+  // --- Compatibilidade com SquadMetricsDialog ---
+  period_type: z.enum(['day', 'week', 'month']).optional().default('day'),
+  sales: z.coerce.number().int().min(0).optional().default(0),
+
+  // --- Campos arquivados ---
   revenue_trend: z.coerce.number().min(0).optional(),
   entries_trend: z.coerce.number().min(0).optional(),
   cancellations: z.coerce.number().int().min(0).optional(),
@@ -70,7 +79,7 @@ const squadMetricsSchema = z.object({
   leads_count: z.coerce.number().int().min(0).optional(),
   qualified_count: z.coerce.number().int().min(0).optional(),
   sdr_id: z.string().optional(),
-  funnel_breakdown: z.array(funnelBreakdownSchema).optional(),
+  funnel_breakdown: z.array(z.any()).optional(),
 });
 
 export type SquadMetricsFormValues = z.infer<typeof squadMetricsSchema>;
@@ -85,7 +94,6 @@ interface SquadMetricsFormProps {
   submitLabel?: string;
 }
 
-// Helper component for metric inputs with icons
 interface MetricInputProps {
   icon: React.ElementType;
   label: string;
@@ -108,62 +116,21 @@ function MetricInput({ icon: Icon, label, iconBgColor, iconColor, children }: Me
   );
 }
 
-function detectPeriodType(startDate: string, endDate: string): PeriodType {
-  const start = parseDateString(startDate);
-  const end = parseDateString(endDate);
-  const daysDiff = differenceInDays(end, start);
-  
-  if (daysDiff === 0) return 'day';
-  if (daysDiff <= 7) return 'week';
-  return 'month';
-}
-
 function calculatePeriod(date: Date, type: PeriodType) {
   switch (type) {
     case 'day':
-      return {
-        start: startOfDay(date),
-        end: endOfDay(date),
-      };
+      return { start: startOfDay(date), end: endOfDay(date) };
     case 'week':
-      return {
-        start: startOfWeek(date, { weekStartsOn: 1 }),
-        end: endOfWeek(date, { weekStartsOn: 1 }),
-      };
+      return { start: startOfWeek(date, { weekStartsOn: 1 }), end: endOfWeek(date, { weekStartsOn: 1 }) };
     case 'month':
-      return {
-        start: startOfMonth(date),
-        end: endOfMonth(date),
-      };
+      return { start: startOfMonth(date), end: endOfMonth(date) };
   }
 }
 
-function formatPeriodDisplay(date: Date | undefined, type: PeriodType): string {
-  if (!date) return 'Selecione...';
-  
-  const period = calculatePeriod(date, type);
-  
-  switch (type) {
-    case 'day':
-      return format(date, "dd 'de' MMMM, yyyy", { locale: ptBR });
-    case 'week':
-      return `${format(period.start, 'dd/MM', { locale: ptBR })} - ${format(period.end, 'dd/MM/yyyy', { locale: ptBR })}`;
-    case 'month':
-      return format(date, "MMMM 'de' yyyy", { locale: ptBR });
-  }
-}
-
-// Get initials from name
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 }
 
-// Generate consistent color from name
 function getAvatarColor(name: string): string {
   const colors = [
     'bg-blue-500/20 text-blue-400',
@@ -173,167 +140,146 @@ function getAvatarColor(name: string): string {
     'bg-rose-500/20 text-rose-400',
     'bg-cyan-500/20 text-cyan-400',
   ];
-  const index = name.charCodeAt(0) % colors.length;
-  return colors[index];
+  return colors[name.charCodeAt(0) % colors.length];
 }
 
-export function SquadMetricsForm({ 
-  squadId, 
-  defaultCloserId, 
+export function SquadMetricsForm({
+  squadId,
+  defaultCloserId,
   defaultMetric,
   selectedMonth,
-  onSubmit, 
+  onSubmit,
   isLoading,
   submitLabel = 'Adicionar Métrica'
 }: SquadMetricsFormProps) {
   const { data: closers } = useClosers(squadId);
+  const { data: allProducts } = useProducts();
   const { data: allFunnels } = useFunnels();
-  const { data: sdrs } = useSDRs();
-  const [showCancellations, setShowCancellations] = useState(
-    !!defaultMetric && (
-      (defaultMetric.cancellations ?? 0) > 0 ||
-      (defaultMetric.cancellation_value ?? 0) > 0 ||
-      (defaultMetric.cancellation_entries ?? 0) > 0
-    )
-  );
-  
-  // Detect period type from existing metric
-  const initialPeriodType = defaultMetric 
-    ? detectPeriodType(defaultMetric.period_start, defaultMetric.period_end)
-    : 'week';
-  
+  const { data: allSDRs } = useSDRs();
+
   const form = useForm<SquadMetricsFormValues>({
     resolver: zodResolver(squadMetricsSchema),
     defaultValues: {
-      period_type: initialPeriodType,
       closer_id: defaultMetric?.closer_id || defaultCloserId || '',
       selected_date: defaultMetric ? parseDateString(defaultMetric.period_start) : (selectedMonth || new Date()),
       calls: defaultMetric?.calls ?? 0,
-      sales: defaultMetric?.sales ?? 0,
+      had_sale: defaultMetric ? (defaultMetric.sales ?? 0) > 0 : false,
+      product_id: (defaultMetric as any)?.product_id || '',
       revenue: defaultMetric?.revenue ?? 0,
       entries: defaultMetric?.entries ?? 0,
+      call_entries: [],
+      period_type: 'day',
+      sales: defaultMetric?.sales ?? 0,
       revenue_trend: defaultMetric?.revenue_trend ?? 0,
       entries_trend: defaultMetric?.entries_trend ?? 0,
       cancellations: defaultMetric?.cancellations ?? 0,
       cancellation_value: defaultMetric?.cancellation_value ?? 0,
       cancellation_entries: defaultMetric?.cancellation_entries ?? 0,
       funnel_id: defaultMetric?.funnel_id || '',
+      sdr_id: (defaultMetric as any)?.sdr_id || '',
     },
   });
 
-  // Reset form when defaultMetric changes (for edit mode)
+  const { fields, replace } = useFieldArray({
+    control: form.control,
+    name: 'call_entries',
+  });
+
   useEffect(() => {
     if (defaultMetric) {
       form.reset({
-        period_type: detectPeriodType(defaultMetric.period_start, defaultMetric.period_end),
         closer_id: defaultMetric.closer_id,
         selected_date: parseDateString(defaultMetric.period_start),
         calls: defaultMetric.calls,
-        sales: defaultMetric.sales,
+        had_sale: (defaultMetric.sales ?? 0) > 0,
+        product_id: (defaultMetric as any)?.product_id || '',
         revenue: defaultMetric.revenue,
         entries: defaultMetric.entries,
+        call_entries: [],
+        period_type: 'day',
+        sales: defaultMetric.sales ?? 0,
         revenue_trend: defaultMetric.revenue_trend ?? 0,
         entries_trend: defaultMetric.entries_trend ?? 0,
         cancellations: defaultMetric.cancellations ?? 0,
         cancellation_value: defaultMetric.cancellation_value ?? 0,
         cancellation_entries: defaultMetric.cancellation_entries ?? 0,
         funnel_id: defaultMetric.funnel_id || '',
+        sdr_id: (defaultMetric as any)?.sdr_id || '',
       });
-      
-      // Open cancellations section if there's data
-      if (
-        (defaultMetric.cancellations ?? 0) > 0 ||
-        (defaultMetric.cancellation_value ?? 0) > 0 ||
-        (defaultMetric.cancellation_entries ?? 0) > 0
-      ) {
-        setShowCancellations(true);
-      }
     }
   }, [defaultMetric, form]);
 
-  const periodType = form.watch('period_type');
-  const selectedDate = form.watch('selected_date');
+  const numCalls = form.watch('calls');
   const selectedCloserId = form.watch('closer_id');
-  const salesValue = form.watch('sales');
-  
+  const hadSale = form.watch('had_sale');
   const selectedCloser = closers?.find(c => c.id === selectedCloserId);
-  const { data: userFunnels } = useUserFunnels(selectedCloserId || undefined);
 
-  // Funnel breakdown state
-  interface FunnelBreakdownEntry {
-    funnel_id: string;
-    funnel_name: string;
-    calls: number;
-    sales: number;
-    sdr_id: string;
-  }
-
-  const [funnelBreakdown, setFunnelBreakdown] = useState<FunnelBreakdownEntry[]>([]);
-
-  // Initialize funnel breakdown when funnels load or closer changes
-  useEffect(() => {
-    if (userFunnels && userFunnels.length > 0) {
-      setFunnelBreakdown(
-        userFunnels.map((f) => ({
-          funnel_id: f.id,
-          funnel_name: f.name,
-          calls: 0,
-          sales: 0,
-          sdr_id: '',
-        }))
-      );
+  // Sincronizar call_entries quando calls muda
+  React.useEffect(() => {
+    const n = Number(numCalls) || 0;
+    if (n > 1) {
+      const currentEntries = form.getValues('call_entries') || [];
+      const newEntries = Array.from({ length: n }, (_, i) => ({
+        had_sale: currentEntries[i]?.had_sale ?? false,
+        product_id: currentEntries[i]?.product_id || '',
+        revenue: currentEntries[i]?.revenue ?? 0,
+        entries: currentEntries[i]?.entries ?? 0,
+      }));
+      replace(newEntries);
     } else {
-      setFunnelBreakdown([]);
+      replace([]);
     }
-  }, [userFunnels]);
+  }, [numCalls]);
 
-  const updateFunnelEntry = (index: number, field: keyof FunnelBreakdownEntry, value: number | string) => {
-    setFunnelBreakdown((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
-  };
-
-  // Quick date setters
-  const setQuickDate = (type: 'today' | 'yesterday' | 'thisWeek') => {
-    const today = new Date();
-    switch (type) {
-      case 'today':
-        form.setValue('selected_date', today);
-        form.setValue('period_type', 'day');
-        break;
-      case 'yesterday':
-        form.setValue('selected_date', subDays(today, 1));
-        form.setValue('period_type', 'day');
-        break;
-      case 'thisWeek':
-        form.setValue('selected_date', today);
-        form.setValue('period_type', 'week');
-        break;
-    }
-  };
+  const showIndividualEntries = Number(numCalls) > 1;
 
   const handleSubmit = async (values: SquadMetricsFormValues) => {
-    const period = calculatePeriod(values.selected_date, values.period_type);
-    // Attach funnel breakdown data
-    const nonEmptyBreakdown = funnelBreakdown.filter(f => f.calls > 0 || f.sales > 0);
-    // Clean funnel_id if 'none' was selected
+    const period = calculatePeriod(values.selected_date, 'day');
     const cleanFunnelId = values.funnel_id === 'none' ? undefined : values.funnel_id;
-    const valuesWithBreakdown = {
-      ...values,
-      funnel_breakdown: nonEmptyBreakdown.length > 0 ? nonEmptyBreakdown : undefined,
-      // If only one funnel has data, set it as the main funnel_id/sdr_id
-      funnel_id: nonEmptyBreakdown.length === 1 ? nonEmptyBreakdown[0].funnel_id : cleanFunnelId,
-      sdr_id: nonEmptyBreakdown.length === 1 ? (nonEmptyBreakdown[0].sdr_id || values.sdr_id) : values.sdr_id,
-    };
-    await onSubmit(valuesWithBreakdown, period);
+    const cleanSdrId = values.sdr_id === 'none' ? undefined : values.sdr_id;
+
+    if (showIndividualEntries && values.call_entries && values.call_entries.length > 0) {
+      // Múltiplas calls: somar totais das entradas individuais
+      const totalSales = values.call_entries.filter(e => e.had_sale).length;
+      const totalRevenue = values.call_entries.reduce((s, e) => s + (e.had_sale ? e.revenue : 0), 0);
+      const totalEntries = values.call_entries.reduce((s, e) => s + (e.had_sale ? e.entries : 0), 0);
+
+      const enriched: SquadMetricsFormValues = {
+        ...values,
+        sales: totalSales,
+        revenue: totalRevenue,
+        entries: totalEntries,
+        funnel_id: cleanFunnelId,
+        sdr_id: cleanSdrId,
+        period_type: 'day',
+      };
+      await onSubmit(enriched, period);
+    } else {
+      // Call única
+      const cleanProductId = values.product_id === 'none' ? undefined : values.product_id;
+      const enriched: SquadMetricsFormValues = {
+        ...values,
+        sales: values.had_sale ? 1 : 0,
+        revenue: values.had_sale ? values.revenue : 0,
+        entries: values.had_sale ? values.entries : 0,
+        product_id: values.had_sale ? cleanProductId : undefined,
+        funnel_id: cleanFunnelId,
+        sdr_id: cleanSdrId,
+        period_type: 'day',
+      };
+      await onSubmit(enriched, period);
+    }
+  };
+
+  const setQuickDate = (type: 'today' | 'yesterday') => {
+    const today = new Date();
+    form.setValue('selected_date', type === 'today' ? today : subDays(today, 1));
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
-        {/* Closer Selector with Avatar */}
+        {/* Closer Selector */}
         <FormField
           control={form.control}
           name="closer_id"
@@ -384,7 +330,71 @@ export function SquadMetricsForm({
           )}
         />
 
-        {/* Funnel Selector */}
+        {/* Data */}
+        <FormField
+          control={form.control}
+          name="selected_date"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="p-1.5 rounded-md bg-amber-500/20">
+                    <CalendarIcon className="h-3.5 w-3.5 text-amber-400" />
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">Data</span>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
+                    onClick={() => setQuickDate('today')}
+                  >
+                    Hoje
+                  </Button>
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
+                    onClick={() => setQuickDate('yesterday')}
+                  >
+                    Ontem
+                  </Button>
+                </div>
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        'w-full pl-3 text-left font-normal h-11 bg-muted/30 border-border/50',
+                        !field.value && 'text-muted-foreground'
+                      )}
+                    >
+                      {field.value
+                        ? format(field.value, "dd 'de' MMMM, yyyy", { locale: ptBR })
+                        : 'Selecione...'}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    disabled={(date) => date > new Date()}
+                    initialFocus
+                    locale={ptBR}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Funil */}
         {allFunnels && allFunnels.length > 0 && (
           <FormField
             control={form.control}
@@ -393,9 +403,9 @@ export function SquadMetricsForm({
               <FormItem>
                 <div className="flex items-center gap-2 mb-1.5">
                   <div className="p-1.5 rounded-md bg-violet-500/20">
-                    <Layers className="h-3.5 w-3.5 text-violet-400" />
+                    <Filter className="h-3.5 w-3.5 text-violet-400" />
                   </div>
-                  <span className="text-xs font-medium text-muted-foreground">Funil / Produto</span>
+                  <span className="text-xs font-medium text-muted-foreground">Funil</span>
                 </div>
                 <Select onValueChange={field.onChange} value={field.value || 'none'}>
                   <FormControl>
@@ -404,7 +414,7 @@ export function SquadMetricsForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="none">Nenhum (geral)</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
                     {allFunnels.map((funnel) => (
                       <SelectItem key={funnel.id} value={funnel.id}>
                         {funnel.name}
@@ -418,509 +428,343 @@ export function SquadMetricsForm({
           />
         )}
 
-        {/* Period Type Selector */}
-        <FormField
-          control={form.control}
-          name="period_type"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="p-1.5 rounded-md bg-purple-500/20">
-                  <CalendarIcon className="h-3.5 w-3.5 text-purple-400" />
-                </div>
-                <span className="text-xs font-medium text-muted-foreground">Tipo de Período</span>
-              </div>
-              <FormControl>
-                <PeriodTypeSelector
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Date Selector with Quick Buttons */}
-        <FormField
-          control={form.control}
-          name="selected_date"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <div className="flex items-center justify-between">
+        {/* SDR que agendou */}
+        {allSDRs && allSDRs.length > 0 && (
+          <FormField
+            control={form.control}
+            name="sdr_id"
+            render={({ field }) => (
+              <FormItem>
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-md bg-amber-500/20">
-                    <CalendarIcon className="h-3.5 w-3.5 text-amber-400" />
+                  <div className="p-1.5 rounded-md bg-cyan-500/20">
+                    <Phone className="h-3.5 w-3.5 text-cyan-400" />
                   </div>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {periodType === 'month' ? 'Mês' : 'Data'}
-                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">SDR que agendou</span>
                 </div>
-                {periodType !== 'month' && (
-                  <div className="flex gap-1.5">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
-                      onClick={() => setQuickDate('today')}
-                    >
-                      Hoje
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
-                      onClick={() => setQuickDate('yesterday')}
-                    >
-                      Ontem
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      className="h-7 text-xs px-2 bg-muted/30 border-border/50 hover:bg-muted/50"
-                      onClick={() => setQuickDate('thisWeek')}
-                    >
-                      Semana
-                    </Button>
-                  </div>
-                )}
-              </div>
-              
-              {/* Month Selector for monthly periods */}
-              {periodType === 'month' ? (
-                <div className="flex justify-center py-2 px-3 rounded-lg bg-muted/30 border border-border/50">
-                  <MonthSelector
-                    selectedMonth={field.value || new Date()}
-                    onMonthChange={(date) => field.onChange(date)}
-                  />
-                </div>
-              ) : (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          'w-full pl-3 text-left font-normal h-11 bg-muted/30 border-border/50',
-                          !field.value && 'text-muted-foreground'
-                        )}
-                      >
-                        {formatPeriodDisplay(field.value, periodType)}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) => date > new Date()}
-                      initialFocus
-                      locale={ptBR}
-                      className={cn('p-3 pointer-events-auto')}
-                    />
-                  </PopoverContent>
-                </Popover>
-              )}
-              
-              {selectedDate && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/20 border border-border/30">
-                  <span className="text-xs text-muted-foreground">Período:</span>
-                  <span className="text-xs font-medium text-foreground">
-                    {format(calculatePeriod(selectedDate, periodType).start, 'dd/MM/yyyy')} a {format(calculatePeriod(selectedDate, periodType).end, 'dd/MM/yyyy')}
-                  </span>
-                </div>
-              )}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Performance Metrics Section */}
-        <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-blue-500/20">
-              <Target className="h-4 w-4 text-blue-400" />
-            </div>
-            <h4 className="text-sm font-semibold text-blue-400">Métricas de Performance</h4>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="calls"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput
-                    icon={Phone}
-                    label="Calls"
-                    iconBgColor="bg-blue-500/20"
-                    iconColor="text-blue-400"
-                  >
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        className="bg-background/50 border-border/50"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="sales"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput
-                    icon={Target}
-                    label="Vendas"
-                    iconBgColor="bg-blue-500/20"
-                    iconColor="text-blue-400"
-                  >
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        className="bg-background/50 border-border/50"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
-
-        {/* Per-Funnel Breakdown */}
-        {funnelBreakdown.length > 0 && (
-          <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-violet-500/20">
-                <Layers className="h-4 w-4 text-violet-400" />
-              </div>
-              <h4 className="text-sm font-semibold text-violet-400">Detalhamento por Produto/Funil</h4>
-            </div>
-
-            {funnelBreakdown.map((entry, i) => (
-              <div key={entry.funnel_id} className="rounded-md border border-border/40 bg-background/30 p-3 space-y-3">
-                <h5 className="text-sm font-semibold text-foreground">{entry.funnel_name}</h5>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Phone className="h-3 w-3 text-blue-400" />
-                      <span className="text-xs text-muted-foreground">Calls</span>
-                    </div>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={entry.calls || ''}
-                      onChange={(e) => updateFunnelEntry(i, 'calls', Number(e.target.value))}
-                      placeholder="0"
-                      className="h-9 bg-background/50 border-border/50 text-center"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Target className="h-3 w-3 text-emerald-400" />
-                      <span className="text-xs text-muted-foreground">Vendas</span>
-                    </div>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={entry.sales || ''}
-                      onChange={(e) => updateFunnelEntry(i, 'sales', Number(e.target.value))}
-                      placeholder="0"
-                      className="h-9 bg-background/50 border-border/50 text-center"
-                    />
-                  </div>
-                </div>
-
-                {/* SDR de Origem per funnel - show when sales > 0 */}
-                {entry.sales > 0 && sdrs && sdrs.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <User className="h-3 w-3 text-violet-400" />
-                      <span className="text-xs text-muted-foreground">SDR que agendou</span>
-                    </div>
-                    <Select
-                      value={entry.sdr_id || 'none'}
-                      onValueChange={(v) => updateFunnelEntry(i, 'sdr_id', v === 'none' ? '' : v)}
-                    >
-                      <SelectTrigger className="h-9 bg-background/50 border-border/50">
-                        <SelectValue placeholder="Selecione o SDR" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {sdrs.map((sdr) => (
-                          <SelectItem key={sdr.id} value={sdr.id}>
-                            {sdr.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Summary of per-funnel totals */}
-            {funnelBreakdown.some(f => f.calls > 0 || f.sales > 0) && (
-              <div className="flex items-center justify-between px-3 py-2 rounded-md bg-violet-500/10 border border-violet-500/20">
-                <span className="text-xs font-medium text-violet-400">Total por funil:</span>
-                <div className="flex items-center gap-4 text-xs font-semibold text-foreground">
-                  <span>{funnelBreakdown.reduce((s, f) => s + f.calls, 0)} calls</span>
-                  <span>{funnelBreakdown.reduce((s, f) => s + f.sales, 0)} vendas</span>
-                </div>
-              </div>
+                <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                  <FormControl>
+                    <SelectTrigger className="h-11 bg-muted/30 border-border/50">
+                      <SelectValue placeholder="Selecione o SDR" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {allSDRs.map((sdr) => (
+                      <SelectItem key={sdr.id} value={sdr.id}>
+                        {sdr.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
         )}
 
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-emerald-500/20">
-              <DollarSign className="h-4 w-4 text-emerald-400" />
-            </div>
-            <h4 className="text-sm font-semibold text-emerald-400">Faturamento</h4>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="revenue"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput
-                    icon={DollarSign}
-                    label="Faturamento (R$)"
-                    iconBgColor="bg-emerald-500/20"
-                    iconColor="text-emerald-400"
-                  >
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        step="0.01" 
-                        className="bg-background/50 border-border/50"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="entries"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput
-                    icon={DollarSign}
-                    label="Entradas (R$)"
-                    iconBgColor="bg-emerald-500/20"
-                    iconColor="text-emerald-400"
-                  >
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        step="0.01" 
-                        className="bg-background/50 border-border/50"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="revenue_trend"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput
-                    icon={TrendingUp}
-                    label="Tend. Faturamento (R$)"
-                    iconBgColor="bg-emerald-500/20"
-                    iconColor="text-emerald-400"
-                  >
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        step="0.01" 
-                        className="bg-background/50 border-border/50"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="entries_trend"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput
-                    icon={TrendingUp}
-                    label="Tend. Entradas (R$)"
-                    iconBgColor="bg-emerald-500/20"
-                    iconColor="text-emerald-400"
-                  >
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        step="0.01" 
-                        className="bg-background/50 border-border/50"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
+        {/* Calls */}
+        <FormField
+          control={form.control}
+          name="calls"
+          render={({ field }) => (
+            <FormItem>
+              <MetricInput
+                icon={Hash}
+                label="Quantidade de Calls"
+                iconBgColor="bg-blue-500/20"
+                iconColor="text-blue-400"
+              >
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="bg-muted/30 border-border/50"
+                    {...field}
+                  />
+                </FormControl>
+              </MetricInput>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        {/* Cancellations Section - Collapsible */}
-        <Collapsible open={showCancellations} onOpenChange={setShowCancellations}>
-          <CollapsibleTrigger asChild>
-            <Button 
-              type="button"
-              variant="ghost" 
-              className={cn(
-                "w-full justify-between h-12 px-4 rounded-lg border transition-all",
-                showCancellations 
-                  ? "border-destructive/30 bg-destructive/5" 
-                  : "border-border/50 bg-muted/30 hover:bg-muted/50"
+        {/* === Call única (calls <= 1) === */}
+        {!showIndividualEntries && (
+          <>
+            <FormField
+              control={form.control}
+              name="had_sale"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="p-1.5 rounded-md bg-emerald-500/20">
+                      <Target className="h-3.5 w-3.5 text-emerald-400" />
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">Houve venda?</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button" variant="outline"
+                      className={cn(
+                        "h-11 gap-2 transition-all",
+                        field.value
+                          ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/20"
+                          : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50"
+                      )}
+                      onClick={() => field.onChange(true)}
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> Sim
+                    </Button>
+                    <Button
+                      type="button" variant="outline"
+                      className={cn(
+                        "h-11 gap-2 transition-all",
+                        !field.value
+                          ? "bg-muted/50 border-border text-foreground hover:bg-muted/60"
+                          : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50"
+                      )}
+                      onClick={() => field.onChange(false)}
+                    >
+                      <XIcon className="h-4 w-4" /> Não
+                    </Button>
+                  </div>
+                </FormItem>
               )}
-            >
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "p-1.5 rounded-md",
-                  showCancellations ? "bg-destructive/20" : "bg-muted"
-                )}>
-                  <XCircle className={cn(
-                    "h-4 w-4",
-                    showCancellations ? "text-destructive" : "text-muted-foreground"
-                  )} />
+            />
+
+            {hadSale && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-md bg-emerald-500/20">
+                    <DollarSign className="h-4 w-4 text-emerald-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-emerald-400">Dados da Venda</h4>
                 </div>
-                <span className={cn(
-                  "text-sm font-medium",
-                  showCancellations ? "text-destructive" : "text-muted-foreground"
-                )}>
-                  Cancelamentos
-                </span>
-                <span className="text-xs text-muted-foreground">(opcional)</span>
+
+                {allProducts && allProducts.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="product_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Layers className="h-3 w-3 text-emerald-400" />
+                          <span className="text-xs text-muted-foreground">Produto</span>
+                        </div>
+                        <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                          <FormControl>
+                            <SelectTrigger className="h-10 bg-background/50 border-border/50">
+                              <SelectValue placeholder="Selecione o produto" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Nenhum (geral)</SelectItem>
+                            {allProducts.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="revenue"
+                  render={({ field }) => (
+                    <FormItem>
+                      <MetricInput icon={DollarSign} label="Faturamento (R$)" iconBgColor="bg-emerald-500/20" iconColor="text-emerald-400">
+                        <FormControl>
+                          <Input type="number" min={0} step="0.01" className="bg-background/50 border-border/50" {...field} />
+                        </FormControl>
+                      </MetricInput>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="entries"
+                  render={({ field }) => (
+                    <FormItem>
+                      <MetricInput icon={DollarSign} label="Entrada (R$)" iconBgColor="bg-emerald-500/20" iconColor="text-emerald-400">
+                        <FormControl>
+                          <Input type="number" min={0} step="0.01" className="bg-background/50 border-border/50" {...field} />
+                        </FormControl>
+                      </MetricInput>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <ChevronDown className={cn(
-                "h-4 w-4 transition-transform duration-200",
-                showCancellations && "rotate-180"
-              )} />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-3">
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <FormField
-                  control={form.control}
-                  name="cancellations"
-                  render={({ field }) => (
-                    <FormItem>
-                      <MetricInput
-                        icon={XCircle}
-                        label="Quantidade"
-                        iconBgColor="bg-destructive/20"
-                        iconColor="text-destructive"
+            )}
+          </>
+        )}
+
+        {/* === Múltiplas calls (calls > 1) - entrada individual por call === */}
+        {showIndividualEntries && fields.map((entry, index) => {
+          const entryHadSale = form.watch(`call_entries.${index}.had_sale`);
+
+          return (
+            <div
+              key={entry.id}
+              className="p-3 rounded-lg border border-border/60 bg-muted/20 space-y-3"
+            >
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Call {index + 1}
+              </p>
+
+              {/* Venda sim/não */}
+              <FormField
+                control={form.control}
+                name={`call_entries.${index}.had_sale`}
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Target className="h-3 w-3 text-emerald-400" />
+                      <span className="text-xs text-muted-foreground">Houve venda?</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button" variant="outline"
+                        className={cn(
+                          "h-9 gap-1.5 text-xs transition-all",
+                          field.value
+                            ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/20"
+                            : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50"
+                        )}
+                        onClick={() => field.onChange(true)}
                       >
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min={0} 
-                            className="bg-background/50 border-border/50"
-                            {...field} 
-                          />
-                        </FormControl>
-                      </MetricInput>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="cancellation_value"
-                  render={({ field }) => (
-                    <FormItem>
-                      <MetricInput
-                        icon={DollarSign}
-                        label="Valor Venda"
-                        iconBgColor="bg-destructive/20"
-                        iconColor="text-destructive"
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Sim
+                      </Button>
+                      <Button
+                        type="button" variant="outline"
+                        className={cn(
+                          "h-9 gap-1.5 text-xs transition-all",
+                          !field.value
+                            ? "bg-muted/50 border-border text-foreground hover:bg-muted/60"
+                            : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50"
+                        )}
+                        onClick={() => field.onChange(false)}
                       >
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min={0} 
-                            step="0.01" 
-                            className="bg-background/50 border-border/50"
-                            {...field} 
-                          />
-                        </FormControl>
-                      </MetricInput>
-                      <FormMessage />
-                    </FormItem>
+                        <XIcon className="h-3.5 w-3.5" /> Não
+                      </Button>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {/* Dados da venda - aparecem se had_sale */}
+              {entryHadSale && (
+                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {/* Produto */}
+                  {allProducts && allProducts.length > 0 && (
+                    <FormField
+                      control={form.control}
+                      name={`call_entries.${index}.product_id`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Layers className="h-3 w-3 text-emerald-400" />
+                            <span className="text-xs text-muted-foreground">Produto</span>
+                          </div>
+                          <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                            <FormControl>
+                              <SelectTrigger className="h-9 bg-background/50 border-border/50">
+                                <SelectValue placeholder="Produto" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">Nenhum</SelectItem>
+                              {allProducts.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
-                <FormField
-                  control={form.control}
-                  name="cancellation_entries"
-                  render={({ field }) => (
-                    <FormItem>
-                      <MetricInput
-                        icon={DollarSign}
-                        label="Valor Entrada"
-                        iconBgColor="bg-destructive/20"
-                        iconColor="text-destructive"
-                      >
+
+                  {/* Faturamento */}
+                  <FormField
+                    control={form.control}
+                    name={`call_entries.${index}.revenue`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <DollarSign className="h-3 w-3 text-emerald-400" />
+                          <span className="text-xs text-muted-foreground">Faturamento (R$)</span>
+                        </div>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min={0} 
-                            step="0.01" 
-                            className="bg-background/50 border-border/50"
-                            {...field} 
-                          />
+                          <Input type="number" min={0} step="0.01" className="h-9 bg-background/50 border-border/50" {...field} />
                         </FormControl>
-                      </MetricInput>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Entrada */}
+                  <FormField
+                    control={form.control}
+                    name={`call_entries.${index}.entries`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <DollarSign className="h-3 w-3 text-emerald-400" />
+                          <span className="text-xs text-muted-foreground">Entrada (R$)</span>
+                        </div>
+                        <FormControl>
+                          <Input type="number" min={0} step="0.01" className="h-9 bg-background/50 border-border/50" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Resumo das calls quando > 1 */}
+        {showIndividualEntries && fields.length > 0 && (() => {
+          const entries = form.watch('call_entries') || [];
+          const totalSales = entries.filter(e => e.had_sale).length;
+          const totalRevenue = entries.reduce((s, e) => s + (e.had_sale ? (Number(e.revenue) || 0) : 0), 0);
+          const totalEntries = entries.reduce((s, e) => s + (e.had_sale ? (Number(e.entries) || 0) : 0), 0);
+
+          if (totalSales === 0) return null;
+
+          return (
+            <div className="flex items-center justify-between px-3 py-2 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-xs font-medium text-emerald-400">Totais:</span>
+              <div className="flex items-center gap-4 text-xs font-semibold text-foreground">
+                <span>{totalSales} venda{totalSales !== 1 ? 's' : ''}</span>
+                <span>R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <span>Ent: R$ {totalEntries.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
+          );
+        })()}
 
-        {/* Submit Button */}
-        <Button 
-          type="submit" 
-          className="w-full h-12 text-base font-semibold" 
+        {/* ===== CAMPOS ARQUIVADOS =====
+        - period_type, revenue_trend, entries_trend
+        - cancellations, cancellation_value, cancellation_entries
+        - leads_count, qualified_count, funnel_breakdown
+        ===== FIM ===== */}
+
+        <Button
+          type="submit"
+          className="w-full h-12 text-base font-semibold"
           disabled={isLoading}
         >
           {isLoading ? 'Salvando...' : submitLabel}

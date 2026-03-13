@@ -1,15 +1,17 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { FileText, TrendingUp, Users, Phone, DollarSign, Target, Filter, Plus } from 'lucide-react';
+import { FileText, TrendingUp, Users, Phone, DollarSign, Target, Filter, Plus, Package } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { PeriodFilter } from '@/components/dashboard/PeriodFilter';
-import { useAllFunnelsSummary, useFunnelReport, useSalesByPersonAndProduct, type FunnelSummary } from '@/controllers/useFunnelController';
+import { useAllFunnelsSummary, useFunnelReport, useSalesByPersonAndProduct, useProductSummary, useProducts, type FunnelSummary } from '@/controllers/useFunnelController';
+import { useMetrics } from '@/controllers/useCloserController';
 import { MetricCardSkeletonGrid } from '@/components/dashboard/skeletons';
 import { FunnelChart } from './FunnelChart';
 import { ProductSalesTable } from './ProductSalesTable';
+import { ProductSummaryView } from './ProductSummaryView';
 import { EditableCell } from './EditableCell';
 import { SDRMetricsDialog } from '@/components/dashboard/sdr/SDRMetricsDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +41,7 @@ export function ReportsPage() {
   const [selectedFunnelId, setSelectedFunnelId] = useState<string | null>(null);
   const [customPeriodStart, setCustomPeriodStart] = useState<string | undefined>(undefined);
   const [customPeriodEnd, setCustomPeriodEnd] = useState<string | undefined>(undefined);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [sdrDialogOpen, setSdrDialogOpen] = useState(false);
   const [sdrDialogType, setSdrDialogType] = useState<'sdr' | 'social_selling'>('sdr');
 
@@ -59,11 +62,56 @@ export function ReportsPage() {
     periodEnd
   );
   const { data: personProductData, isLoading: isLoadingPersonProduct } = useSalesByPersonAndProduct(periodStart, periodEnd);
+  const { data: productSummaryData, isLoading: isLoadingProductSummary } = useProductSummary(periodStart, periodEnd);
+  const { data: allProducts } = useProducts();
+  const { data: allMetrics } = useMetrics(periodStart, periodEnd);
+  const availableProducts = allProducts || [];
 
   const displayedSummaries = useMemo(() => {
     if (!summaries) return [];
+
+    // When a product is selected, re-aggregate from metrics table
+    if (selectedProductId && allMetrics) {
+      const filtered = allMetrics.filter(m => m.product_id === selectedProductId);
+      const byFunnel = new Map<string, FunnelSummary>();
+
+      for (const m of filtered) {
+        const fid = m.funnel_id || 'no-funnel';
+        const fname = m.funnel?.name || 'Sem Funil';
+        const existing = byFunnel.get(fid);
+        if (existing) {
+          existing.total_calls_done += m.calls || 0;
+          existing.total_sales += m.sales || 0;
+          existing.total_revenue += m.revenue || 0;
+          existing.total_entries += (m.entries || 0);
+        } else {
+          byFunnel.set(fid, {
+            funnel_id: fid,
+            funnel_name: fname,
+            category: null,
+            total_leads: 0,
+            total_qualified: 0,
+            total_calls_scheduled: 0,
+            total_calls_done: m.calls || 0,
+            total_sales: m.sales || 0,
+            total_revenue: m.revenue || 0,
+            total_entries: m.entries || 0,
+            leads_to_qualified_rate: 0,
+            conversion_rate: 0,
+          });
+        }
+      }
+
+      const result = Array.from(byFunnel.values()).map(s => ({
+        ...s,
+        conversion_rate: s.total_calls_done > 0 ? (s.total_sales / s.total_calls_done) * 100 : 0,
+      }));
+
+      return selectedFunnelId ? result.filter(f => f.funnel_id === selectedFunnelId) : result;
+    }
+
     return selectedFunnelId ? summaries.filter(f => f.funnel_id === selectedFunnelId) : summaries;
-  }, [summaries, selectedFunnelId]);
+  }, [summaries, selectedFunnelId, selectedProductId, allMetrics]);
 
   const totals = useMemo(() => {
     if (!displayedSummaries || displayedSummaries.length === 0) return null;
@@ -93,17 +141,15 @@ export function ReportsPage() {
             <h1 className="text-2xl font-bold text-foreground">Relatórios por Funil</h1>
             <p className="text-muted-foreground">Visão consolidada de todos os funis</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
           {canManage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-1.5">
-                  <Plus size={16} />
-                  Adicionar Métrica
+                <Button size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
+                  <Plus size={14} />
+                  Metrica
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={() => { setSdrDialogType('sdr'); setSdrDialogOpen(true); }}>
                   Métrica SDR
                 </DropdownMenuItem>
@@ -113,6 +159,8 @@ export function ReportsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <PeriodFilter
             periodStart={customPeriodStart}
             periodEnd={customPeriodEnd}
@@ -125,8 +173,9 @@ export function ReportsPage() {
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
         <TabsList>
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="overview">Por Funil</TabsTrigger>
           <TabsTrigger value="by-product">Por Produto</TabsTrigger>
+          <TabsTrigger value="by-person">Por Pessoa</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -149,15 +198,31 @@ export function ReportsPage() {
                 ))}
               </SelectContent>
             </Select>
+            {availableProducts.length > 0 && (
+              <Select
+                value={selectedProductId || 'all'}
+                onValueChange={(v) => setSelectedProductId(v === 'all' ? null : v)}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <Package size={16} className="mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Todos os Produtos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Produtos</SelectItem>
+                  {availableProducts.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Total Cards */}
           {isLoading ? (
             <MetricCardSkeletonGrid count={6} />
           ) : totals ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <SummaryCard icon={Users} title="Leads" value={totals.leads} />
-              <SummaryCard icon={Target} title="Qualificados" value={totals.qualified} />
               <SummaryCard icon={Phone} title="Agendadas" value={totals.scheduled} />
               <SummaryCard icon={Phone} title="Realizadas" value={totals.done} />
               <SummaryCard icon={TrendingUp} title="Vendas" value={totals.sales} />
@@ -187,7 +252,6 @@ export function ReportsPage() {
                     <TableRow>
                       <TableHead>Funil</TableHead>
                       <TableHead className="text-right">Leads</TableHead>
-                      <TableHead className="text-right">Qualificados</TableHead>
                       <TableHead className="text-right">Agendadas</TableHead>
                       <TableHead className="text-right">Realizadas</TableHead>
                       <TableHead className="text-right">Vendas</TableHead>
@@ -208,6 +272,10 @@ export function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="by-product" className="space-y-6">
+          <ProductSummaryView data={productSummaryData || []} isLoading={isLoadingProductSummary} />
+        </TabsContent>
+
+        <TabsContent value="by-person" className="space-y-6">
           <ProductSalesTable data={personProductData || []} isLoading={isLoadingPersonProduct} periodStart={periodStart} periodEnd={periodEnd} canEdit={canManage} />
         </TabsContent>
       </Tabs>
@@ -300,9 +368,6 @@ function FunnelRow({ funnel: f, canEdit, periodStart, periodEnd, formatCurrency 
       <TableCell className="font-medium">{f.funnel_name}</TableCell>
       <TableCell className="text-right">
         <EditableCell value={Number(f.total_leads)} onSave={(v) => handleSave('leads', v)} disabled={!canEdit} />
-      </TableCell>
-      <TableCell className="text-right">
-        <EditableCell value={Number(f.total_qualified)} onSave={(v) => handleSave('qualified', v)} disabled={!canEdit} />
       </TableCell>
       <TableCell className="text-right">
         <EditableCell value={Number(f.total_calls_scheduled)} onSave={(v) => handleSave('scheduled', v)} disabled={!canEdit} />

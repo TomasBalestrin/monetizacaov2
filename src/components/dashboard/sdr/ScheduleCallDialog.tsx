@@ -29,19 +29,35 @@ export function ScheduleCallDialog({
 
   const handleSubmit = async (values: ScheduleCallFormValues) => {
     try {
-      const localDate = new Date(`${values.scheduled_date}T${values.scheduled_time}:00`);
-      const scheduledTime = localDate.toISOString();
+      if (values.num_calls > 1 && values.entries && values.entries.length > 0) {
+        // Múltiplas calls com dados individuais
+        const promises = values.entries.map((entry, i) => {
+          const scheduledTime = new Date(`${entry.scheduled_date}T12:00:00`).toISOString();
+          return createCall.mutateAsync({
+            sdr_id: defaultSdrId || '',
+            closer_id: entry.closer_id,
+            funnel_id: entry.funnel_id,
+            client_name: `Call agendada ${i + 1}/${values.num_calls}`,
+            client_phone: '',
+            scheduled_time: scheduledTime,
+          });
+        });
+        await Promise.all(promises);
+        toast.success(`${values.num_calls} calls agendadas com sucesso!`);
+      } else {
+        // Call única
+        const scheduledTime = new Date(`${values.scheduled_date}T12:00:00`).toISOString();
+        await createCall.mutateAsync({
+          sdr_id: defaultSdrId || '',
+          closer_id: values.closer_id,
+          funnel_id: values.funnel_id,
+          client_name: 'Call agendada',
+          client_phone: '',
+          scheduled_time: scheduledTime,
+        });
+        toast.success('Call agendada com sucesso!');
+      }
 
-      await createCall.mutateAsync({
-        sdr_id: values.sdr_id,
-        closer_id: values.closer_id,
-        funnel_id: values.funnel_id,
-        client_name: values.client_name,
-        client_phone: values.client_phone,
-        scheduled_time: scheduledTime,
-      });
-
-      toast.success('Call agendada com sucesso!');
       onOpenChange(false);
     } catch (error) {
       console.error('Error scheduling call:', error);

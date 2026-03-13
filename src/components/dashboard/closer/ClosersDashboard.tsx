@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { UserCheck, Plus, Filter } from 'lucide-react';
+import { UserCheck, Plus, Filter, Package } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
 import { CloserCard } from './CloserCard';
@@ -9,7 +9,7 @@ import { CloserDetailPage } from './CloserDetailPage';
 import { CloserFunnelKanban } from './CloserFunnelKanban';
 import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
 import { useSquadMetrics, useSquads, useMetrics } from '@/controllers/useCloserController';
-import { useFunnels } from '@/controllers/useFunnelController';
+import { useFunnels, useProducts } from '@/controllers/useFunnelController';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ export function ClosersDashboard() {
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
 
   useRealtimeMetrics();
 
@@ -32,9 +33,11 @@ export function ClosersDashboard() {
   const { squadMetrics, isLoading } = useSquadMetrics(periodStart, periodEnd);
   const { data: rawMetrics } = useMetrics(periodStart, periodEnd);
   const { data: allFunnels } = useFunnels();
+  const { data: allProducts } = useProducts();
 
   const { data: squads } = useSquads();
   const availableFunnels = allFunnels || [];
+  const availableProducts = allProducts || [];
 
   // Week filter
   const weekFilter = useMemo(() => {
@@ -45,7 +48,7 @@ export function ClosersDashboard() {
 
   // Filter raw metrics by week and funnel, then re-aggregate
   const filteredSquadMetrics = useMemo(() => {
-    if (!weekFilter && !selectedFunnel) return squadMetrics;
+    if (!weekFilter && !selectedFunnel && !selectedProduct) return squadMetrics;
     if (!rawMetrics || !squads) return squadMetrics;
 
     let filtered = rawMetrics;
@@ -63,13 +66,18 @@ export function ClosersDashboard() {
       filtered = filtered.filter(m => m.funnel_id === selectedFunnel);
     }
 
+    if (selectedProduct) {
+      filtered = filtered.filter(m => m.product_id === selectedProduct);
+    }
+
     const referenceDate = periodStart ? parseDateString(periodStart) : new Date();
     return aggregateSquadMetrics(squads, filtered, referenceDate);
-  }, [weekFilter, selectedFunnel, squadMetrics, rawMetrics, squads, periodStart]);
+  }, [weekFilter, selectedFunnel, selectedProduct, squadMetrics, rawMetrics, squads, periodStart]);
 
   const handleMonthChange = useCallback((month: Date) => {
     setSelectedMonth(month);
     setSelectedWeek(null);
+    setSelectedProduct(null);
   }, []);
 
   const handleCloserClick = useCallback((closerId: string) => {
@@ -131,10 +139,6 @@ export function ClosersDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setIsMetricsDialogOpen(true)} size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
-              <Plus className="h-3.5 w-3.5" />
-              Metrica
-            </Button>
             <MonthSelector
               selectedMonth={selectedMonth}
               onMonthChange={handleMonthChange}
@@ -161,11 +165,28 @@ export function ClosersDashboard() {
                 </SelectContent>
               </Select>
             )}
+            {availableProducts.length > 0 && (
+              <Select
+                value={selectedProduct || 'all'}
+                onValueChange={(v) => setSelectedProduct(v === 'all' ? null : v)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <Package size={16} className="mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Todos os Produtos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Produtos</SelectItem>
+                  {availableProducts.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 
         {/* Funnel Kanban */}
-        {!isLoading && !selectedFunnel && rawMetrics && allClosers.length > 0 && (
+        {!isLoading && !selectedFunnel && !selectedProduct && rawMetrics && allClosers.length > 0 && (
           <CloserFunnelKanban
             closers={allClosers}
             metrics={weekFilter ? rawMetrics.filter(m => {

@@ -28,7 +28,9 @@ export interface Metric {
   cancellation_entries?: number;
   funnel_id?: string | null;
   sdr_id?: string | null;
+  product_id?: string | null;
   funnel?: { id: string; name: string } | null;
+  product?: { id: string; name: string } | null;
   closer?: Closer;
 }
 
@@ -49,8 +51,10 @@ export interface CloserMetricRecord {
   cancellation_entries: number;
   funnel_id?: string | null;
   sdr_id?: string | null;
+  product_id?: string | null;
   funnel?: { id: string; name: string } | null;
   sdr?: { id: string; name: string; type: string } | null;
+  product?: { id: string; name: string } | null;
 }
 
 export interface CloserMetricTotals {
@@ -92,5 +96,6 @@ export interface CreateMetricPayload {
   cancellation_entries?: number;
   funnel_id?: string | null;
   sdr_id?: string | null;
+  product_id?: string | null;
   created_by?: string;
 }

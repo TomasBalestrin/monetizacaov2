@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as funnelRepo from '@/model/repositories/funnelRepository';
-import type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales } from '@/model/entities/funnel';
+import type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales, Product, ProductSummary } from '@/model/entities/funnel';
 
 export function useFunnels() {
   return useQuery({
@@ -162,5 +162,74 @@ export function useDeleteFunnelDailyData() {
   });
 }
 
+export function useFunnelDailyData(periodStart?: string, periodEnd?: string) {
+  return useQuery({
+    queryKey: ['funnel-daily-data', periodStart, periodEnd],
+    queryFn: () => funnelRepo.fetchFunnelDailyDataByPeriod(periodStart, periodEnd),
+  });
+}
+
+// Product hooks
+export function useProducts() {
+  return useQuery({
+    queryKey: ['products'],
+    queryFn: funnelRepo.fetchProducts,
+  });
+}
+
+export function useAllProductsAdmin() {
+  return useQuery({
+    queryKey: ['products-admin'],
+    queryFn: funnelRepo.fetchAllProductsIncludingInactive,
+  });
+}
+
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name }: { name: string }) => funnelRepo.createProduct(name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-admin'] });
+      toast.success('Produto criado com sucesso!');
+    },
+    onError: () => toast.error('Erro ao criar produto'),
+  });
+}
+
+export function useUpdateProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...updates }: { id: string; name?: string; is_active?: boolean }) =>
+      funnelRepo.updateProduct(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-admin'] });
+      toast.success('Produto atualizado!');
+    },
+    onError: () => toast.error('Erro ao atualizar produto'),
+  });
+}
+
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => funnelRepo.deleteProduct(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-admin'] });
+      toast.success('Produto removido!');
+    },
+    onError: () => toast.error('Erro ao remover produto. Verifique se não há dados vinculados.'),
+  });
+}
+
+export function useProductSummary(periodStart?: string, periodEnd?: string) {
+  return useQuery({
+    queryKey: ['product-summary', periodStart, periodEnd],
+    queryFn: () => funnelRepo.fetchProductSummary(periodStart, periodEnd),
+  });
+}
+
 // Re-export types
-export type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales } from '@/model/entities/funnel';
+export type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales, Product, ProductSummary } from '@/model/entities/funnel';

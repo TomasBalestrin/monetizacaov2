@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/dialog';
 import { SquadMetricsForm, type SquadMetricsFormValues } from './SquadMetricsForm';
 import { useCreateMetric, useUpdateMetric, useSquads, type CloserMetricRecord } from '@/controllers/useCloserController';
-import { useCreateFunnelDailyData } from '@/controllers/useFunnelController';
 
 interface SquadMetricsDialogProps {
   open: boolean;
@@ -20,9 +19,9 @@ interface SquadMetricsDialogProps {
   selectedMonth?: Date;
 }
 
-export function SquadMetricsDialog({ 
-  open, 
-  onOpenChange, 
+export function SquadMetricsDialog({
+  open,
+  onOpenChange,
   squadSlug,
   defaultCloserId,
   metric,
@@ -30,72 +29,88 @@ export function SquadMetricsDialog({
 }: SquadMetricsDialogProps) {
   const createMetric = useCreateMetric();
   const updateMetric = useUpdateMetric();
-  const createFunnelData = useCreateFunnelDailyData();
   const { data: squads } = useSquads();
-  
+
   const squad = squadSlug
     ? squads?.find(s => s.slug.toLowerCase() === squadSlug.toLowerCase())
     : squads?.[0];
   const isEditing = !!metric?.id;
 
   const handleSubmit = async (
-    values: SquadMetricsFormValues, 
+    values: SquadMetricsFormValues,
     period: { start: Date; end: Date }
   ) => {
-    const payload = {
-      closer_id: values.closer_id,
-      period_start: formatDateString(period.start),
-      period_end: formatDateString(period.end),
-      calls: values.calls,
-      sales: values.sales,
-      revenue: values.revenue,
-      entries: values.entries,
-      revenue_trend: values.revenue_trend ?? 0,
-      entries_trend: values.entries_trend ?? 0,
-      cancellations: values.cancellations ?? 0,
-      cancellation_value: values.cancellation_value ?? 0,
-      cancellation_entries: values.cancellation_entries ?? 0,
-      source: 'manual',
-      funnel_id: values.funnel_id || null,
-      sdr_id: values.sdr_id || null,
-    };
+    const periodStart = formatDateString(period.start);
+    const periodEnd = formatDateString(period.end);
 
     if (isEditing) {
-      await updateMetric.mutateAsync({ id: metric.id, ...payload });
-    } else {
-      await createMetric.mutateAsync(payload);
-    }
-
-    // Save per-funnel breakdown data to funnel_daily_data
-    if (values.funnel_breakdown && values.funnel_breakdown.length > 0) {
-      await createFunnelData.mutateAsync(
-        values.funnel_breakdown.map((fb) => ({
-          user_id: values.closer_id,
-          funnel_id: fb.funnel_id,
-          date: formatDateString(period.start),
-          calls_scheduled: fb.calls,
-          calls_done: fb.calls,
-          sales_count: fb.sales,
-          sales_value: 0,
-          leads_count: 0,
-          qualified_count: 0,
-          sdr_id: fb.sdr_id || null,
-        }))
-      );
-    } else if (values.funnel_id) {
-      // Fallback: save single funnel data if funnel_id is provided
-      await createFunnelData.mutateAsync([{
-        user_id: values.closer_id,
-        funnel_id: values.funnel_id,
-        date: formatDateString(period.start),
-        calls_scheduled: values.calls,
-        calls_done: values.calls,
-        sales_count: values.sales,
-        sales_value: values.revenue,
-        leads_count: values.leads_count ?? 0,
-        qualified_count: values.qualified_count ?? 0,
+      // Edição: atualizar registro existente
+      await updateMetric.mutateAsync({
+        id: metric.id,
+        closer_id: values.closer_id,
+        period_start: periodStart,
+        period_end: periodEnd,
+        calls: values.calls,
+        sales: values.sales ?? 0,
+        revenue: values.revenue,
+        entries: values.entries,
+        revenue_trend: values.revenue_trend ?? 0,
+        entries_trend: values.entries_trend ?? 0,
+        cancellations: values.cancellations ?? 0,
+        cancellation_value: values.cancellation_value ?? 0,
+        cancellation_entries: values.cancellation_entries ?? 0,
+        source: 'manual',
+        funnel_id: values.funnel_id || null,
         sdr_id: values.sdr_id || null,
-      }]);
+        product_id: values.product_id || null,
+      });
+    } else if (values.call_entries && values.call_entries.length > 0 && values.calls > 1) {
+      // Múltiplas calls: criar um registro por call
+      const cleanFunnelId = values.funnel_id || null;
+      const cleanSdrId = values.sdr_id || null;
+      const promises = values.call_entries.map((entry) => {
+        const cleanProductId = entry.product_id === 'none' ? null : (entry.product_id || null);
+        return createMetric.mutateAsync({
+          closer_id: values.closer_id,
+          period_start: periodStart,
+          period_end: periodEnd,
+          calls: 1,
+          sales: entry.had_sale ? 1 : 0,
+          revenue: entry.had_sale ? entry.revenue : 0,
+          entries: entry.had_sale ? entry.entries : 0,
+          revenue_trend: 0,
+          entries_trend: 0,
+          cancellations: 0,
+          cancellation_value: 0,
+          cancellation_entries: 0,
+          source: 'manual',
+          funnel_id: cleanFunnelId,
+          sdr_id: cleanSdrId,
+          product_id: entry.had_sale ? cleanProductId : null,
+        });
+      });
+      await Promise.all(promises);
+    } else {
+      // Call única
+      const cleanProductId = values.product_id === 'none' ? null : (values.product_id || null);
+      await createMetric.mutateAsync({
+        closer_id: values.closer_id,
+        period_start: periodStart,
+        period_end: periodEnd,
+        calls: values.calls,
+        sales: values.sales ?? 0,
+        revenue: values.revenue,
+        entries: values.entries,
+        revenue_trend: values.revenue_trend ?? 0,
+        entries_trend: values.entries_trend ?? 0,
+        cancellations: values.cancellations ?? 0,
+        cancellation_value: values.cancellation_value ?? 0,
+        cancellation_entries: values.cancellation_entries ?? 0,
+        source: 'manual',
+        funnel_id: values.funnel_id || null,
+        sdr_id: values.sdr_id || null,
+        product_id: cleanProductId,
+      });
     }
 
     onOpenChange(false);
@@ -133,7 +148,7 @@ export function SquadMetricsDialog({
             </div>
           </div>
         </DialogHeader>
-        
+
         <SquadMetricsForm
           squadId={squadSlug ? squad.id : undefined}
           defaultCloserId={defaultCloserId}

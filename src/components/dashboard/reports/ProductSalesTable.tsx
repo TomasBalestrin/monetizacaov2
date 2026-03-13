@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Filter, Users, Package } from 'lucide-react';
+import { Filter, Users, Phone, Package } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -24,118 +23,121 @@ interface ProductSalesTableProps {
   canEdit: boolean;
 }
 
+function formatCurrency(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+}
+
 export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, canEdit }: ProductSalesTableProps) {
+  const [selectedFunnel, setSelectedFunnel] = useState<string>('all');
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
   const queryClient = useQueryClient();
 
-  const products = useMemo(() => {
+  const funnelNames = useMemo(() => {
     if (!data) return [];
-    return [...new Set(data.map(d => d.funnel_name))].sort();
+    return [...new Set(data.map(d => d.funnel_name).filter(Boolean))].sort();
+  }, [data]);
+
+  const productNames = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.map(d => d.product_name).filter(n => n && n !== ''))].sort();
   }, [data]);
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    return selectedProduct === 'all' ? data : data.filter(d => d.funnel_name === selectedProduct);
-  }, [data, selectedProduct]);
+    let result = data;
+    if (selectedFunnel !== 'all') result = result.filter(d => d.funnel_name === selectedFunnel);
+    if (selectedProduct !== 'all') result = result.filter(d => d.product_name === selectedProduct);
+    return result;
+  }, [data, selectedFunnel, selectedProduct]);
 
-  const personTotals = useMemo(() => {
-    const map = new Map<string, { person_id: string; person_name: string; person_type: string; total_sales: number; total_revenue: number; total_leads: number; total_done: number; total_entries: number }>();
-    filtered.forEach(row => {
+  // Split by role
+  const sdrRows = useMemo(() => filtered.filter(r => r.person_type === 'sdr' || r.person_type === 'social_selling'), [filtered]);
+  const closerRows = useMemo(() => filtered.filter(r => r.person_type === 'closer'), [filtered]);
+
+  // Aggregate by person
+  const aggregateByPerson = (rows: PersonProductSales[]) => {
+    const map = new Map<string, { person_id: string; person_name: string; person_type: string; total_sales: number; total_revenue: number; total_leads: number; total_scheduled: number; total_done: number; total_entries: number }>();
+    rows.forEach(row => {
       const key = `${row.person_name}-${row.person_type}`;
-      const existing = map.get(key) || { person_id: row.person_id, person_name: row.person_name, person_type: row.person_type, total_sales: 0, total_revenue: 0, total_leads: 0, total_done: 0, total_entries: 0 };
+      const existing = map.get(key) || { person_id: row.person_id, person_name: row.person_name, person_type: row.person_type, total_sales: 0, total_revenue: 0, total_leads: 0, total_scheduled: 0, total_done: 0, total_entries: 0 };
       existing.total_sales += Number(row.total_sales);
       existing.total_revenue += Number(row.total_revenue);
       existing.total_leads += Number(row.total_leads);
+      existing.total_scheduled += Number(row.total_scheduled);
       existing.total_done += Number(row.total_done);
       existing.total_entries += Number(row.total_entries);
       map.set(key, existing);
     });
-    return [...map.values()].sort((a, b) => b.total_sales - a.total_sales);
-  }, [filtered]);
-
-  const grandTotal = useMemo(() => ({
-    sales: personTotals.reduce((s, p) => s + p.total_sales, 0),
-    revenue: personTotals.reduce((s, p) => s + p.total_revenue, 0),
-    leads: personTotals.reduce((s, p) => s + p.total_leads, 0),
-    done: personTotals.reduce((s, p) => s + p.total_done, 0),
-    entries: personTotals.reduce((s, p) => s + p.total_entries, 0),
-  }), [personTotals]);
-
-  const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-
-  const typeLabel = (t: string) => {
-    if (t === 'closer') return 'Closer';
-    if (t === 'sdr') return 'SDR';
-    if (t === 'social_selling') return 'Social Selling';
-    return t;
+    return [...map.values()];
   };
+
+  const isFiltered = selectedFunnel !== 'all' || selectedProduct !== 'all';
+
+  const sdrPersonTotals = useMemo(() =>
+    aggregateByPerson(sdrRows).sort((a, b) => b.total_scheduled - a.total_scheduled),
+    [sdrRows]
+  );
+
+  const closerPersonTotals = useMemo(() =>
+    aggregateByPerson(closerRows).sort((a, b) => b.total_sales - a.total_sales),
+    [closerRows]
+  );
+
+  const sdrGrandTotal = useMemo(() => ({
+    leads: sdrPersonTotals.reduce((s, p) => s + p.total_leads, 0),
+    scheduled: sdrPersonTotals.reduce((s, p) => s + p.total_scheduled, 0),
+    done: sdrPersonTotals.reduce((s, p) => s + p.total_done, 0),
+  }), [sdrPersonTotals]);
+
+  const closerGrandTotal = useMemo(() => ({
+    done: closerPersonTotals.reduce((s, p) => s + p.total_done, 0),
+    sales: closerPersonTotals.reduce((s, p) => s + p.total_sales, 0),
+    revenue: closerPersonTotals.reduce((s, p) => s + p.total_revenue, 0),
+    entries: closerPersonTotals.reduce((s, p) => s + p.total_entries, 0),
+  }), [closerPersonTotals]);
 
   const invalidateQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['sales-by-person-product'] });
     queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
   };
 
-  const handleSaveField = async (
-    row: PersonProductSales,
+  const handleCloserSave = async (
+    personId: string,
     field: 'sales' | 'entries' | 'revenue',
-    newValue: number
+    currentValue: number,
+    newValue: number,
+    funnelId?: string | null,
   ) => {
+    const delta = newValue - currentValue;
+    if (delta === 0) return;
     try {
-      const currentValue = field === 'sales' ? Number(row.total_sales) : field === 'revenue' ? Number(row.total_revenue) : Number(row.total_entries);
-      const delta = newValue - currentValue;
-      if (delta === 0) return;
-
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
 
-      if (row.person_type === 'closer') {
-        if (row.funnel_id && field === 'sales') {
-          const { error } = await supabase.from('funnel_daily_data').insert({
-            user_id: row.person_id,
-            funnel_id: row.funnel_id,
-            date: periodEnd,
-            sales_count: delta,
-            sales_value: 0,
-            created_by: userId,
-          });
-          if (error) throw error;
-        } else if (row.funnel_id && field === 'revenue') {
-          const { error } = await supabase.from('funnel_daily_data').insert({
-            user_id: row.person_id,
-            funnel_id: row.funnel_id,
-            date: periodEnd,
-            sales_value: delta,
-            created_by: userId,
-          });
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from('metrics').insert({
-            closer_id: row.person_id,
-            period_start: periodStart,
-            period_end: periodEnd,
-            source: 'manual' as const,
-            sales: field === 'sales' ? delta : 0,
-            calls: 0,
-            revenue: field === 'revenue' ? delta : 0,
-            entries: field === 'entries' ? delta : 0,
-            created_by: userId,
-          });
-          if (error) throw error;
-        }
+      if (funnelId && (field === 'sales' || field === 'revenue')) {
+        const insertData: Record<string, unknown> = {
+          user_id: personId,
+          funnel_id: funnelId,
+          date: periodEnd,
+          created_by: userId,
+        };
+        if (field === 'sales') insertData.sales_count = delta;
+        if (field === 'revenue') insertData.sales_value = delta;
+        const { error } = await supabase.from('funnel_daily_data').insert(insertData as any);
+        if (error) throw error;
       } else {
-        // SDR / Social Selling
-        if (field === 'sales') {
-          const { error } = await supabase.from('sdr_metrics').insert({
-            sdr_id: row.person_id,
-            date: periodEnd,
-            funnel: row.funnel_name,
-            sales: delta,
-            source: 'manual',
-            created_by: userId,
-          });
-          if (error) throw error;
-        }
+        const { error } = await supabase.from('metrics').insert({
+          closer_id: personId,
+          period_start: periodStart,
+          period_end: periodEnd,
+          source: 'manual' as const,
+          sales: field === 'sales' ? delta : 0,
+          calls: 0,
+          revenue: field === 'revenue' ? delta : 0,
+          entries: field === 'entries' ? delta : 0,
+          created_by: userId,
+        });
+        if (error) throw error;
       }
 
       invalidateQueries();
@@ -157,195 +159,181 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
     );
   }
 
-  const renderRow = (row: PersonProductSales, i: number) => (
-    <TableRow key={i}>
-      <TableCell className="font-medium">{row.person_name}</TableCell>
-      <TableCell>
-        <Badge variant="secondary" className="text-xs">{typeLabel(row.person_type)}</Badge>
-      </TableCell>
-      <TableCell className="text-right">{Number(row.total_leads)}</TableCell>
-      <TableCell className="text-right">{Number(row.total_done)}</TableCell>
-      <TableCell className="text-right">
-        <EditableCell
-          value={Number(row.total_sales)}
-          onSave={(v) => handleSaveField(row, 'sales', v)}
-          disabled={!canEdit}
-        />
-      </TableCell>
-      <TableCell className="text-right">
-        <EditableCell
-          value={Number(row.total_revenue)}
-          onSave={(v) => handleSaveField(row, 'revenue', v)}
-          disabled={!canEdit || row.person_type !== 'closer'}
-          isCurrency
-        />
-      </TableCell>
-      <TableCell className="text-right">
-        <EditableCell
-          value={Number(row.total_entries)}
-          onSave={(v) => handleSaveField(row, 'entries', v)}
-          disabled={!canEdit || row.person_type !== 'closer'}
-          isCurrency
-        />
-      </TableCell>
-      <TableCell className="text-right font-semibold">
-        {Number(row.total_done) > 0
-          ? ((Number(row.total_sales) / Number(row.total_done)) * 100).toFixed(1)
-          : '0.0'}%
-      </TableCell>
-    </TableRow>
-  );
-
-  const handleSaveAggField = async (
-    p: typeof personTotals[0],
-    field: 'sales' | 'entries' | 'revenue',
-    newValue: number
-  ) => {
-    const currentValue = field === 'sales' ? p.total_sales : field === 'revenue' ? p.total_revenue : p.total_entries;
-    const delta = newValue - currentValue;
-    if (delta === 0) return;
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
-
-      if (p.person_type === 'closer') {
-        const { error } = await supabase.from('metrics').insert({
-          closer_id: p.person_id,
-          period_start: periodStart,
-          period_end: periodEnd,
-          source: 'manual' as const,
-          sales: field === 'sales' ? delta : 0,
-          calls: 0,
-          revenue: field === 'revenue' ? delta : 0,
-          entries: field === 'entries' ? delta : 0,
-          created_by: userId,
-        });
-        if (error) throw error;
-      } else {
-        if (field === 'sales') {
-          const matchingRows = filtered.filter(r => r.person_id === p.person_id);
-          const funnelName = matchingRows.length > 0 ? matchingRows[0].funnel_name : '';
-          const { error } = await supabase.from('sdr_metrics').insert({
-            sdr_id: p.person_id,
-            date: periodEnd,
-            funnel: funnelName,
-            sales: delta,
-            source: 'manual',
-            created_by: userId,
-          });
-          if (error) throw error;
-        }
-      }
-
-      invalidateQueries();
-      toast.success('Valor atualizado!');
-    } catch (err) {
-      console.error(err);
-      toast.error('Erro ao salvar valor');
-    }
-  };
-
-  const renderAggRow = (p: typeof personTotals[0], i: number) => (
-    <TableRow key={i}>
-      <TableCell className="font-medium">{p.person_name}</TableCell>
-      <TableCell>
-        <Badge variant="secondary" className="text-xs">{typeLabel(p.person_type)}</Badge>
-      </TableCell>
-      <TableCell className="text-right">{p.total_leads}</TableCell>
-      <TableCell className="text-right">{p.total_done}</TableCell>
-      <TableCell className="text-right">
-        <EditableCell
-          value={p.total_sales}
-          onSave={(v) => handleSaveAggField(p, 'sales', v)}
-          disabled={!canEdit}
-        />
-      </TableCell>
-      <TableCell className="text-right">
-        <EditableCell
-          value={p.total_revenue}
-          onSave={(v) => handleSaveAggField(p, 'revenue', v)}
-          disabled={!canEdit || p.person_type !== 'closer'}
-          isCurrency
-        />
-      </TableCell>
-      <TableCell className="text-right">
-        <EditableCell
-          value={p.total_entries}
-          onSave={(v) => handleSaveAggField(p, 'entries', v)}
-          disabled={!canEdit || p.person_type !== 'closer'}
-          isCurrency
-        />
-      </TableCell>
-      <TableCell className="text-right font-semibold">
-        {p.total_done > 0 ? ((p.total_sales / p.total_done) * 100).toFixed(1) : '0.0'}%
-      </TableCell>
-    </TableRow>
-  );
-
-  const tableHeaders = (
-    <TableHeader>
-      <TableRow>
-        <TableHead>Nome</TableHead>
-        <TableHead>Tipo</TableHead>
-        <TableHead className="text-right">Leads</TableHead>
-        <TableHead className="text-right">Realizadas</TableHead>
-        <TableHead className="text-right">Vendas</TableHead>
-        <TableHead className="text-right">Faturamento</TableHead>
-        <TableHead className="text-right">Valor Entrada</TableHead>
-        <TableHead className="text-right">Conversão</TableHead>
-      </TableRow>
-    </TableHeader>
-  );
-
-  const totalRow = (
-    <TableRow className="bg-muted/50 font-semibold">
-      <TableCell>Total</TableCell>
-      <TableCell></TableCell>
-      <TableCell className="text-right">{grandTotal.leads}</TableCell>
-      <TableCell className="text-right">{grandTotal.done}</TableCell>
-      <TableCell className="text-right">{grandTotal.sales}</TableCell>
-      <TableCell className="text-right">{formatCurrency(grandTotal.revenue)}</TableCell>
-      <TableCell className="text-right">{formatCurrency(grandTotal.entries)}</TableCell>
-      <TableCell className="text-right">
-        {grandTotal.done > 0 ? ((grandTotal.sales / grandTotal.done) * 100).toFixed(1) : '0.0'}%
-      </TableCell>
-    </TableRow>
-  );
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Filters */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Users size={20} />
-          Vendas por Pessoa × Produto
+          Vendas por Pessoa
         </h2>
-        <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-          <SelectTrigger className="w-[220px]">
-            <Filter size={16} className="mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Todos os Produtos" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os Produtos</SelectItem>
-            {products.map(p => (
-              <SelectItem key={p} value={p}>{p}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={selectedFunnel} onValueChange={setSelectedFunnel}>
+            <SelectTrigger className="w-[200px]">
+              <Filter size={16} className="mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Todos os Funis" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Funis</SelectItem>
+              {funnelNames.map(f => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {productNames.length > 0 && (
+            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+              <SelectTrigger className="w-[200px]">
+                <Package size={16} className="mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Todos os Produtos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Produtos</SelectItem>
+                {productNames.map(p => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
-        <Table>
-          {tableHeaders}
-          <TableBody>
-            {selectedProduct !== 'all'
-              ? filtered.map((row, i) => renderRow(row, i))
-              : personTotals.map((p, i) => renderAggRow(p, i))
-            }
-            {(selectedProduct !== 'all' ? filtered.length > 1 : personTotals.length > 1) && totalRow}
-          </TableBody>
-        </Table>
-      </div>
+      {/* SDRs & Social Selling Table */}
+      {sdrPersonTotals.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Users size={16} />
+            SDRs & Social Selling
+          </h3>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">Agendados</TableHead>
+                  <TableHead className="text-right">Realizados</TableHead>
+                  <TableHead className="text-right">% Agend.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sdrPersonTotals.map((p, i) => {
+                  const scheduledRate = p.total_leads > 0 ? (p.total_scheduled / p.total_leads) * 100 : 0;
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {p.person_name}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                            p.person_type === 'social_selling'
+                              ? 'bg-violet-500/15 text-violet-500'
+                              : 'bg-blue-500/15 text-blue-500'
+                          }`}>
+                            {p.person_type === 'social_selling' ? 'SS' : 'SDR'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{p.total_leads}</TableCell>
+                      <TableCell className="text-right">{p.total_scheduled}</TableCell>
+                      <TableCell className="text-right">{p.total_done}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {scheduledRate.toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {sdrPersonTotals.length > 1 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right">{sdrGrandTotal.leads}</TableCell>
+                    <TableCell className="text-right">{sdrGrandTotal.scheduled}</TableCell>
+                    <TableCell className="text-right">{sdrGrandTotal.done}</TableCell>
+                    <TableCell className="text-right">
+                      {sdrGrandTotal.leads > 0
+                        ? ((sdrGrandTotal.scheduled / sdrGrandTotal.leads) * 100).toFixed(1)
+                        : '0.0'}%
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* Closers Table */}
+      {closerPersonTotals.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Phone size={16} />
+            Closers
+          </h3>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="text-right">Calls</TableHead>
+                  <TableHead className="text-right">Vendas</TableHead>
+                  <TableHead className="text-right">Faturamento</TableHead>
+                  <TableHead className="text-right">Entradas</TableHead>
+                  <TableHead className="text-right">% Conv.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {closerPersonTotals.map((p, i) => {
+                  const conversionRate = p.total_done > 0 ? (p.total_sales / p.total_done) * 100 : 0;
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{p.person_name}</TableCell>
+                      <TableCell className="text-right">{p.total_done}</TableCell>
+                      <TableCell className="text-right">
+                        <EditableCell
+                          value={p.total_sales}
+                          onSave={(v) => handleCloserSave(p.person_id, 'sales', p.total_sales, v)}
+                          disabled={!canEdit}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <EditableCell
+                          value={p.total_revenue}
+                          onSave={(v) => handleCloserSave(p.person_id, 'revenue', p.total_revenue, v)}
+                          disabled={!canEdit}
+                          isCurrency
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <EditableCell
+                          value={p.total_entries}
+                          onSave={(v) => handleCloserSave(p.person_id, 'entries', p.total_entries, v)}
+                          disabled={!canEdit}
+                          isCurrency
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {conversionRate.toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {closerPersonTotals.length > 1 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right">{closerGrandTotal.done}</TableCell>
+                    <TableCell className="text-right">{closerGrandTotal.sales}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(closerGrandTotal.revenue)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(closerGrandTotal.entries)}</TableCell>
+                    <TableCell className="text-right">
+                      {closerGrandTotal.done > 0
+                        ? ((closerGrandTotal.sales / closerGrandTotal.done) * 100).toFixed(1)
+                        : '0.0'}%
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

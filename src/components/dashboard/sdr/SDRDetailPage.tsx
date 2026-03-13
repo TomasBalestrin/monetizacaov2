@@ -87,35 +87,6 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
   };
 }
 
-// Aggregate metrics by date when viewing all funnels (sum values for same date)
-function aggregateMetricsByDate(metrics: SDRMetric[]): SDRMetric[] {
-  const byDate = new Map<string, SDRMetric>();
-  
-  for (const m of metrics) {
-    const existing = byDate.get(m.date);
-    if (existing) {
-      existing.activated += m.activated || 0;
-      existing.scheduled += m.scheduled || 0;
-      existing.scheduled_follow_up += m.scheduled_follow_up || 0;
-      existing.scheduled_same_day += m.scheduled_same_day || 0;
-      existing.attended += m.attended || 0;
-      existing.sales += m.sales || 0;
-    } else {
-      byDate.set(m.date, { ...m });
-    }
-  }
-  
-  // Recalculate rates
-  const aggregated = Array.from(byDate.values());
-  for (const m of aggregated) {
-    m.scheduled_rate = m.activated > 0 ? (m.scheduled / m.activated) * 100 : 0;
-    m.attendance_rate = m.scheduled_same_day > 0 ? (m.attended / m.scheduled_same_day) * 100 : 0;
-    m.conversion_rate = m.attended > 0 ? (m.sales / m.attended) * 100 : 0;
-    m.funnel = ''; // Clear funnel since it's aggregated
-  }
-  
-  return aggregated.sort((a, b) => a.date.localeCompare(b.date));
-}
 
 export function SDRDetailPage({
   sdrId,
@@ -170,24 +141,16 @@ export function SDRDetailPage({
 
   const sdr = sdrs?.find((s) => s.id === sdrId);
   
-  // Filter and/or aggregate metrics based on funnel selection
+  // Filter metrics based on funnel selection (no aggregation — table handles grouping)
   const displayMetrics = useMemo(() => {
     if (!rawMetrics) return [];
-    
+
     if (selectedFunnel) {
-      // Filter by selected funnel
       return rawMetrics.filter(m => m.funnel === selectedFunnel);
     }
-    
-    // If no funnel selected and SDR has multiple funnels, aggregate by date
-    // Exclude empty-funnel records (created by a previous bug) to avoid inflating totals
-    if (hasFunnels) {
-      const metricsWithFunnel = rawMetrics.filter(m => m.funnel !== '');
-      return aggregateMetricsByDate(metricsWithFunnel);
-    }
-    
+
     return rawMetrics;
-  }, [rawMetrics, selectedFunnel, funnels]);
+  }, [rawMetrics, selectedFunnel]);
   
   // Get week boundaries for filtering
   const weekFilter = useMemo(() => {
@@ -348,6 +311,15 @@ export function SDRDetailPage({
                 </>
               )}
             </div>
+            <Button
+              onClick={() => setShowMetricsDialog(true)}
+              size="sm"
+              variant="outline"
+              className="rounded-xl h-8 text-xs gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Metrica
+            </Button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -374,7 +346,7 @@ export function SDRDetailPage({
                 </Button>
               </div>
             )}
-            
+
             {/* Funnel selector - only show if SDR has multiple funnels */}
             {hasFunnels && !isLoadingFunnels && (
               <Select
@@ -394,7 +366,7 @@ export function SDRDetailPage({
                 </SelectContent>
               </Select>
             )}
-            
+
             <MonthSelector
               selectedMonth={selectedMonth}
               onMonthChange={handleMonthChange}
@@ -406,19 +378,10 @@ export function SDRDetailPage({
             />
 
             <Button
-              onClick={() => setShowMetricsDialog(true)}
-              size="sm"
-              variant="outline"
-              className="rounded-xl h-8 text-xs gap-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Metrica</span>
-            </Button>
-            <Button
               onClick={() => setShowScheduleCallDialog(true)}
               size="sm"
               variant="outline"
-              className="rounded-xl h-8 text-xs gap-1.5"
+              className="hidden rounded-xl h-8 text-xs gap-1.5"
             >
               <CalendarPlus className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Agendar Call</span>
@@ -568,6 +531,7 @@ export function SDRDetailPage({
         onOpenChange={setShowMetricsDialog}
         sdrType={sdr?.type || 'sdr'}
         defaultSdrId={sdrId}
+        defaultFunnel={selectedFunnel}
         lockSdr
       />
 

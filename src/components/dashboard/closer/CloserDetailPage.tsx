@@ -351,6 +351,15 @@ export function CloserDetailPage({
                 </>
               )}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsMetricsDialogOpen(true)}
+              className="rounded-xl h-8 text-xs gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Metrica
+            </Button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -377,16 +386,6 @@ export function CloserDetailPage({
                 </Button>
               </div>
             )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsMetricsDialogOpen(true)}
-              className="rounded-xl h-8 text-xs gap-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Metrica
-            </Button>
 
             {closerFunnels && closerFunnels.length > 0 && (
               <Button

@@ -48,12 +48,14 @@ export interface FunnelDailyData {
   sales_value: number;
   entries_value: number;
   sdr_id: string | null;
+  product_id: string | null;
   leads_count: number;
   qualified_count: number;
   created_at: string;
   created_by: string | null;
   funnel?: { id: string; name: string } | null;
   sdr?: { id: string; name: string; type: string } | null;
+  product?: { id: string; name: string } | null;
 }
 
 export interface PersonProductSales {
@@ -62,6 +64,8 @@ export interface PersonProductSales {
   person_type: string;
   funnel_id: string | null;
   funnel_name: string;
+  product_id: string | null;
+  product_name: string;
   total_sales: number;
   total_revenue: number;
   total_leads: number;
@@ -69,4 +73,20 @@ export interface PersonProductSales {
   total_scheduled: number;
   total_done: number;
   total_entries: number;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ProductSummary {
+  product_id: string;
+  product_name: string;
+  total_sales: number;
+  total_revenue: number;
+  total_entries: number;
+  total_calls: number;
 }

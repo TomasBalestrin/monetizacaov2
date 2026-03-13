@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useUserFunnels, useCreateFunnelDailyData, type Funnel } from '@/controllers/useFunnelController';
+import { useUserFunnels, useCreateFunnelDailyData, useProducts, type Funnel } from '@/controllers/useFunnelController';
 import { useSDRs } from '@/controllers/useSdrController';
 
 interface CloserFunnelFormProps {
@@ -45,6 +45,7 @@ interface FunnelEntry {
   sales_value: number;
   entries_value: number;
   sdr_id: string;
+  product_id: string;
   leads_count: number;
   qualified_count: number;
 }
@@ -53,6 +54,7 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
   const [date, setDate] = useState<Date>(new Date());
   const { data: funnels, isLoading: loadingFunnels } = useUserFunnels(closerId);
   const { data: sdrs } = useSDRs();
+  const { data: products } = useProducts();
   const createData = useCreateFunnelDailyData();
 
   const [entries, setEntries] = useState<FunnelEntry[]>([]);
@@ -70,6 +72,7 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
           sales_value: 0,
           entries_value: 0,
           sdr_id: '',
+          product_id: '',
           leads_count: 0,
           qualified_count: 0,
         }))
@@ -104,6 +107,7 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
         sales_value: e.sales_value,
         entries_value: e.entries_value,
         sdr_id: e.sdr_id || null,
+        product_id: e.product_id || null,
         leads_count: e.leads_count,
         qualified_count: e.qualified_count,
       }))
@@ -230,6 +234,29 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
                     />
                   </div>
                 </div>
+
+                {/* Produto - show when there are sales */}
+                {entry.sales_count > 0 && products && products.length > 0 && (
+                  <div>
+                    <Label className="text-xs">Produto</Label>
+                    <Select
+                      value={entry.product_id || 'none'}
+                      onValueChange={(v) => updateEntry(i, 'product_id', v === 'none' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* SDR de Origem - only show if there are sales */}
                 {entry.sales_count > 0 && sdrs && sdrs.length > 0 && (

@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales } from '@/model/entities/funnel';
+import type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales, Product, ProductSummary } from '@/model/entities/funnel';
 
 export async function fetchFunnels(): Promise<Funnel[]> {
   const { data, error } = await supabase
@@ -117,6 +117,7 @@ export async function createFunnelDailyData(records: {
   sales_value?: number;
   entries_value?: number;
   sdr_id?: string | null;
+  product_id?: string | null;
   leads_count?: number;
   qualified_count?: number;
 }[]): Promise<unknown[]> {
@@ -148,4 +149,79 @@ export async function deleteFunnelDailyData(id: string): Promise<void> {
     .delete()
     .eq('id', id);
   if (error) throw error;
+}
+
+export async function fetchFunnelDailyDataByPeriod(
+  periodStart?: string,
+  periodEnd?: string
+): Promise<FunnelDailyData[]> {
+  let query = supabase
+    .from('funnel_daily_data')
+    .select('*, funnel:funnels(id, name), sdr:sdrs(id, name, type), product:products(id, name)')
+    .order('date', { ascending: false });
+
+  if (periodStart) query = query.gte('date', periodStart);
+  if (periodEnd) query = query.lte('date', periodEnd);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as FunnelDailyData[];
+}
+
+// Product CRUD
+export async function fetchProducts(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true)
+    .order('name');
+  if (error) throw error;
+  return data as Product[];
+}
+
+export async function fetchAllProductsIncludingInactive(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data as Product[];
+}
+
+export async function createProduct(name: string): Promise<Product> {
+  const { data, error } = await supabase
+    .from('products')
+    .insert({ name, is_active: true })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Product;
+}
+
+export async function updateProduct(id: string, updates: { name?: string; is_active?: boolean }): Promise<Product> {
+  const { data, error } = await supabase
+    .from('products')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Product;
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchProductSummary(
+  periodStart?: string,
+  periodEnd?: string
+): Promise<ProductSummary[]> {
+  const { data, error } = await supabase.rpc('get_product_summary', {
+    p_period_start: periodStart || null,
+    p_period_end: periodEnd || null,
+  });
+  if (error) throw error;
+  return (data as unknown as ProductSummary[]) || [];
 }
