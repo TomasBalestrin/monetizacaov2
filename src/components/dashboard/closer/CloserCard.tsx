@@ -42,11 +42,10 @@ export function CloserCard({ closer, onClick }: CloserCardProps) {
     <button
       onClick={onClick}
       className={cn(
-        'w-full p-4 rounded-2xl border border-border/30 bg-card',
-        'hover:border-primary/20 transition-all duration-300',
+        'w-full p-4 rounded-xl border border-border bg-card shadow-sm',
+        'hover:border-primary/30 hover:shadow-md transition-all duration-300',
         'text-left group'
       )}
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
@@ -69,30 +68,35 @@ export function CloserCard({ closer, onClick }: CloserCardProps) {
       </div>
 
       {/* Main stats row */}
-      <div className="grid grid-cols-3 gap-3">
-        <div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="p-2 rounded-lg bg-muted/40">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Calls</p>
-          <p className="text-lg font-bold text-foreground">
+          <p className="text-lg font-bold text-foreground tabular-nums">
             {metrics.calls.toLocaleString('pt-BR')}
           </p>
         </div>
-        <div>
+        <div className="p-2 rounded-lg bg-primary/5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Vendas</p>
-          <p className="text-lg font-bold text-foreground">
+          <p className="text-lg font-bold text-primary tabular-nums">
             {metrics.sales.toLocaleString('pt-BR')}
           </p>
         </div>
-        <div>
+        <div className="p-2 rounded-lg bg-muted/40">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Conversão</p>
-          <p className="text-lg font-bold text-foreground">
+          <p className={cn(
+            'text-lg font-bold tabular-nums',
+            metrics.conversion >= 30 ? 'text-success' :
+            metrics.conversion >= 15 ? 'text-warning' :
+            'text-destructive'
+          )}>
             {metrics.conversion.toFixed(1)}%
           </p>
         </div>
       </div>
 
       {/* Financial row */}
-      <div className="mt-2 grid grid-cols-2 gap-3">
-        <div className="p-2 rounded-lg bg-muted/30">
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="p-2 rounded-lg bg-muted/40">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Faturamento</p>
           <p className="text-sm font-bold text-foreground flex items-center gap-1">
             {formatCurrency(metrics.revenue)}
@@ -105,7 +109,7 @@ export function CloserCard({ closer, onClick }: CloserCardProps) {
             )}
           </p>
         </div>
-        <div className="p-2 rounded-lg bg-muted/30">
+        <div className="p-2 rounded-lg bg-muted/40">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Entradas</p>
           <p className="text-sm font-bold text-foreground">
             {formatCurrency(metrics.entries)}
@@ -113,8 +117,8 @@ export function CloserCard({ closer, onClick }: CloserCardProps) {
         </div>
       </div>
 
-      {/* Conversion bar - scaled to 50% as a healthy benchmark */}
-      <div className="mt-3 pt-3 border-t border-border/20">
+      {/* Conversion bar */}
+      <div className="mt-3 pt-3 border-t border-border/30">
         <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
           <span>Taxa de Conversão</span>
           <span className={cn(
@@ -126,7 +130,7 @@ export function CloserCard({ closer, onClick }: CloserCardProps) {
             {metrics.conversion.toFixed(1)}%
           </span>
         </div>
-        <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
           <div
             className={cn('h-full rounded-full transition-all duration-500', getConversionColor(metrics.conversion))}
             style={{ width: `${Math.min((metrics.conversion / 50) * 100, 100)}%` }}

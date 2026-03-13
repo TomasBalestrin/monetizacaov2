@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { FileText, TrendingUp, Users, Phone, DollarSign, Target, Filter, Plus, Package } from 'lucide-react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useMemo } from 'react';
+import { FileText, TrendingUp, Users, Phone, DollarSign, Filter, Package } from 'lucide-react';
+import { startOfMonth } from 'date-fns';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { PeriodFilter } from '@/components/dashboard/PeriodFilter';
 import { useAllFunnelsSummary, useFunnelReport, useSalesByPersonAndProduct, useProductSummary, useProducts, type FunnelSummary } from '@/controllers/useFunnelController';
@@ -13,17 +12,10 @@ import { FunnelChart } from './FunnelChart';
 import { ProductSalesTable } from './ProductSalesTable';
 import { ProductSummaryView } from './ProductSummaryView';
 import { EditableCell } from './EditableCell';
-import { SDRMetricsDialog } from '@/components/dashboard/sdr/SDRMetricsDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Select,
@@ -42,8 +34,6 @@ export function ReportsPage() {
   const [customPeriodStart, setCustomPeriodStart] = useState<string | undefined>(undefined);
   const [customPeriodEnd, setCustomPeriodEnd] = useState<string | undefined>(undefined);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [sdrDialogOpen, setSdrDialogOpen] = useState(false);
-  const [sdrDialogType, setSdrDialogType] = useState<'sdr' | 'social_selling'>('sdr');
 
   const monthPeriod = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
 
@@ -141,24 +131,6 @@ export function ReportsPage() {
             <h1 className="text-2xl font-bold text-foreground">Relatórios por Funil</h1>
             <p className="text-muted-foreground">Visão consolidada de todos os funis</p>
           </div>
-          {canManage && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="rounded-xl h-8 text-xs gap-1.5">
-                  <Plus size={14} />
-                  Metrica
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => { setSdrDialogType('sdr'); setSdrDialogOpen(true); }}>
-                  Métrica SDR
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSdrDialogType('social_selling'); setSdrDialogOpen(true); }}>
-                  Métrica Social Selling
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <PeriodFilter
@@ -280,13 +252,6 @@ export function ReportsPage() {
         </TabsContent>
       </Tabs>
 
-      {canManage && (
-        <SDRMetricsDialog
-          open={sdrDialogOpen}
-          onOpenChange={setSdrDialogOpen}
-          sdrType={sdrDialogType}
-        />
-      )}
     </div>
   );
 }

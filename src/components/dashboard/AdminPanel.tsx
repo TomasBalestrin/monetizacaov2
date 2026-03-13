@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2, Target, Filter } from 'lucide-react';
+import { Trash2, Loader2, Plus, Settings, Database, Users, Link2, Edit2, Target, Filter, Activity } from 'lucide-react';
 import { useUsers, useAssignRole, useTogglePermission } from '@/controllers/useUserController';
 import { DeleteUserDialog } from './DeleteUserDialog';
 import { useAllEntityLinks, useClosersForLinking, useSDRsForLinking } from '@/controllers/useUserController';
@@ -14,6 +14,7 @@ import { EditUserLinksDialog } from './EditUserLinksDialog';
 import { GoalsConfig } from './GoalsConfig';
 import { FunnelManagerAdmin } from './FunnelManagerAdmin';
 import { ProductManagerAdmin } from './ProductManagerAdmin';
+import { ActivityLog } from './ActivityLog';
 
 const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'reports', 'admin'];
 
@@ -70,6 +71,10 @@ export function AdminPanel() {
           <TabsTrigger value="products" className="data-[state=active]:bg-background gap-2 px-4 py-2">
             <Settings className="h-4 w-4" />
             Produtos
+          </TabsTrigger>
+          <TabsTrigger value="log" className="data-[state=active]:bg-background gap-2 px-4 py-2">
+            <Activity className="h-4 w-4" />
+            Log
           </TabsTrigger>
         </TabsList>
 
@@ -219,6 +224,11 @@ export function AdminPanel() {
         {/* Products Tab */}
         <TabsContent value="products" className="space-y-6">
           <ProductManagerAdmin />
+        </TabsContent>
+
+        {/* Activity Log Tab */}
+        <TabsContent value="log" className="space-y-6">
+          <ActivityLog />
         </TabsContent>
       </Tabs>
 
