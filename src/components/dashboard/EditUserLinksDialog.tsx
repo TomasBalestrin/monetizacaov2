@@ -91,7 +91,7 @@
    const getEntityTypeLabel = (link: UserEntityLink) => {
      if (link.entity_type === 'closer') return 'Closer';
      const sdr = sdrs?.find(s => s.id === link.entity_id);
-     return sdr?.type === 'sdr' ? 'SDR' : 'Social Selling';
+     return sdr?.type === 'sdr' ? 'SDR' : sdr?.type === 'funil_intensivo' ? 'Funil Intensivo' : 'Social Selling';
    };
  
    const availableEntities = newLinkType === 'closer' 

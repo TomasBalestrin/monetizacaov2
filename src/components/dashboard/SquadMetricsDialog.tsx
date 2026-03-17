@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { SquadMetricsForm, type SquadMetricsFormValues } from './SquadMetricsForm';
 import { useCreateMetric, useUpdateMetric, useSquads, type CloserMetricRecord } from '@/controllers/useCloserController';
+import { useFunnels } from '@/controllers/useFunnelController';
+import { incrementSdrSales } from '@/model/repositories/sdrRepository';
 
 interface SquadMetricsDialogProps {
   open: boolean;
@@ -30,6 +32,7 @@ export function SquadMetricsDialog({
   const createMetric = useCreateMetric();
   const updateMetric = useUpdateMetric();
   const { data: squads } = useSquads();
+  const { data: funnels } = useFunnels();
 
   const squad = squadSlug
     ? squads?.find(s => s.slug.toLowerCase() === squadSlug.toLowerCase())
@@ -42,6 +45,10 @@ export function SquadMetricsDialog({
   ) => {
     const periodStart = formatDateString(period.start);
     const periodEnd = formatDateString(period.end);
+
+    let totalSalesForSDR = 0;
+    let totalRevenueForSDR = 0;
+    let totalEntriesForSDR = 0;
 
     if (isEditing) {
       // Edição: atualizar registro existente
@@ -64,6 +71,7 @@ export function SquadMetricsDialog({
         sdr_id: values.sdr_id || null,
         product_id: values.product_id || null,
       });
+      // Skip SDR increment on edit to avoid double-counting
     } else if (values.call_entries && values.call_entries.length > 0 && values.calls > 1) {
       // Múltiplas calls: criar um registro por call
       const cleanFunnelId = values.funnel_id || null;
@@ -90,6 +98,9 @@ export function SquadMetricsDialog({
         });
       });
       await Promise.all(promises);
+      totalSalesForSDR = values.call_entries.filter(e => e.had_sale).length;
+      totalRevenueForSDR = values.call_entries.reduce((s, e) => s + (e.had_sale ? (e.revenue || 0) : 0), 0);
+      totalEntriesForSDR = values.call_entries.reduce((s, e) => s + (e.had_sale ? (e.entries || 0) : 0), 0);
     } else {
       // Call única
       const cleanProductId = values.product_id === 'none' ? null : (values.product_id || null);
@@ -111,6 +122,24 @@ export function SquadMetricsDialog({
         sdr_id: values.sdr_id || null,
         product_id: cleanProductId,
       });
+      totalSalesForSDR = values.sales ?? 0;
+      totalRevenueForSDR = values.revenue || 0;
+      totalEntriesForSDR = values.entries || 0;
+    }
+
+    // Increment SDR sales, revenue and entries
+    const cleanSdrId = values.sdr_id || null;
+    if (cleanSdrId && !isEditing && (totalSalesForSDR > 0 || totalRevenueForSDR > 0 || totalEntriesForSDR > 0)) {
+      try {
+        const funnelName = values.funnel_id
+          ? funnels?.find(f => f.id === values.funnel_id)?.name || ''
+          : '';
+        if (funnelName) {
+          await incrementSdrSales(cleanSdrId, periodStart, funnelName, totalSalesForSDR, totalRevenueForSDR, totalEntriesForSDR);
+        }
+      } catch (err) {
+        console.error('Error incrementing SDR sales:', err);
+      }
     }
 
     onOpenChange(false);

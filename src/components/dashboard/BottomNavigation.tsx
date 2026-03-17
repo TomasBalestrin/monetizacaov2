@@ -13,6 +13,7 @@ const navItems = [
   { id: 'closers' as ModuleId, label: 'Closers', icon: UserCheck },
   { id: 'sdrs' as ModuleId, label: 'SDRs', icon: Phone },
   { id: 'social_selling' as ModuleId, label: 'Social', icon: Share2 },
+  { id: 'funil_intensivo' as ModuleId, label: 'Funil Int.', icon: Phone },
   { id: 'admin' as ModuleId, label: 'Admin', icon: User },
 ];
 

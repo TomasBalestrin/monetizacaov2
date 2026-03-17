@@ -1,7 +1,7 @@
 export interface SDR {
   id: string;
   name: string;
-  type: 'sdr' | 'social_selling';
+  type: 'sdr' | 'social_selling' | 'funil_intensivo';
   created_at: string;
   updated_at: string;
 }
@@ -19,10 +19,19 @@ export interface SDRMetric {
   attended: number;
   attendance_rate: number;
   sales: number;
+  revenue: number;
+  entries: number; // valor de entrada (R$)
   conversion_rate: number;
   source: string | null;
   created_at: string;
   updated_at: string;
+  // Funil Intensivo specific fields
+  fi_called?: number;
+  fi_awaiting?: number;
+  fi_received_link?: number;
+  fi_got_ticket?: number;
+  fi_attended?: number;
+  fi_attendance_rate?: number;
 }
 
 export interface SDRAggregatedMetrics {
@@ -34,11 +43,25 @@ export interface SDRAggregatedMetrics {
   totalAttended: number;
   avgAttendanceRate: number;
   totalSales: number;
+  totalRevenue: number;
+  totalEntries: number;
   avgConversionRate: number;
+  // Funil Intensivo aggregated fields
+  totalFiCalled?: number;
+  totalFiAwaiting?: number;
+  totalFiReceivedLink?: number;
+  totalFiGotTicket?: number;
+  totalFiAttended?: number;
+  avgFiAttendanceRate?: number;
 }
 
 export interface SDRWithMetrics extends SDR {
   metrics: SDRAggregatedMetrics;
+}
+
+export interface SDRFunnelWithDate {
+  funnel_name: string;
+  event_date: string | null;
 }
 
 export interface CreateSDRMetricPayload {
@@ -52,4 +75,10 @@ export interface CreateSDRMetricPayload {
   attended: number;
   sales: number;
   source: string;
+  // Funil Intensivo fields
+  fi_called?: number;
+  fi_awaiting?: number;
+  fi_received_link?: number;
+  fi_got_ticket?: number;
+  fi_attended?: number;
 }

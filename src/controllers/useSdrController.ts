@@ -4,7 +4,7 @@ import * as sdrRepo from '@/model/repositories/sdrRepository';
 import { calculateSDRRates, calculatePartialSDRRates, groupMetricsBySDR, calculateAggregatedMetrics } from '@/model/services/sdrService';
 import type { SDR, SDRMetric, SDRAggregatedMetrics, SDRWithMetrics } from '@/model/entities/sdr';
 
-export function useSDRs(type?: 'sdr' | 'social_selling') {
+export function useSDRs(type?: 'sdr' | 'social_selling' | 'funil_intensivo') {
   return useQuery({
     queryKey: ['sdrs', type],
     queryFn: () => sdrRepo.fetchSDRs(type),
@@ -39,15 +39,27 @@ export function useSDRFunnels(sdrId?: string) {
   });
 }
 
+export function useSDRFunnelsWithDates(sdrId?: string) {
+  return useQuery({
+    queryKey: ['sdr-funnels-dates', sdrId],
+    queryFn: async () => {
+      if (!sdrId) return [];
+      return sdrRepo.fetchSDRFunnelsWithDates(sdrId);
+    },
+    enabled: !!sdrId,
+  });
+}
+
 export function useAddSDRFunnel() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ sdrId, funnelName }: { sdrId: string; funnelName: string }) => {
-      return sdrRepo.addSDRFunnel(sdrId, funnelName);
+    mutationFn: async ({ sdrId, funnelName, eventDate }: { sdrId: string; funnelName: string; eventDate?: string }) => {
+      return sdrRepo.addSDRFunnel(sdrId, funnelName, eventDate);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['sdr-funnels', variables.sdrId] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-funnels-dates', variables.sdrId] });
       toast.success('Funil adicionado!');
     },
     onError: (error: any) => {
@@ -69,6 +81,7 @@ export function useDeleteSDRFunnel() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['sdr-funnels', variables.sdrId] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-funnels-dates', variables.sdrId] });
       toast.success('Funil removido!');
     },
     onError: () => {
@@ -78,7 +91,7 @@ export function useDeleteSDRFunnel() {
 }
 
 export function useSDRTotalMetrics(
-  type: 'sdr' | 'social_selling',
+  type: 'sdr' | 'social_selling' | 'funil_intensivo',
   periodStart?: string,
   periodEnd?: string
 ) {
@@ -89,7 +102,7 @@ export function useSDRTotalMetrics(
 }
 
 export function useSDRsWithMetrics(
-  type: 'sdr' | 'social_selling',
+  type: 'sdr' | 'social_selling' | 'funil_intensivo',
   periodStart?: string,
   periodEnd?: string
 ) {
@@ -104,7 +117,7 @@ export function useSDRsWithMetrics(
 }
 
 export function useSDRsWithMetricsRaw(
-  type: 'sdr' | 'social_selling',
+  type: 'sdr' | 'social_selling' | 'funil_intensivo',
   periodStart?: string,
   periodEnd?: string
 ) {
@@ -133,6 +146,12 @@ export function useCreateSDRMetric() {
       attended: number;
       sales: number;
       source: string;
+      fi_called?: number;
+      fi_awaiting?: number;
+      fi_received_link?: number;
+      fi_got_ticket?: number;
+      fi_attended?: number;
+      fi_attendance_rate?: number;
     }) => {
       const { data: { user } } = await (await import('@/integrations/supabase/client')).supabase.auth.getUser();
       const rates = calculateSDRRates(metric);
@@ -170,6 +189,12 @@ export function useUpdateSDRMetric() {
       scheduled_same_day?: number;
       attended?: number;
       sales?: number;
+      fi_called?: number;
+      fi_awaiting?: number;
+      fi_received_link?: number;
+      fi_got_ticket?: number;
+      fi_attended?: number;
+      fi_attendance_rate?: number;
     }) => {
       const calculatedRates = calculatePartialSDRRates(updates);
 
@@ -217,5 +242,5 @@ export function useDeleteSDRMetric() {
 }
 
 // Re-export types and service
-export type { SDR, SDRMetric, SDRAggregatedMetrics, SDRWithMetrics } from '@/model/entities/sdr';
+export type { SDR, SDRMetric, SDRAggregatedMetrics, SDRWithMetrics, SDRFunnelWithDate } from '@/model/entities/sdr';
 export { calculateAggregatedMetrics } from '@/model/services/sdrService';

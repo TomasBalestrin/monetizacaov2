@@ -9,6 +9,7 @@ interface SDRMetricCardProps {
   value: number;
   icon?: LucideIcon;
   isPercentage?: boolean;
+  isCurrency?: boolean;
   showProgress?: boolean;
   variant?: 'default' | 'highlight' | 'success' | 'warning';
   size?: 'default' | 'large' | 'featured';
@@ -23,6 +24,7 @@ export function SDRMetricCard({
   value,
   icon: Icon,
   isPercentage = false,
+  isCurrency = false,
   showProgress = false,
   variant = 'default',
   size = 'default',
@@ -33,6 +35,8 @@ export function SDRMetricCard({
 }: SDRMetricCardProps) {
   const displayValue = isPercentage
     ? `${value.toFixed(1)}%`
+    : isCurrency
+    ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     : value.toLocaleString('pt-BR');
 
   const TrendIcon = trend && trend > 0 ? TrendingUp : trend && trend < 0 ? TrendingDown : Minus;

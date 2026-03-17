@@ -14,7 +14,15 @@ export function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedM
       totalAttended: 0,
       avgAttendanceRate: 0,
       totalSales: 0,
+      totalRevenue: 0,
+      totalEntries: 0,
       avgConversionRate: 0,
+      totalFiCalled: 0,
+      totalFiAwaiting: 0,
+      totalFiReceivedLink: 0,
+      totalFiGotTicket: 0,
+      totalFiAttended: 0,
+      avgFiAttendanceRate: 0,
     };
   }
 
@@ -24,10 +32,20 @@ export function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedM
   const totalScheduledSameDay = metrics.reduce((sum, m) => sum + (m.scheduled_same_day || 0), 0);
   const totalAttended = metrics.reduce((sum, m) => sum + (m.attended || 0), 0);
   const totalSales = metrics.reduce((sum, m) => sum + (m.sales || 0), 0);
+  const totalRevenue = metrics.reduce((sum, m) => sum + (Number(m.revenue) || 0), 0);
+  const totalEntries = metrics.reduce((sum, m) => sum + (Number(m.entries) || 0), 0);
 
   const avgScheduledRate = totalActivated > 0 ? (totalScheduled / totalActivated) * 100 : 0;
   const avgAttendanceRate = totalScheduledSameDay > 0 ? (totalAttended / totalScheduledSameDay) * 100 : 0;
   const avgConversionRate = totalAttended > 0 ? (totalSales / totalAttended) * 100 : 0;
+
+  // Funil Intensivo aggregation
+  const totalFiCalled = metrics.reduce((sum, m) => sum + (m.fi_called || 0), 0);
+  const totalFiAwaiting = metrics.reduce((sum, m) => sum + (m.fi_awaiting || 0), 0);
+  const totalFiReceivedLink = metrics.reduce((sum, m) => sum + (m.fi_received_link || 0), 0);
+  const totalFiGotTicket = metrics.reduce((sum, m) => sum + (m.fi_got_ticket || 0), 0);
+  const totalFiAttended = metrics.reduce((sum, m) => sum + (m.fi_attended || 0), 0);
+  const avgFiAttendanceRate = totalFiGotTicket > 0 ? (totalFiAttended / totalFiGotTicket) * 100 : 0;
 
   return {
     totalActivated,
@@ -38,7 +56,15 @@ export function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedM
     totalAttended,
     avgAttendanceRate,
     totalSales,
+    totalRevenue,
+    totalEntries,
     avgConversionRate,
+    totalFiCalled,
+    totalFiAwaiting,
+    totalFiReceivedLink,
+    totalFiGotTicket,
+    totalFiAttended,
+    avgFiAttendanceRate,
   };
 }
 
@@ -74,6 +100,20 @@ export function calculateSDRRates(metric: {
       : 0,
     conversion_rate: metric.attended > 0
       ? (metric.sales / metric.attended) * 100
+      : 0,
+  };
+}
+
+/**
+ * Calcula a taxa de comparecimento do Funil Intensivo
+ */
+export function calculateFIRates(metric: {
+  fi_got_ticket?: number;
+  fi_attended?: number;
+}) {
+  return {
+    fi_attendance_rate: (metric.fi_got_ticket || 0) > 0
+      ? ((metric.fi_attended || 0) / metric.fi_got_ticket!) * 100
       : 0,
   };
 }

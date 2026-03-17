@@ -37,7 +37,7 @@ const Index = () => {
   // Handle URL module parameter
   useEffect(() => {
     const moduleParam = searchParams.get('module');
-    if (moduleParam && ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'social_selling', 'reports', 'admin', 'goals', 'meetings'].includes(moduleParam)) {
+    if (moduleParam && ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'social_selling', 'funil_intensivo', 'reports', 'admin', 'goals', 'meetings'].includes(moduleParam)) {
       setActiveModule(moduleParam as ModuleId);
     }
   }, [searchParams]);
@@ -94,6 +94,8 @@ const Index = () => {
         return <SDRDashboard sdrType="sdr" />;
       case 'social_selling':
         return <SDRDashboard sdrType="social_selling" />;
+      case 'funil_intensivo':
+        return <SDRDashboard sdrType="funil_intensivo" />;
       case 'reports':
         return <ReportsPage />;
       default:

@@ -98,7 +98,7 @@ export function GoalsConfig() {
       // Filter by manager's squad permissions
       return allClosers.filter(c => managerSquadSlugs?.includes(c.squadSlug || ''));
     }
-    return (sdrs || []).map(s => ({ id: s.id, name: s.name, extra: s.type === 'sdr' ? 'SDR' : 'Social', squadSlug: undefined }));
+    return (sdrs || []).map(s => ({ id: s.id, name: s.name, extra: s.type === 'sdr' ? 'SDR' : s.type === 'funil_intensivo' ? 'Funil Int.' : 'Social', squadSlug: undefined }));
   }, [entityType, closers, sdrs, isAdmin, managerSquadSlugs]);
 
   const metricKeys = entityType === 'closer' ? CLOSER_METRIC_KEYS : SDR_METRIC_KEYS;

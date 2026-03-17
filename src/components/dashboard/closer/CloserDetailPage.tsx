@@ -26,6 +26,7 @@ import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
 import { CloserFunnelForm } from './CloserFunnelForm';
 import { ActiveCallBanner } from './ActiveCallBanner';
 import { useClosers, useCloserMetrics, useCloserMetricsByFunnel, useDeleteMetric, type CloserMetricRecord } from '@/controllers/useCloserController';
+import { decrementSdrSales } from '@/model/repositories/sdrRepository';
 import { useCloserFunnelData, useUserFunnels, useFunnels, type FunnelDailyData } from '@/controllers/useFunnelController';
 import { calculateTrendDetailed } from '@/model/services/trendService';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -294,10 +295,27 @@ export function CloserDetailPage({
 
   const confirmDelete = useCallback(async () => {
     if (deletingMetricId) {
+      // Find the metric to decrement SDR sales/revenue/entries before deleting
+      const metricToDelete = metrics?.find(m => m.id === deletingMetricId);
+      if (metricToDelete?.sdr_id && (metricToDelete.sales > 0 || metricToDelete.revenue > 0 || metricToDelete.entries > 0)) {
+        const funnelName = metricToDelete.funnel?.name || '';
+        try {
+          await decrementSdrSales(
+            metricToDelete.sdr_id,
+            metricToDelete.period_start,
+            funnelName,
+            metricToDelete.sales || 0,
+            Number(metricToDelete.revenue) || 0,
+            Number(metricToDelete.entries) || 0
+          );
+        } catch (err) {
+          console.error('Error decrementing SDR sales:', err);
+        }
+      }
       await deleteMetric.mutateAsync(deletingMetricId);
       setDeletingMetricId(null);
     }
-  }, [deletingMetricId, deleteMetric]);
+  }, [deletingMetricId, deleteMetric, metrics]);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>

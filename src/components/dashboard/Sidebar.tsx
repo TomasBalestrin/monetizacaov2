@@ -21,7 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useClosers } from '@/controllers/useCloserController';
 import { useSDRs } from '@/controllers/useSdrController';
 
-export type ModuleId = 'dashboard' | 'closers' | 'eagles' | 'sharks' | 'sdrs' | 'social_selling' | 'reports' | 'admin' | 'goals' | 'meetings';
+export type ModuleId = 'dashboard' | 'closers' | 'eagles' | 'sharks' | 'sdrs' | 'social_selling' | 'funil_intensivo' | 'reports' | 'admin' | 'goals' | 'meetings';
 
 interface MenuItem {
   id: ModuleId;
@@ -42,6 +42,7 @@ const mainItems: MenuItem[] = [
   { id: 'closers', label: 'Closers', icon: UserCheck, permission: 'closers', expandable: true },
   { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs', expandable: true },
   { id: 'social_selling', label: 'Social Selling', icon: Users, permission: 'sdrs', expandable: true },
+  { id: 'funil_intensivo', label: 'Funil Intensivo', icon: Phone, permission: 'sdrs', expandable: true },
   { id: 'meetings', label: 'Reuniões', icon: CalendarDays, permission: 'meetings' },
   { id: 'goals', label: 'Metas', icon: Target, permission: 'goals' },
   { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'reports' },
@@ -66,6 +67,7 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
   const { data: closers } = useClosers();
   const { data: sdrs } = useSDRs('sdr');
   const { data: socialSellers } = useSDRs('social_selling');
+  const { data: funilIntensivo } = useSDRs('funil_intensivo');
 
   const handleLogout = async () => {
     await signOut();
@@ -83,6 +85,8 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
         return sdrs?.map((s) => ({ id: s.id, name: s.name })) || [];
       case 'social_selling':
         return socialSellers?.map((s) => ({ id: s.id, name: s.name })) || [];
+      case 'funil_intensivo':
+        return funilIntensivo?.map((s) => ({ id: s.id, name: s.name })) || [];
       default:
         return [];
     }
@@ -166,7 +170,7 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
                   key={profile.id}
                   onClick={() => {
                     const paramKey = item.id === 'closers' ? 'closer' : 'sdr';
-                    const moduleName = item.id === 'social_selling' ? 'social_selling' : item.id;
+                    const moduleName = item.id;
                     setSearchParams({ module: moduleName, [paramKey]: profile.id });
                     onModuleChange(item.id);
                     if (window.innerWidth < 768) onClose();

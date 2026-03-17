@@ -40,6 +40,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMetrics, useDeleteMetric, useSquads, Metric } from '@/controllers/useCloserController';
+import { decrementSdrSales } from '@/model/repositories/sdrRepository';
 import { MetricsDialog } from './MetricsDialog';
 
 export function MetricsTable() {
@@ -65,6 +66,23 @@ export function MetricsTable() {
 
   const handleDelete = async () => {
     if (deletingMetricId) {
+      // Decrement SDR sales/revenue/entries before deleting
+      const metricToDelete = metrics?.find(m => m.id === deletingMetricId);
+      if (metricToDelete?.sdr_id && (metricToDelete.sales > 0 || metricToDelete.revenue > 0 || metricToDelete.entries > 0)) {
+        const funnelName = metricToDelete.funnel?.name || '';
+        try {
+          await decrementSdrSales(
+            metricToDelete.sdr_id,
+            metricToDelete.period_start,
+            funnelName,
+            metricToDelete.sales || 0,
+            Number(metricToDelete.revenue) || 0,
+            Number(metricToDelete.entries) || 0
+          );
+        } catch (err) {
+          console.error('Error decrementing SDR sales:', err);
+        }
+      }
       await deleteMetric.mutateAsync(deletingMetricId);
       setDeletingMetricId(null);
     }

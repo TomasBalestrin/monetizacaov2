@@ -15,7 +15,7 @@ import { formatDateString } from '@/lib/utils';
 interface SDRMetricsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sdrType: 'sdr' | 'social_selling';
+  sdrType: 'sdr' | 'social_selling' | 'funil_intensivo';
   defaultSdrId?: string;
   defaultFunnel?: string | null;
   editingMetric?: SDRMetric | null;
@@ -38,6 +38,12 @@ export function SDRMetricsDialog({
 
   const handleSubmit = async (values: SDRMetricsFormValues) => {
     try {
+      const isFI = sdrType === 'funil_intensivo';
+      // Calculate FI attendance rate
+      const fiAttendanceRate = isFI && (values.fi_got_ticket || 0) > 0
+        ? ((values.fi_attended || 0) / (values.fi_got_ticket || 1)) * 100
+        : 0;
+
       if (isEditing && editingMetric) {
         // Update existing metric
         await updateMetric.mutateAsync({
@@ -50,6 +56,14 @@ export function SDRMetricsDialog({
           scheduled_same_day: values.scheduled_same_day,
           attended: values.attended,
           sales: values.sales,
+          ...(isFI && {
+            fi_called: values.fi_called || 0,
+            fi_awaiting: values.fi_awaiting || 0,
+            fi_received_link: values.fi_received_link || 0,
+            fi_got_ticket: values.fi_got_ticket || 0,
+            fi_attended: values.fi_attended || 0,
+            fi_attendance_rate: fiAttendanceRate,
+          }),
         });
         toast.success('Métrica atualizada com sucesso!');
       } else {
@@ -65,6 +79,14 @@ export function SDRMetricsDialog({
           attended: values.attended,
           sales: values.sales,
           source: 'manual',
+          ...(isFI && {
+            fi_called: values.fi_called || 0,
+            fi_awaiting: values.fi_awaiting || 0,
+            fi_received_link: values.fi_received_link || 0,
+            fi_got_ticket: values.fi_got_ticket || 0,
+            fi_attended: values.fi_attended || 0,
+            fi_attendance_rate: fiAttendanceRate,
+          }),
         });
         toast.success('Métrica adicionada com sucesso!');
       }
@@ -92,7 +114,7 @@ export function SDRMetricsDialog({
             </div>
             <div>
               <DialogTitle className="text-lg font-semibold">
-                {isEditing ? 'Editar' : 'Nova'} Métrica {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}
+                {isEditing ? 'Editar' : 'Nova'} Métrica {sdrType === 'sdr' ? 'SDR' : sdrType === 'funil_intensivo' ? 'Funil Intensivo' : 'Social Selling'}
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
                 {isEditing ? 'Modifique os dados da métrica' : 'Insira os dados de desempenho manualmente'}

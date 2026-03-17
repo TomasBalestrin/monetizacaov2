@@ -11,7 +11,7 @@ interface SDRFunnelKanbanProps {
 interface FunnelSDRData {
   sdrId: string;
   sdrName: string;
-  sdrType: 'sdr' | 'social_selling';
+  sdrType: 'sdr' | 'social_selling' | 'funil_intensivo';
   activated: number;
   scheduled: number;
   scheduledRate: number;
@@ -19,6 +19,13 @@ interface FunnelSDRData {
   attendanceRate: number;
   sales: number;
   conversionRate: number;
+  // FI fields
+  fiCalled: number;
+  fiAwaiting: number;
+  fiReceivedLink: number;
+  fiGotTicket: number;
+  fiAttended: number;
+  fiAttendanceRate: number;
 }
 
 interface FunnelColumn {
@@ -27,6 +34,8 @@ interface FunnelColumn {
   totalScheduled: number;
   totalAttended: number;
   totalSales: number;
+  totalFiCalled: number;
+  totalFiAttended: number;
   sdrs: FunnelSDRData[];
 }
 
@@ -63,6 +72,8 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
       let totalScheduled = 0;
       let totalAttended = 0;
       let totalSales = 0;
+      let totalFiCalled = 0;
+      let totalFiAttended = 0;
 
       for (const [sdrId, sdrMetrics] of sdrMap) {
         const sdr = sdrLookup.get(sdrId);
@@ -74,10 +85,18 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
         const attended = sdrMetrics.reduce((s, m) => s + (m.attended || 0), 0);
         const sales = sdrMetrics.reduce((s, m) => s + (m.sales || 0), 0);
 
+        const fiCalled = sdrMetrics.reduce((s, m) => s + (m.fi_called || 0), 0);
+        const fiAwaiting = sdrMetrics.reduce((s, m) => s + (m.fi_awaiting || 0), 0);
+        const fiReceivedLink = sdrMetrics.reduce((s, m) => s + (m.fi_received_link || 0), 0);
+        const fiGotTicket = sdrMetrics.reduce((s, m) => s + (m.fi_got_ticket || 0), 0);
+        const fiAttended = sdrMetrics.reduce((s, m) => s + (m.fi_attended || 0), 0);
+
         totalActivated += activated;
         totalScheduled += scheduled;
         totalAttended += attended;
         totalSales += sales;
+        totalFiCalled += fiCalled;
+        totalFiAttended += fiAttended;
 
         sdrDataList.push({
           sdrId,
@@ -90,6 +109,12 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
           attendanceRate: scheduledSameDay > 0 ? (attended / scheduledSameDay) * 100 : 0,
           sales,
           conversionRate: attended > 0 ? (sales / attended) * 100 : 0,
+          fiCalled,
+          fiAwaiting,
+          fiReceivedLink,
+          fiGotTicket,
+          fiAttended,
+          fiAttendanceRate: fiGotTicket > 0 ? (fiAttended / fiGotTicket) * 100 : 0,
         });
       }
 
@@ -101,6 +126,8 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
         totalScheduled,
         totalAttended,
         totalSales,
+        totalFiCalled,
+        totalFiAttended,
         sdrs: sdrDataList,
       });
     }
@@ -110,6 +137,9 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
   }, [sdrs, metrics]);
 
   if (columns.length === 0) return null;
+
+  // Detect if all SDRs are funil_intensivo
+  const isFI = sdrs.length > 0 && sdrs.every(s => s.type === 'funil_intensivo');
 
   return (
     <div className="space-y-4">
@@ -130,30 +160,42 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
             <div className="px-4 py-3 bg-muted/30 border-b border-border/30 flex items-center justify-between">
               <h4 className="font-semibold text-sm text-foreground">{col.funnel}</h4>
               <div className="flex items-center gap-3 text-xs">
-                <span className="text-muted-foreground">
-                  {col.totalActivated} ativ
-                </span>
-                <span className="text-muted-foreground">
-                  {col.totalScheduled} agend
-                </span>
-                <span className="text-muted-foreground">
-                  {col.totalAttended} realiz
-                </span>
-                <span className="font-bold text-success">
-                  {col.totalSales} vendas
-                </span>
+                {isFI ? (
+                  <>
+                    <span className="text-muted-foreground">{col.totalFiCalled} cham</span>
+                    <span className="font-bold text-success">{col.totalFiAttended} comp.</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-muted-foreground">{col.totalActivated} ativ</span>
+                    <span className="text-muted-foreground">{col.totalScheduled} agend</span>
+                    <span className="text-muted-foreground">{col.totalAttended} realiz</span>
+                    <span className="font-bold text-success">{col.totalSales} vendas</span>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Table header */}
-            <div className="grid grid-cols-[1fr_60px_70px_60px_55px_55px] px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
-              <span>Nome</span>
-              <span className="text-right">Ativ.</span>
-              <span className="text-right">Agend.</span>
-              <span className="text-right">Realiz.</span>
-              <span className="text-right">Vendas</span>
-              <span className="text-right">Conv.</span>
-            </div>
+            {isFI ? (
+              <div className="grid grid-cols-[1fr_55px_55px_55px_55px_55px] px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
+                <span>Nome</span>
+                <span className="text-right">Cham.</span>
+                <span className="text-right">Link</span>
+                <span className="text-right">Ingr.</span>
+                <span className="text-right">Comp.</span>
+                <span className="text-right">% Comp.</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[1fr_60px_70px_60px_55px_55px] px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
+                <span>Nome</span>
+                <span className="text-right">Ativ.</span>
+                <span className="text-right">Agend.</span>
+                <span className="text-right">Realiz.</span>
+                <span className="text-right">Vendas</span>
+                <span className="text-right">Conv.</span>
+              </div>
+            )}
 
             {/* SDR rows */}
             {col.sdrs.map((sdr, idx) => {
@@ -162,7 +204,9 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
                 <div
                   key={sdr.sdrId}
                   className={cn(
-                    'grid grid-cols-[1fr_60px_70px_60px_55px_55px] px-4 py-2.5 items-center',
+                    isFI
+                      ? 'grid grid-cols-[1fr_55px_55px_55px_55px_55px] px-4 py-2.5 items-center'
+                      : 'grid grid-cols-[1fr_60px_70px_60px_55px_55px] px-4 py-2.5 items-center',
                     idx < col.sdrs.length - 1 && 'border-b border-border/10'
                   )}
                 >
@@ -170,16 +214,30 @@ export function SDRFunnelKanban({ sdrs, metrics }: SDRFunnelKanbanProps) {
                     <Icon size={13} className="text-muted-foreground shrink-0" />
                     <span className="text-sm font-medium text-foreground truncate">{sdr.sdrName}</span>
                   </div>
-                  <span className="text-sm text-right text-foreground tabular-nums">{sdr.activated}</span>
-                  <div className="text-right">
-                    <span className="text-sm text-foreground tabular-nums">{sdr.scheduled}</span>
-                    <span className="text-[10px] text-muted-foreground ml-1">({sdr.scheduledRate.toFixed(0)}%)</span>
-                  </div>
-                  <span className="text-sm text-right text-foreground tabular-nums">{sdr.attended}</span>
-                  <span className="text-sm text-right font-bold text-success tabular-nums">{sdr.sales}</span>
-                  <span className={cn('text-sm text-right font-semibold tabular-nums', getConversionTextColor(sdr.conversionRate))}>
-                    {sdr.conversionRate.toFixed(0)}%
-                  </span>
+                  {isFI ? (
+                    <>
+                      <span className="text-sm text-right text-foreground tabular-nums">{sdr.fiCalled}</span>
+                      <span className="text-sm text-right text-foreground tabular-nums">{sdr.fiReceivedLink}</span>
+                      <span className="text-sm text-right text-foreground tabular-nums">{sdr.fiGotTicket}</span>
+                      <span className="text-sm text-right font-bold text-success tabular-nums">{sdr.fiAttended}</span>
+                      <span className={cn('text-sm text-right font-semibold tabular-nums', getConversionTextColor(sdr.fiAttendanceRate))}>
+                        {sdr.fiAttendanceRate.toFixed(0)}%
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm text-right text-foreground tabular-nums">{sdr.activated}</span>
+                      <div className="text-right">
+                        <span className="text-sm text-foreground tabular-nums">{sdr.scheduled}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">({sdr.scheduledRate.toFixed(0)}%)</span>
+                      </div>
+                      <span className="text-sm text-right text-foreground tabular-nums">{sdr.attended}</span>
+                      <span className="text-sm text-right font-bold text-success tabular-nums">{sdr.sales}</span>
+                      <span className={cn('text-sm text-right font-semibold tabular-nums', getConversionTextColor(sdr.conversionRate))}>
+                        {sdr.conversionRate.toFixed(0)}%
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             })}

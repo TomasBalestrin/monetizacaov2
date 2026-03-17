@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Menu, User } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Menu, User, Timer } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { NotificationPanel } from './NotificationPanel';
@@ -13,9 +13,53 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { useSDRs, useSDRFunnelsWithDates } from '@/controllers/useSdrController';
+import { differenceInDays, isPast, parseISO, startOfDay } from 'date-fns';
 
 interface HeaderProps {
   onMenuClick: () => void;
+}
+
+function FICountdown() {
+  const { isAdmin, isManager, selectedEntity } = useAuth();
+  const { data: fiSdrs } = useSDRs('funil_intensivo');
+  const fiSdrId = fiSdrs?.[0]?.id;
+  const isFIOwner = selectedEntity?.entity_type === 'sdr' && fiSdrs?.some(s => s.id === selectedEntity?.entity_id);
+  const canSeeFI = isAdmin || isManager || isFIOwner;
+  const { data: funnelsWithDates } = useSDRFunnelsWithDates(canSeeFI ? fiSdrId : undefined);
+
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const nextEvent = useMemo(() => {
+    if (!funnelsWithDates) return null;
+    const upcoming = funnelsWithDates
+      .filter(f => f.event_date && !isPast(startOfDay(parseISO(f.event_date))))
+      .sort((a, b) => a.event_date!.localeCompare(b.event_date!));
+    return upcoming[0] || null;
+  }, [funnelsWithDates]);
+
+  if (!canSeeFI || !nextEvent?.event_date) return null;
+
+  const target = startOfDay(parseISO(nextEvent.event_date));
+  const daysLeft = differenceInDays(target, startOfDay(now));
+
+  if (daysLeft < 0) return null;
+
+  return (
+    <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/8 border border-primary/15 text-xs">
+      <Timer size={13} className="text-primary" />
+      <span className="text-muted-foreground">{nextEvent.funnel_name}:</span>
+      {daysLeft === 0 ? (
+        <span className="font-bold text-primary">Hoje!</span>
+      ) : (
+        <span className="font-bold text-foreground">{daysLeft}d</span>
+      )}
+    </div>
+  );
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
@@ -76,6 +120,9 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {/* FI Countdown */}
+          <FICountdown />
+
           {/* Notifications */}
           <NotificationPanel />
 

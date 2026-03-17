@@ -18,6 +18,7 @@ import { cn, parseDateString } from '@/lib/utils';
 interface SDRWeeklyComparisonChartProps {
   metrics: SDRMetric[];
   activeWeekKey?: string | null;
+  sdrType?: 'sdr' | 'social_selling' | 'funil_intensivo';
 }
 
 interface WeeklyData {
@@ -27,24 +28,31 @@ interface WeeklyData {
   scheduled: number;
   attended: number;
   sales: number;
+  // FI fields
+  fi_called: number;
+  fi_received_link: number;
+  fi_got_ticket: number;
+  fi_attended: number;
 }
 
 interface WeeklyComparison {
   current: WeeklyData | null;
   previous: WeeklyData | null;
-  changes: {
-    activated: number | null;
-    scheduled: number | null;
-    attended: number | null;
-    sales: number | null;
-  };
+  changes: Record<string, number | null>;
 }
 
-const COLORS = {
+const COLORS: Record<string, string> = {
   activated: '#6366f1',  // indigo
   scheduled: '#06b6d4',  // cyan
   attended: '#f59e0b',   // amber
   sales: '#10b981',      // emerald
+};
+
+const FI_COLORS: Record<string, string> = {
+  fi_called: '#3b82f6',      // blue
+  fi_received_link: '#8b5cf6', // violet
+  fi_got_ticket: '#6366f1',    // indigo
+  fi_attended: '#10b981',      // emerald
 };
 
 const LABELS: Record<string, string> = {
@@ -52,6 +60,10 @@ const LABELS: Record<string, string> = {
   scheduled: 'Agendados',
   attended: 'Realizados',
   sales: 'Vendas',
+  fi_called: 'Chamou',
+  fi_received_link: 'Rec. Link',
+  fi_got_ticket: 'Ret. Ingresso',
+  fi_attended: 'Compareceram',
 };
 
 function groupMetricsByWeek(metrics: SDRMetric[]): WeeklyData[] {
@@ -69,6 +81,10 @@ function groupMetricsByWeek(metrics: SDRMetric[]): WeeklyData[] {
       existing.scheduled += m.scheduled || 0;
       existing.attended += m.attended || 0;
       existing.sales += m.sales || 0;
+      existing.fi_called += m.fi_called || 0;
+      existing.fi_received_link += m.fi_received_link || 0;
+      existing.fi_got_ticket += m.fi_got_ticket || 0;
+      existing.fi_attended += m.fi_attended || 0;
     } else {
       weeklyMap.set(weekKey, {
         weekKey,
@@ -77,6 +93,10 @@ function groupMetricsByWeek(metrics: SDRMetric[]): WeeklyData[] {
         scheduled: m.scheduled || 0,
         attended: m.attended || 0,
         sales: m.sales || 0,
+        fi_called: m.fi_called || 0,
+        fi_received_link: m.fi_received_link || 0,
+        fi_got_ticket: m.fi_got_ticket || 0,
+        fi_attended: m.fi_attended || 0,
       });
     }
   }
@@ -147,50 +167,43 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export function SDRWeeklyComparisonChart({ metrics, activeWeekKey }: SDRWeeklyComparisonChartProps) {
+export function SDRWeeklyComparisonChart({ metrics, activeWeekKey, sdrType = 'sdr' }: SDRWeeklyComparisonChartProps) {
+  const isFI = sdrType === 'funil_intensivo';
+  const metricKeys = isFI
+    ? ['fi_called', 'fi_received_link', 'fi_got_ticket', 'fi_attended'] as const
+    : ['activated', 'scheduled', 'attended', 'sales'] as const;
+  const colors = isFI ? FI_COLORS : COLORS;
+
   const weeklyData = useMemo(() => groupMetricsByWeek(metrics), [metrics]);
 
   const comparison: WeeklyComparison = useMemo(() => {
+    const buildChanges = (current: WeeklyData, previous: WeeklyData | null): Record<string, number | null> => {
+      const changes: Record<string, number | null> = {};
+      for (const key of metricKeys) {
+        changes[key] = previous ? calculateChange(current[key], previous[key]) : null;
+      }
+      return changes;
+    };
+
     if (activeWeekKey) {
       const activeIndex = weeklyData.findIndex(w => w.weekKey === activeWeekKey);
       if (activeIndex >= 0) {
         const current = weeklyData[activeIndex];
         const previous = activeIndex > 0 ? weeklyData[activeIndex - 1] : null;
-        return {
-          current,
-          previous,
-          changes: previous ? {
-            activated: calculateChange(current.activated, previous.activated),
-            scheduled: calculateChange(current.scheduled, previous.scheduled),
-            attended: calculateChange(current.attended, previous.attended),
-            sales: calculateChange(current.sales, previous.sales),
-          } : { activated: null, scheduled: null, attended: null, sales: null },
-        };
+        return { current, previous, changes: buildChanges(current, previous) };
       }
     }
 
     if (weeklyData.length < 2) {
-      return {
-        current: weeklyData[weeklyData.length - 1] || null,
-        previous: null,
-        changes: { activated: null, scheduled: null, attended: null, sales: null },
-      };
+      const nullChanges: Record<string, number | null> = {};
+      for (const key of metricKeys) nullChanges[key] = null;
+      return { current: weeklyData[weeklyData.length - 1] || null, previous: null, changes: nullChanges };
     }
 
     const current = weeklyData[weeklyData.length - 1];
     const previous = weeklyData[weeklyData.length - 2];
-
-    return {
-      current,
-      previous,
-      changes: {
-        activated: calculateChange(current.activated, previous.activated),
-        scheduled: calculateChange(current.scheduled, previous.scheduled),
-        attended: calculateChange(current.attended, previous.attended),
-        sales: calculateChange(current.sales, previous.sales),
-      },
-    };
-  }, [weeklyData, activeWeekKey]);
+    return { current, previous, changes: buildChanges(current, previous) };
+  }, [weeklyData, activeWeekKey, metricKeys]);
 
   const chartData = useMemo(() => {
     if (!activeWeekKey) return weeklyData.map(w => ({ ...w, opacity: 1 }));
@@ -219,19 +232,18 @@ export function SDRWeeklyComparisonChart({ metrics, activeWeekKey }: SDRWeeklyCo
 
         {comparison.previous && (
           <div className="flex flex-wrap gap-1.5">
-            <ChangeIndicator value={comparison.changes.activated} label="Ativados" color={COLORS.activated} />
-            <ChangeIndicator value={comparison.changes.scheduled} label="Agendados" color={COLORS.scheduled} />
-            <ChangeIndicator value={comparison.changes.attended} label="Realizados" color={COLORS.attended} />
-            <ChangeIndicator value={comparison.changes.sales} label="Vendas" color={COLORS.sales} />
+            {metricKeys.map(key => (
+              <ChangeIndicator key={key} value={comparison.changes[key]} label={LABELS[key]} color={colors[key]} />
+            ))}
           </div>
         )}
       </div>
 
       {/* Legend */}
       <div className="flex items-center gap-4 px-5 pb-3">
-        {Object.entries(COLORS).map(([key, color]) => (
+        {metricKeys.map(key => (
           <div key={key} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: colors[key] }} />
             <span className="text-[11px] text-muted-foreground">{LABELS[key]}</span>
           </div>
         ))}
@@ -254,11 +266,11 @@ export function SDRWeeklyComparisonChart({ metrics, activeWeekKey }: SDRWeeklyCo
               width={35}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} />
-            {(['activated', 'scheduled', 'attended', 'sales'] as const).map((key) => (
+            {metricKeys.map((key) => (
               <Bar
                 key={key}
                 dataKey={key}
-                fill={COLORS[key]}
+                fill={colors[key]}
                 radius={[4, 4, 0, 0]}
               >
                 {activeWeekKey && chartData.map((entry, index) => (

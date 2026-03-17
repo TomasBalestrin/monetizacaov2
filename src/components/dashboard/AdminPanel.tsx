@@ -39,7 +39,7 @@ export function AdminPanel() {
         return { type: 'Closer', name: closer?.name || 'Desconhecido' };
       } else {
         const sdr = sdrs?.find(s => s.id === link.entity_id);
-        return { type: sdr?.type === 'sdr' ? 'SDR' : 'Social', name: sdr?.name || 'Desconhecido' };
+        return { type: sdr?.type === 'sdr' ? 'SDR' : sdr?.type === 'funil_intensivo' ? 'Funil Int.' : 'Social', name: sdr?.name || 'Desconhecido' };
       }
     });
   };

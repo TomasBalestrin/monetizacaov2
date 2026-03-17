@@ -4,16 +4,20 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  CalendarIcon, 
-  Users, 
-  Calendar, 
-  UserCheck, 
+import {
+  CalendarIcon,
+  Users,
+  Calendar,
+  UserCheck,
   ShoppingCart,
   Clock,
   Zap,
   Filter,
-  CalendarPlus
+  CalendarPlus,
+  Phone,
+  Link,
+  Ticket,
+  CheckCircle
 } from 'lucide-react';
 import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,8 +43,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useSDRs, useSDRFunnels, type SDRMetric } from '@/controllers/useSdrController';
+import { useSDRs, useSDRFunnels, useSDRFunnelsWithDates, type SDRMetric } from '@/controllers/useSdrController';
 import { useFunnels } from '@/controllers/useFunnelController';
+import { isPast, parseISO, startOfDay } from 'date-fns';
 
 const sdrMetricsSchema = z.object({
   sdr_id: z.string().min(1, 'Selecione um SDR'),
@@ -52,12 +57,18 @@ const sdrMetricsSchema = z.object({
   scheduled_same_day: z.coerce.number().int().min(0),
   attended: z.coerce.number().int().min(0),
   sales: z.coerce.number().int().min(0),
+  // Funil Intensivo fields
+  fi_called: z.coerce.number().int().min(0).optional(),
+  fi_awaiting: z.coerce.number().int().min(0).optional(),
+  fi_received_link: z.coerce.number().int().min(0).optional(),
+  fi_got_ticket: z.coerce.number().int().min(0).optional(),
+  fi_attended: z.coerce.number().int().min(0).optional(),
 });
 
 export type SDRMetricsFormValues = z.infer<typeof sdrMetricsSchema>;
 
 interface SDRMetricsFormProps {
-  sdrType: 'sdr' | 'social_selling';
+  sdrType: 'sdr' | 'social_selling' | 'funil_intensivo';
   defaultSdrId?: string;
   defaultFunnel?: string | null;
   defaultMetric?: SDRMetric;
@@ -115,13 +126,41 @@ export function SDRMetricsForm({
       scheduled_same_day: defaultMetric?.scheduled_same_day ?? 0,
       attended: defaultMetric?.attended ?? 0,
       sales: defaultMetric?.sales ?? 0,
+      fi_called: defaultMetric?.fi_called ?? 0,
+      fi_awaiting: defaultMetric?.fi_awaiting ?? 0,
+      fi_received_link: defaultMetric?.fi_received_link ?? 0,
+      fi_got_ticket: defaultMetric?.fi_got_ticket ?? 0,
+      fi_attended: defaultMetric?.fi_attended ?? 0,
     },
   });
+
+  const isFI = sdrType === 'funil_intensivo';
 
   // Watch the selected SDR to fetch its funnels
   const selectedSdrId = form.watch('sdr_id');
   const { data: sdrFunnels, isLoading: isLoadingFunnels } = useSDRFunnels(selectedSdrId);
+  const { data: funnelsWithDates } = useSDRFunnelsWithDates(isFI ? selectedSdrId : undefined);
   const { data: allFunnels } = useFunnels();
+
+  // Build event date map for FI labels
+  const eventDateMap = React.useMemo(() => {
+    const map = new Map<string, string | null>();
+    if (funnelsWithDates) {
+      for (const f of funnelsWithDates) map.set(f.funnel_name, f.event_date);
+    }
+    return map;
+  }, [funnelsWithDates]);
+
+  // Find the active (next upcoming) event for FI auto-selection
+  const activeEventFunnel = React.useMemo(() => {
+    if (!isFI || !funnelsWithDates || funnelsWithDates.length === 0) return null;
+    const upcoming = funnelsWithDates
+      .filter(f => f.event_date && !isPast(startOfDay(parseISO(f.event_date))))
+      .sort((a, b) => a.event_date!.localeCompare(b.event_date!));
+    // Prefer the next upcoming event, otherwise the most recent
+    if (upcoming.length > 0) return upcoming[0].funnel_name;
+    return funnelsWithDates[0].funnel_name;
+  }, [isFI, funnelsWithDates]);
 
   // Use SDR-specific funnels if available, otherwise show all global funnels
   const displayFunnels = sdrFunnels && sdrFunnels.length > 0
@@ -133,12 +172,16 @@ export function SDRMetricsForm({
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      // For FI: auto-select the active event on first render (only for new metrics)
+      if (isFI && activeEventFunnel && !defaultMetric) {
+        form.setValue('funnel', activeEventFunnel);
+      }
       return;
     }
     if (selectedSdrId && !defaultMetric) {
-      form.setValue('funnel', 'none');
+      form.setValue('funnel', isFI && activeEventFunnel ? activeEventFunnel : 'none');
     }
-  }, [selectedSdrId, form, defaultMetric]);
+  }, [selectedSdrId, form, defaultMetric, isFI, activeEventFunnel]);
 
   const handleSubmit = async (values: SDRMetricsFormValues) => {
     // Convert "none" to empty string for submission
@@ -165,12 +208,12 @@ export function SDRMetricsForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-xs font-medium text-muted-foreground">
-                {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}
+                {sdrType === 'sdr' ? 'SDR' : sdrType === 'funil_intensivo' ? 'Funil Intensivo' : 'Social Selling'}
               </FormLabel>
               <Select onValueChange={field.onChange} value={field.value} disabled={lockSdr}>
                 <FormControl>
                   <SelectTrigger className={cn("h-11 bg-card border-border/50 hover:border-primary/50 transition-colors", lockSdr && "opacity-70 cursor-not-allowed")}>
-                    <SelectValue placeholder={`Selecione um ${sdrType === 'sdr' ? 'SDR' : 'Social Selling'}`} />
+                    <SelectValue placeholder={`Selecione um ${sdrType === 'sdr' ? 'SDR' : sdrType === 'funil_intensivo' ? 'responsável' : 'Social Selling'}`} />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent className="bg-popover border-border">
@@ -266,40 +309,48 @@ export function SDRMetricsForm({
             <FormItem>
               <FormLabel className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Filter className="h-3.5 w-3.5" />
-                Funil
+                {isFI ? 'Evento' : 'Funil'}
               </FormLabel>
-              <Select 
-                onValueChange={field.onChange} 
+              <Select
+                onValueChange={field.onChange}
                 value={field.value || 'none'}
                 disabled={!selectedSdrId || isLoadingFunnels}
               >
                 <FormControl>
                   <SelectTrigger className="h-10 bg-card border-border/50 hover:border-primary/50 transition-colors">
-                    <SelectValue 
+                    <SelectValue
                       placeholder={
-                        !selectedSdrId 
-                          ? "Selecione um SDR primeiro" 
-                          : isLoadingFunnels 
-                            ? "Carregando funis..." 
-                            : "Selecione o funil"
-                      } 
+                        !selectedSdrId
+                          ? "Selecione um SDR primeiro"
+                          : isLoadingFunnels
+                            ? "Carregando..."
+                            : isFI ? "Selecione o evento" : "Selecione o funil"
+                      }
                     />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent className="bg-popover border-border">
-                  <SelectItem value="none" className="cursor-pointer">
-                    <span className="text-muted-foreground">Nenhum</span>
-                  </SelectItem>
-                  {hasFunnels && displayFunnels.map((funnel) => (
-                    <SelectItem key={funnel} value={funnel} className="cursor-pointer">
-                      {funnel}
+                  {!isFI && (
+                    <SelectItem value="none" className="cursor-pointer">
+                      <span className="text-muted-foreground">Nenhum</span>
                     </SelectItem>
-                  ))}
+                  )}
+                  {hasFunnels && displayFunnels.map((funnel) => {
+                    const eventDate = eventDateMap.get(funnel);
+                    const label = isFI && eventDate
+                      ? `${funnel} (${new Date(eventDate + 'T12:00:00').toLocaleDateString('pt-BR')})`
+                      : funnel;
+                    return (
+                      <SelectItem key={funnel} value={funnel} className="cursor-pointer">
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               {selectedSdrId && !isLoadingFunnels && !hasFunnels && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Nenhum funil disponivel
+                  {isFI ? 'Nenhum evento cadastrado' : 'Nenhum funil disponivel'}
                 </p>
               )}
               <FormMessage />
@@ -314,131 +365,238 @@ export function SDRMetricsForm({
             <h4 className="text-sm font-semibold text-foreground">Métricas de Desempenho</h4>
           </div>
 
-          {/* Metrics Grid - 2x3 layout with visual hierarchy */}
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="activated"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput icon={Users} label="Ativados" iconColor="text-blue-500">
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        className="h-10 bg-card border-border/50 text-center font-medium hover:border-blue-500/50 focus:border-blue-500 transition-colors"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="scheduled"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput icon={Calendar} label="Agendados" iconColor="text-purple-500">
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        className="h-10 bg-card border-border/50 text-center font-medium hover:border-purple-500/50 focus:border-purple-500 transition-colors"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="scheduled_follow_up"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput icon={CalendarPlus} label="Agend. Follow Up" iconColor="text-indigo-500">
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        className="h-10 bg-card border-border/50 text-center font-medium hover:border-indigo-500/50 focus:border-indigo-500 transition-colors"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="scheduled_same_day"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput icon={Clock} label="Agend. no dia" iconColor="text-orange-500">
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        className="h-10 bg-card border-border/50 text-center font-medium hover:border-orange-500/50 focus:border-orange-500 transition-colors"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="attended"
-              render={({ field }) => (
-                <FormItem>
-                  <MetricInput icon={UserCheck} label="Realizados" iconColor="text-cyan-500">
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        className="h-10 bg-card border-border/50 text-center font-medium hover:border-cyan-500/50 focus:border-cyan-500 transition-colors"
-                        {...field} 
-                      />
-                    </FormControl>
-                  </MetricInput>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Sales - Full width highlight */}
-            <FormField
-              control={form.control}
-              name="sales"
-              render={({ field }) => (
-                <FormItem className="col-span-2">
-                  <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
-                    <MetricInput icon={ShoppingCart} label="Vendas" iconColor="text-green-500">
+          {sdrType === 'funil_intensivo' ? (
+            /* Funil Intensivo metrics - 5 fields */
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="fi_called"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={Phone} label="Chamou" iconColor="text-blue-500">
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          min={0} 
-                          className="h-12 bg-card/50 border-green-500/30 text-center text-lg font-bold hover:border-green-500/50 focus:border-green-500 transition-colors"
-                          {...field} 
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-blue-500/50 focus:border-blue-500 transition-colors"
+                          {...field}
                         />
                       </FormControl>
                     </MetricInput>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fi_awaiting"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={Clock} label="Aguardando" iconColor="text-orange-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-orange-500/50 focus:border-orange-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fi_received_link"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={Link} label="Receberam Link" iconColor="text-purple-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-purple-500/50 focus:border-purple-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fi_got_ticket"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={Ticket} label="Retiraram Ingresso" iconColor="text-indigo-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-indigo-500/50 focus:border-indigo-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fi_attended"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                      <MetricInput icon={CheckCircle} label="Compareceram" iconColor="text-green-500">
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            className="h-12 bg-card/50 border-green-500/30 text-center text-lg font-bold hover:border-green-500/50 focus:border-green-500 transition-colors"
+                            {...field}
+                          />
+                        </FormControl>
+                      </MetricInput>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          ) : (
+            /* Standard SDR/Social Selling metrics - 6 fields */
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="activated"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={Users} label="Ativados" iconColor="text-blue-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-blue-500/50 focus:border-blue-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="scheduled"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={Calendar} label="Agendados" iconColor="text-purple-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-purple-500/50 focus:border-purple-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="scheduled_follow_up"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={CalendarPlus} label="Agend. Follow Up" iconColor="text-indigo-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-indigo-500/50 focus:border-indigo-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="scheduled_same_day"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={Clock} label="Agend. no dia" iconColor="text-orange-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-orange-500/50 focus:border-orange-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="attended"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={UserCheck} label="Realizados" iconColor="text-cyan-500">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-border/50 text-center font-medium hover:border-cyan-500/50 focus:border-cyan-500 transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Sales - Full width highlight */}
+              <FormField
+                control={form.control}
+                name="sales"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                      <MetricInput icon={ShoppingCart} label="Vendas" iconColor="text-green-500">
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            className="h-12 bg-card/50 border-green-500/30 text-center text-lg font-bold hover:border-green-500/50 focus:border-green-500 transition-colors"
+                            {...field}
+                          />
+                        </FormControl>
+                      </MetricInput>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
         </div>
 
         {/* Submit Button */}

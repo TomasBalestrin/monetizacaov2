@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import type { SDRMetric } from '@/controllers/useSdrController';
 import { cn, parseDateString } from '@/lib/utils';
 
-type EditableField = 'activated' | 'scheduled' | 'scheduled_follow_up' | 'scheduled_same_day' | 'attended' | 'sales';
+type EditableField = 'activated' | 'scheduled' | 'scheduled_follow_up' | 'scheduled_same_day' | 'attended' | 'sales' | 'fi_called' | 'fi_awaiting' | 'fi_received_link' | 'fi_got_ticket' | 'fi_attended';
 
 interface SDRDataTableProps {
   metrics: SDRMetric[];
@@ -29,6 +29,7 @@ interface SDRDataTableProps {
   onDeleteMetric?: (metricId: string) => void;
   onUpdateField?: (metricId: string, field: EditableField, value: number) => void;
   canInlineEdit?: boolean;
+  sdrType?: 'sdr' | 'social_selling' | 'funil_intensivo';
 }
 
 interface DateGroup {
@@ -41,6 +42,13 @@ interface DateGroup {
     scheduled_same_day: number;
     attended: number;
     sales: number;
+    revenue: number;
+    entries: number;
+    fi_called: number;
+    fi_awaiting: number;
+    fi_received_link: number;
+    fi_got_ticket: number;
+    fi_attended: number;
   };
 }
 
@@ -177,6 +185,7 @@ export function SDRDataTable({
   onDeleteMetric,
   onUpdateField,
   canInlineEdit = false,
+  sdrType = 'sdr',
 }: SDRDataTableProps) {
   const hasActions = onEditMetric || onDeleteMetric;
   const editable = canInlineEdit && !!onUpdateField;
@@ -204,6 +213,13 @@ export function SDRDataTable({
           scheduled_same_day: items.reduce((s, m) => s + m.scheduled_same_day, 0),
           attended: items.reduce((s, m) => s + m.attended, 0),
           sales: items.reduce((s, m) => s + m.sales, 0),
+          revenue: items.reduce((s, m) => s + (Number(m.revenue) || 0), 0),
+          entries: items.reduce((s, m) => s + (Number(m.entries) || 0), 0),
+          fi_called: items.reduce((s, m) => s + (m.fi_called || 0), 0),
+          fi_awaiting: items.reduce((s, m) => s + (m.fi_awaiting || 0), 0),
+          fi_received_link: items.reduce((s, m) => s + (m.fi_received_link || 0), 0),
+          fi_got_ticket: items.reduce((s, m) => s + (m.fi_got_ticket || 0), 0),
+          fi_attended: items.reduce((s, m) => s + (m.fi_attended || 0), 0),
         },
       });
     }
@@ -231,7 +247,96 @@ export function SDRDataTable({
     );
   }
 
+  const isFI = sdrType === 'funil_intensivo';
+
   const renderMetricRow = (metric: SDRMetric, index: number, isSubRow: boolean) => {
+    const canEditRow = editable && !!metric.id;
+
+    const dateCellContent = isSubRow ? (
+      <span className="text-sm text-muted-foreground">{metric.funnel || '-'}</span>
+    ) : (
+      format(parseDateString(metric.date), 'dd/MM/yyyy', { locale: ptBR })
+    );
+
+    if (isFI) {
+      const fiAttRate = (metric.fi_got_ticket || 0) > 0
+        ? ((metric.fi_attended || 0) / (metric.fi_got_ticket || 1)) * 100
+        : 0;
+
+      return (
+        <TableRow
+          key={metric.id || `${metric.date}-${index}`}
+          className={cn(
+            "transition-colors",
+            isSubRow
+              ? "bg-primary/[0.03] border-l-2 border-l-primary/30"
+              : index % 2 === 0 ? "bg-transparent" : "bg-muted/30",
+            "hover:bg-primary/5"
+          )}
+        >
+          <TableCell className={cn("font-medium text-foreground", isSubRow && "pl-10")}>
+            {dateCellContent}
+          </TableCell>
+          {showFunnelColumn && (
+            <TableCell className="text-muted-foreground text-sm">{metric.funnel || '-'}</TableCell>
+          )}
+          <TableCell>
+            <EditableCell value={metric.fi_called || 0} metricId={metric.id} field="fi_called" onSave={onUpdateField!} canEdit={canEditRow} />
+          </TableCell>
+          <TableCell>
+            <EditableCell value={metric.fi_awaiting || 0} metricId={metric.id} field="fi_awaiting" onSave={onUpdateField!} canEdit={canEditRow} />
+          </TableCell>
+          <TableCell>
+            <EditableCell value={metric.fi_received_link || 0} metricId={metric.id} field="fi_received_link" onSave={onUpdateField!} canEdit={canEditRow} />
+          </TableCell>
+          <TableCell>
+            <EditableCell value={metric.fi_got_ticket || 0} metricId={metric.id} field="fi_got_ticket" onSave={onUpdateField!} canEdit={canEditRow} />
+          </TableCell>
+          <TableCell>
+            <EditableCell value={metric.fi_attended || 0} metricId={metric.id} field="fi_attended" onSave={onUpdateField!} canEdit={canEditRow} highlight />
+          </TableCell>
+          <TableCell className="text-right">
+            <span className={cn(
+              "px-2 py-0.5 rounded-md text-xs font-bold",
+              getPercentageColor(fiAttRate),
+              getPercentageBg(fiAttRate)
+            )}>
+              {fiAttRate.toFixed(1)}%
+            </span>
+          </TableCell>
+          {hasActions && (
+            <TableCell>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-popover border-border">
+                  {onEditMetric && (
+                    <DropdownMenuItem onClick={() => onEditMetric(metric)} className="cursor-pointer">
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  )}
+                  {onDeleteMetric && (
+                    <DropdownMenuItem
+                      onClick={() => onDeleteMetric(metric.id)}
+                      className="cursor-pointer text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
+          )}
+        </TableRow>
+      );
+    }
+
+    // Standard SDR row
     const scheduledRate = metric.activated > 0
       ? (metric.scheduled / metric.activated) * 100
       : 0;
@@ -241,8 +346,6 @@ export function SDRDataTable({
     const conversionRate = metric.attended > 0
       ? (metric.sales / metric.attended) * 100
       : 0;
-
-    const canEditRow = editable && !!metric.id;
 
     return (
       <TableRow
@@ -256,11 +359,7 @@ export function SDRDataTable({
         )}
       >
         <TableCell className={cn("font-medium text-foreground", isSubRow && "pl-10")}>
-          {isSubRow ? (
-            <span className="text-sm text-muted-foreground">{metric.funnel || '-'}</span>
-          ) : (
-            format(parseDateString(metric.date), 'dd/MM/yyyy', { locale: ptBR })
-          )}
+          {dateCellContent}
         </TableCell>
         {showFunnelColumn && (
           <TableCell className="text-muted-foreground text-sm">
@@ -268,7 +367,6 @@ export function SDRDataTable({
           </TableCell>
         )}
 
-        {/* Editable cells */}
         <TableCell>
           <EditableCell value={metric.activated} metricId={metric.id} field="activated" onSave={onUpdateField!} canEdit={canEditRow} />
         </TableCell>
@@ -279,7 +377,6 @@ export function SDRDataTable({
           <EditableCell value={metric.scheduled_follow_up || 0} metricId={metric.id} field="scheduled_follow_up" onSave={onUpdateField!} canEdit={canEditRow} />
         </TableCell>
 
-        {/* Percentage - auto calculated */}
         <TableCell className="text-right">
           <span className={cn(
             "px-2 py-0.5 rounded-md text-xs font-bold",
@@ -297,7 +394,6 @@ export function SDRDataTable({
           <EditableCell value={metric.attended} metricId={metric.id} field="attended" onSave={onUpdateField!} canEdit={canEditRow} />
         </TableCell>
 
-        {/* Percentage - auto calculated */}
         <TableCell className="text-right">
           <span className={cn(
             "px-2 py-0.5 rounded-md text-xs font-bold",
@@ -312,7 +408,6 @@ export function SDRDataTable({
           <EditableCell value={metric.sales} metricId={metric.id} field="sales" onSave={onUpdateField!} canEdit={canEditRow} highlight />
         </TableCell>
 
-        {/* Percentage - auto calculated */}
         <TableCell className="text-right">
           <span className={cn(
             "px-2 py-0.5 rounded-md text-xs font-bold",
@@ -321,6 +416,13 @@ export function SDRDataTable({
           )}>
             {conversionRate.toFixed(1)}%
           </span>
+        </TableCell>
+
+        <TableCell className="text-right font-medium text-emerald-600">
+          {(Number(metric.revenue) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </TableCell>
+        <TableCell className="text-right font-medium text-emerald-600">
+          {(Number(metric.entries) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </TableCell>
 
         {hasActions && (
@@ -358,10 +460,59 @@ export function SDRDataTable({
   const renderGroupRow = (group: DateGroup, index: number) => {
     const isExpanded = expandedDates.has(group.date);
     const t = group.totals;
+
+    const dateCell = (
+      <TableCell className="font-medium text-foreground">
+        <div className="flex items-center gap-1.5">
+          {isExpanded
+            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          }
+          <div>
+            <span>{format(parseDateString(group.date), 'dd/MM/yyyy', { locale: ptBR })}</span>
+            {!showFunnelColumn && (
+              <div className="text-xs text-muted-foreground">{summarizeFunnels(group.metrics)}</div>
+            )}
+          </div>
+          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground">
+            {group.metrics.length}
+          </span>
+        </div>
+      </TableCell>
+    );
+
+    if (isFI) {
+      const fiAttRate = t.fi_got_ticket > 0 ? (t.fi_attended / t.fi_got_ticket) * 100 : 0;
+      return (
+        <TableRow
+          key={group.date}
+          className={cn("transition-colors cursor-pointer", index % 2 === 0 ? "bg-transparent" : "bg-muted/30", "hover:bg-primary/5")}
+          onClick={() => toggleDate(group.date)}
+        >
+          {dateCell}
+          {showFunnelColumn && <TableCell className="text-muted-foreground text-sm">{summarizeFunnels(group.metrics)}</TableCell>}
+          <TableCell className="text-right font-medium">{t.fi_called}</TableCell>
+          <TableCell className="text-right font-medium">{t.fi_awaiting}</TableCell>
+          <TableCell className="text-right font-medium">{t.fi_received_link}</TableCell>
+          <TableCell className="text-right font-medium">{t.fi_got_ticket}</TableCell>
+          <TableCell>
+            <div className="text-right">
+              <span className="px-2.5 py-1 rounded-lg bg-primary/15 text-primary font-bold text-sm inline-block">{t.fi_attended}</span>
+            </div>
+          </TableCell>
+          <TableCell className="text-right">
+            <span className={cn("px-2 py-0.5 rounded-md text-xs font-bold", getPercentageColor(fiAttRate), getPercentageBg(fiAttRate))}>
+              {fiAttRate.toFixed(1)}%
+            </span>
+          </TableCell>
+          {hasActions && <TableCell />}
+        </TableRow>
+      );
+    }
+
     const scheduledRate = t.activated > 0 ? (t.scheduled / t.activated) * 100 : 0;
     const attendanceRate = t.scheduled_same_day > 0 ? (t.attended / t.scheduled_same_day) * 100 : 0;
     const conversionRate = t.attended > 0 ? (t.sales / t.attended) * 100 : 0;
-    const colSpan = showFunnelColumn ? 1 : 1;
 
     return (
       <TableRow
@@ -373,23 +524,7 @@ export function SDRDataTable({
         )}
         onClick={() => toggleDate(group.date)}
       >
-        <TableCell className="font-medium text-foreground">
-          <div className="flex items-center gap-1.5">
-            {isExpanded
-              ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            }
-            <div>
-              <span>{format(parseDateString(group.date), 'dd/MM/yyyy', { locale: ptBR })}</span>
-              {!showFunnelColumn && (
-                <div className="text-xs text-muted-foreground">{summarizeFunnels(group.metrics)}</div>
-              )}
-            </div>
-            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground">
-              {group.metrics.length}
-            </span>
-          </div>
-        </TableCell>
+        {dateCell}
         {showFunnelColumn && (
           <TableCell className="text-muted-foreground text-sm">
             {summarizeFunnels(group.metrics)}
@@ -434,6 +569,12 @@ export function SDRDataTable({
             {conversionRate.toFixed(1)}%
           </span>
         </TableCell>
+        <TableCell className="text-right font-medium text-emerald-600">
+          {t.revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </TableCell>
+        <TableCell className="text-right font-medium text-emerald-600">
+          {t.entries.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </TableCell>
         {hasActions && <TableCell />}
       </TableRow>
     );
@@ -460,15 +601,30 @@ export function SDRDataTable({
               {showFunnelColumn && (
                 <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funil</TableHead>
               )}
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Ativados</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agendados</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agend. FU</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Agend.</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agend. dia</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Realizados</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Comp.</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Vendas</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Conv.</TableHead>
+              {isFI ? (
+                <>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Chamou</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Aguard.</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Link</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Ingresso</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Comparec.</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Comp.</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Ativados</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agendados</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agend. FU</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Agend.</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Agend. dia</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Realizados</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Comp.</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Vendas</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Conv.</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Faturamento</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Entradas</TableHead>
+                </>
+              )}
               {hasActions && (
                 <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground w-[50px]"></TableHead>
               )}

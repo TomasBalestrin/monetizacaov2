@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { SDR, SDRMetric, SDRAggregatedMetrics } from '@/model/entities/sdr';
 
-export async function fetchSDRs(type?: 'sdr' | 'social_selling'): Promise<SDR[]> {
+export async function fetchSDRs(type?: 'sdr' | 'social_selling' | 'funil_intensivo'): Promise<SDR[]> {
   let query = supabase
     .from('sdrs')
     .select('id, name, type, created_at, updated_at')
@@ -25,7 +25,7 @@ export async function fetchSDRMetrics(
 ): Promise<SDRMetric[]> {
   let query = supabase
     .from('sdr_metrics')
-    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, conversion_rate, source, created_at, updated_at')
+    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, revenue, entries, conversion_rate, source, created_at, updated_at, fi_called, fi_awaiting, fi_received_link, fi_got_ticket, fi_attended, fi_attendance_rate')
     .eq('sdr_id', sdrId)
     .order('date', { ascending: true });
 
@@ -58,11 +58,29 @@ export async function fetchSDRFunnels(sdrId: string): Promise<string[]> {
   return (data || []).map(f => f.funnel_name);
 }
 
-export async function addSDRFunnel(sdrId: string, funnelName: string): Promise<unknown> {
-  const { data: { user } } = await supabase.auth.getUser();
+export async function fetchSDRFunnelsWithDates(sdrId: string): Promise<{ funnel_name: string; event_date: string | null }[]> {
   const { data, error } = await supabase
     .from('sdr_funnels')
-    .insert({ sdr_id: sdrId, funnel_name: funnelName, created_by: user?.id })
+    .select('funnel_name, event_date')
+    .eq('sdr_id', sdrId)
+    .order('event_date', { ascending: false, nullsFirst: false });
+
+  if (error) throw error;
+  return (data || []) as { funnel_name: string; event_date: string | null }[];
+}
+
+export async function addSDRFunnel(sdrId: string, funnelName: string, eventDate?: string): Promise<unknown> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const insertData: Record<string, unknown> = {
+    sdr_id: sdrId,
+    funnel_name: funnelName,
+    created_by: user?.id,
+  };
+  if (eventDate) insertData.event_date = eventDate;
+
+  const { data, error } = await supabase
+    .from('sdr_funnels')
+    .insert(insertData as any)
     .select()
     .single();
   if (error) throw error;
@@ -79,7 +97,7 @@ export async function deleteSDRFunnel(sdrId: string, funnelName: string): Promis
 }
 
 export async function fetchSDRTotalMetrics(
-  type: 'sdr' | 'social_selling',
+  type: 'sdr' | 'social_selling' | 'funil_intensivo',
   periodStart?: string,
   periodEnd?: string
 ): Promise<SDRAggregatedMetrics> {
@@ -101,12 +119,20 @@ export async function fetchSDRTotalMetrics(
     totalAttended: Number(result.totalAttended) || 0,
     avgAttendanceRate: Number(result.avgAttendanceRate) || 0,
     totalSales: Number(result.totalSales) || 0,
+    totalRevenue: Number((result as any).totalRevenue) || 0,
+    totalEntries: Number((result as any).totalEntries) || 0,
     avgConversionRate: Number(result.avgConversionRate) || 0,
+    totalFiCalled: Number((result as any).totalFiCalled) || 0,
+    totalFiAwaiting: Number((result as any).totalFiAwaiting) || 0,
+    totalFiReceivedLink: Number((result as any).totalFiReceivedLink) || 0,
+    totalFiGotTicket: Number((result as any).totalFiGotTicket) || 0,
+    totalFiAttended: Number((result as any).totalFiAttended) || 0,
+    avgFiAttendanceRate: Number((result as any).avgFiAttendanceRate) || 0,
   };
 }
 
 export async function fetchSDRsWithMetricsRaw(
-  type: 'sdr' | 'social_selling',
+  type: 'sdr' | 'social_selling' | 'funil_intensivo',
   periodStart?: string,
   periodEnd?: string
 ): Promise<{ sdrs: SDR[]; metrics: SDRMetric[] }> {
@@ -122,7 +148,7 @@ export async function fetchSDRsWithMetricsRaw(
   const sdrIds = sdrs.map((s) => s.id);
   let query = supabase
     .from('sdr_metrics')
-    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, conversion_rate, source, created_at, updated_at')
+    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, revenue, entries, conversion_rate, source, created_at, updated_at, fi_called, fi_awaiting, fi_received_link, fi_got_ticket, fi_attended, fi_attendance_rate')
     .in('sdr_id', sdrIds)
     .neq('funnel', '');
 
@@ -157,6 +183,12 @@ export async function createSDRMetric(metric: {
   attendance_rate: number;
   conversion_rate: number;
   created_by?: string;
+  fi_called?: number;
+  fi_awaiting?: number;
+  fi_received_link?: number;
+  fi_got_ticket?: number;
+  fi_attended?: number;
+  fi_attendance_rate?: number;
 }): Promise<unknown> {
   const { data, error } = await supabase
     .from('sdr_metrics')
@@ -233,6 +265,96 @@ export async function incrementSdrAttended(
 
     if (error) throw error;
   }
+}
+
+export async function incrementSdrSales(
+  sdrId: string,
+  date: string,
+  funnelName: string,
+  addSales: number,
+  addRevenue: number = 0,
+  addEntries: number = 0
+): Promise<void> {
+  if (addSales <= 0 && addRevenue <= 0 && addEntries <= 0) return;
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('sdr_metrics')
+    .select('id, sales, revenue, entries')
+    .eq('sdr_id', sdrId)
+    .eq('date', date)
+    .eq('funnel', funnelName)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+
+  if (existing) {
+    const { error } = await supabase
+      .from('sdr_metrics')
+      .update({
+        sales: (existing.sales || 0) + addSales,
+        revenue: (existing.revenue || 0) + addRevenue,
+        entries: (existing.entries || 0) + addEntries,
+      })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('sdr_metrics')
+      .insert({
+        sdr_id: sdrId,
+        date,
+        funnel: funnelName,
+        activated: 0,
+        scheduled: 0,
+        scheduled_follow_up: 0,
+        scheduled_same_day: 0,
+        attended: 0,
+        sales: addSales,
+        revenue: addRevenue,
+        entries: addEntries,
+        source: 'manual',
+        scheduled_rate: 0,
+        attendance_rate: 0,
+        conversion_rate: 0,
+      });
+    if (error) throw error;
+  }
+}
+
+export async function decrementSdrSales(
+  sdrId: string,
+  date: string,
+  funnelName: string,
+  removeSales: number,
+  removeRevenue: number = 0,
+  removeEntries: number = 0
+): Promise<void> {
+  if (removeSales <= 0 && removeRevenue <= 0 && removeEntries <= 0) return;
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('sdr_metrics')
+    .select('id, sales, revenue, entries')
+    .eq('sdr_id', sdrId)
+    .eq('date', date)
+    .eq('funnel', funnelName)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!existing) return;
+
+  const newSales = Math.max(0, (existing.sales || 0) - removeSales);
+  const newRevenue = Math.max(0, (Number(existing.revenue) || 0) - removeRevenue);
+  const newEntries = Math.max(0, (Number(existing.entries) || 0) - removeEntries);
+
+  const { error } = await supabase
+    .from('sdr_metrics')
+    .update({
+      sales: newSales,
+      revenue: newRevenue,
+      entries: newEntries,
+    })
+    .eq('id', existing.id);
+  if (error) throw error;
 }
 
 export async function deleteSDRMetric(id: string): Promise<void> {

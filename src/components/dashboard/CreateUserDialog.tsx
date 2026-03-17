@@ -240,7 +240,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                       <SelectItem value="none">Nenhum</SelectItem>
                       {validSdrs.map((sdr) => (
                         <SelectItem key={sdr.id} value={sdr.id}>
-                          {sdr.name} ({sdr.type === 'sdr' ? 'SDR' : 'Social Selling'})
+                          {sdr.name} ({sdr.type === 'sdr' ? 'SDR' : sdr.type === 'funil_intensivo' ? 'Funil Intensivo' : 'Social Selling'})
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -1,20 +1,22 @@
 import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, CalendarPlus, Filter, ChevronRight } from 'lucide-react';
+import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, CalendarPlus, Filter, ChevronRight, MessageSquare, Clock, Link, Ticket, CheckCircle, Settings, DollarSign, CreditCard } from 'lucide-react';
 import { MonthSelector, getMonthPeriod } from '@/components/dashboard/MonthSelector';
 import { WeekSelector, getWeeksOfMonth } from '@/components/dashboard/WeekSelector';
 import { parseDateString } from '@/lib/utils';
 import type { SDRType } from './SDRTypeToggle';
 import { SDRMetricCard } from './SDRMetricCard';
-import { useSDRTotalMetrics, useSDRsWithMetricsRaw } from '@/controllers/useSdrController';
+import { useSDRTotalMetrics, useSDRsWithMetricsRaw, useSDRs, useSDRFunnelsWithDates } from '@/controllers/useSdrController';
 import { calculateAggregatedMetrics, groupMetricsBySDR } from '@/model/services/sdrService';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import { MetricCardSkeletonGrid } from '@/components/dashboard/skeletons';
 import { useRealtimeSDRMetrics } from '@/hooks/useRealtimeMetrics';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SDRFunnelKanban } from './SDRFunnelKanban';
+import { SDRFunnelManager } from './SDRFunnelManager';
 
 // Lazy load heavy sub-pages/dialogs to avoid circular chunk initialization
 const SDRDetailPage = lazy(() => import('./SDRDetailPage').then(m => ({ default: m.SDRDetailPage })));
@@ -32,8 +34,27 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
 
+  const { isAdmin, isManager } = useAuth();
+
   // Enable realtime subscriptions for automatic updates
   useRealtimeSDRMetrics();
+
+  const isFI = sdrType === 'funil_intensivo';
+
+  // FI-specific: get SDR id and events with dates
+  const { data: fiSdrs } = useSDRs(isFI ? 'funil_intensivo' : undefined);
+  const fiSdrId = fiSdrs?.[0]?.id;
+  const fiSdrName = fiSdrs?.[0]?.name || '';
+  const { data: funnelsWithDates } = useSDRFunnelsWithDates(isFI ? fiSdrId : undefined);
+
+  // Build event_date map for FI funnel filter labels
+  const eventDateMap = useMemo(() => {
+    const map = new Map<string, string | null>();
+    if (funnelsWithDates) {
+      for (const f of funnelsWithDates) map.set(f.funnel_name, f.event_date);
+    }
+    return map;
+  }, [funnelsWithDates]);
 
   // Check if viewing a specific SDR
   const selectedSdrId = searchParams.get('sdr');
@@ -98,7 +119,7 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
     setSelectedWeek(null); // Reset week when month changes
   }, []);
 
-  const moduleName = sdrType === 'sdr' ? 'sdrs' : 'social_selling';
+  const moduleName = sdrType === 'sdr' ? 'sdrs' : sdrType === 'social_selling' ? 'social_selling' : 'funil_intensivo';
 
   const handleSDRClick = (sdrId: string) => {
     setSearchParams({ module: moduleName, sdr: sdrId });
@@ -137,18 +158,18 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-primary/8">
-              {sdrType === 'sdr' ? (
-                <Phone size={22} className="text-primary" />
-              ) : (
+              {sdrType === 'social_selling' ? (
                 <Users size={22} className="text-primary" />
+              ) : (
+                <Phone size={22} className="text-primary" />
               )}
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground tracking-tight">
-                Dashboard {sdrType === 'sdr' ? 'SDR' : 'Social Selling'}
+                Dashboard {sdrType === 'sdr' ? 'SDR' : sdrType === 'social_selling' ? 'Social Selling' : 'Funil Intensivo'}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Metricas consolidadas de {sdrType === 'sdr' ? 'SDRs' : 'Social Selling'}
+                Metricas consolidadas de {sdrType === 'sdr' ? 'SDRs' : sdrType === 'social_selling' ? 'Social Selling' : 'Funil Intensivo'}
               </p>
             </div>
           </div>
@@ -172,17 +193,34 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
                 value={selectedFunnel || 'all'}
                 onValueChange={(v) => setSelectedFunnel(v === 'all' ? null : v)}
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[220px]">
                   <Filter size={16} className="mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Todos os Funis" />
+                  <SelectValue placeholder={isFI ? 'Todos os Eventos' : 'Todos os Funis'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os Funis</SelectItem>
-                  {availableFunnels.map((f) => (
-                    <SelectItem key={f} value={f}>{f}</SelectItem>
-                  ))}
+                  <SelectItem value="all">{isFI ? 'Todos os Eventos' : 'Todos os Funis'}</SelectItem>
+                  {availableFunnels.map((f) => {
+                    const eventDate = eventDateMap.get(f);
+                    const label = isFI && eventDate
+                      ? `${f} (${new Date(eventDate + 'T12:00:00').toLocaleDateString('pt-BR')})`
+                      : f;
+                    return <SelectItem key={f} value={f}>{label}</SelectItem>;
+                  })}
                 </SelectContent>
               </Select>
+            )}
+            {isFI && (isAdmin || isManager) && fiSdrId && (
+              <SDRFunnelManager
+                sdrId={fiSdrId}
+                sdrName={fiSdrName}
+                sdrType="funil_intensivo"
+                trigger={
+                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs rounded-xl">
+                    <Settings size={14} />
+                    Eventos
+                  </Button>
+                }
+              />
             )}
           </div>
         </div>
@@ -193,62 +231,127 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
           <MetricCardSkeletonGrid count={8} />
         ) : (
           <div className="space-y-4">
-            {/* Primary metrics */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <SDRMetricCard
-                title="Ativados"
-                value={totalMetrics?.totalActivated || 0}
-                icon={Users}
-                size="large"
-              />
-              <SDRMetricCard
-                title="Agendados"
-                value={totalMetrics?.totalScheduled || 0}
-                icon={Calendar}
-                size="large"
-              />
-              <SDRMetricCard
-                title="Realizados"
-                value={totalMetrics?.totalAttended || 0}
-                icon={UserCheck}
-                size="large"
-              />
-              <SDRMetricCard
-                title="Vendas"
-                value={totalMetrics?.totalSales || 0}
-                icon={ShoppingCart}
-                variant="highlight"
-                size="large"
-              />
-            </div>
-
-            {/* Secondary metrics */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <SDRMetricCard
-                title="% Agendamento"
-                value={totalMetrics?.avgScheduledRate || 0}
-                isPercentage
-                showProgress
-                icon={TrendingUp}
-              />
-              <SDRMetricCard
-                title="Agend. Follow Up"
-                value={totalMetrics?.totalScheduledFollowUp || 0}
-                icon={CalendarPlus}
-              />
-              <SDRMetricCard
-                title="Agend. no Dia"
-                value={totalMetrics?.totalScheduledSameDay || 0}
-                icon={UserCheck}
-              />
-              <SDRMetricCard
-                title="% Comparecimento"
-                value={totalMetrics?.avgAttendanceRate || 0}
-                isPercentage
-                showProgress
-                icon={TrendingUp}
-              />
-            </div>
+            {sdrType === 'funil_intensivo' ? (
+              <>
+                {/* Funil Intensivo metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  <SDRMetricCard
+                    title="Chamou"
+                    value={totalMetrics?.totalFiCalled || 0}
+                    icon={Phone}
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="Aguardando"
+                    value={totalMetrics?.totalFiAwaiting || 0}
+                    icon={Clock}
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="Receberam Link"
+                    value={totalMetrics?.totalFiReceivedLink || 0}
+                    icon={Link}
+                    size="large"
+                  />
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  <SDRMetricCard
+                    title="Retiraram Ingresso"
+                    value={totalMetrics?.totalFiGotTicket || 0}
+                    icon={Ticket}
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="Compareceram"
+                    value={totalMetrics?.totalFiAttended || 0}
+                    icon={CheckCircle}
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="% Comparecimento"
+                    value={totalMetrics?.avgFiAttendanceRate || 0}
+                    isPercentage
+                    showProgress
+                    icon={TrendingUp}
+                    variant={(totalMetrics?.avgFiAttendanceRate || 0) >= 50 ? 'success' : 'warning'}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Standard SDR metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  <SDRMetricCard
+                    title="Ativados"
+                    value={totalMetrics?.totalActivated || 0}
+                    icon={Users}
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="Agendados"
+                    value={totalMetrics?.totalScheduled || 0}
+                    icon={Calendar}
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="Realizados"
+                    value={totalMetrics?.totalAttended || 0}
+                    icon={UserCheck}
+                    size="large"
+                  />
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  <SDRMetricCard
+                    title="Vendas"
+                    value={totalMetrics?.totalSales || 0}
+                    icon={ShoppingCart}
+                    variant="highlight"
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="Faturamento"
+                    value={totalMetrics?.totalRevenue || 0}
+                    icon={DollarSign}
+                    isCurrency
+                    variant="success"
+                    size="large"
+                  />
+                  <SDRMetricCard
+                    title="Entradas"
+                    value={totalMetrics?.totalEntries || 0}
+                    icon={CreditCard}
+                    isCurrency
+                    size="large"
+                  />
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <SDRMetricCard
+                    title="% Agendamento"
+                    value={totalMetrics?.avgScheduledRate || 0}
+                    isPercentage
+                    showProgress
+                    icon={TrendingUp}
+                  />
+                  <SDRMetricCard
+                    title="Agend. Follow Up"
+                    value={totalMetrics?.totalScheduledFollowUp || 0}
+                    icon={CalendarPlus}
+                  />
+                  <SDRMetricCard
+                    title="Agend. no Dia"
+                    value={totalMetrics?.totalScheduledSameDay || 0}
+                    icon={UserCheck}
+                  />
+                  <SDRMetricCard
+                    title="% Comparecimento"
+                    value={totalMetrics?.avgAttendanceRate || 0}
+                    isPercentage
+                    showProgress
+                    icon={TrendingUp}
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -264,7 +367,7 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
         {!isLoading && sdrsWithMetrics && sdrsWithMetrics.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mr-1">
-              {sdrType === 'sdr' ? 'SDRs' : 'Social Selling'}:
+              {sdrType === 'sdr' ? 'SDRs' : sdrType === 'social_selling' ? 'Social Selling' : 'Funil Intensivo'}:
             </p>
             {sdrsWithMetrics.map((sdr) => (
               <button
@@ -272,13 +375,18 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
                 onClick={() => handleSDRClick(sdr.id)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/40 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all text-sm font-medium text-foreground group"
               >
-                {sdr.type === 'sdr' ? (
-                  <Phone size={12} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                ) : (
+                {sdr.type === 'social_selling' ? (
                   <Users size={12} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                ) : (
+                  <Phone size={12} className="text-muted-foreground group-hover:text-primary transition-colors" />
                 )}
                 {sdr.name}
-                <span className="text-xs text-success font-bold">{sdr.metrics.totalSales}v</span>
+                <span className="text-xs text-success font-bold">
+                  {sdrType === 'funil_intensivo'
+                    ? `${sdr.metrics.totalFiAttended || 0} comp.`
+                    : `${sdr.metrics.totalSales}v`
+                  }
+                </span>
                 <ChevronRight size={12} className="text-muted-foreground/40 group-hover:text-primary transition-colors" />
               </button>
             ))}

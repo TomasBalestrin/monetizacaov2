@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus, CalendarPlus } from 'lucide-react';
+import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus, CalendarPlus, Clock, Link, Ticket, CheckCircle, DollarSign, CreditCard } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,7 +59,15 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
       totalAttended: 0,
       avgAttendanceRate: 0,
       totalSales: 0,
+      totalRevenue: 0,
+      totalEntries: 0,
       avgConversionRate: 0,
+      totalFiCalled: 0,
+      totalFiAwaiting: 0,
+      totalFiReceivedLink: 0,
+      totalFiGotTicket: 0,
+      totalFiAttended: 0,
+      avgFiAttendanceRate: 0,
     };
   }
 
@@ -69,10 +77,20 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
   const totalScheduledSameDay = metrics.reduce((sum, m) => sum + (m.scheduled_same_day || 0), 0);
   const totalAttended = metrics.reduce((sum, m) => sum + (m.attended || 0), 0);
   const totalSales = metrics.reduce((sum, m) => sum + (m.sales || 0), 0);
+  const totalRevenue = metrics.reduce((sum, m) => sum + (Number(m.revenue) || 0), 0);
+  const totalEntries = metrics.reduce((sum, m) => sum + (Number(m.entries) || 0), 0);
 
   const avgScheduledRate = totalActivated > 0 ? (totalScheduled / totalActivated) * 100 : 0;
   const avgAttendanceRate = totalScheduledSameDay > 0 ? (totalAttended / totalScheduledSameDay) * 100 : 0;
   const avgConversionRate = totalAttended > 0 ? (totalSales / totalAttended) * 100 : 0;
+
+  // Funil Intensivo
+  const totalFiCalled = metrics.reduce((sum, m) => sum + (m.fi_called || 0), 0);
+  const totalFiAwaiting = metrics.reduce((sum, m) => sum + (m.fi_awaiting || 0), 0);
+  const totalFiReceivedLink = metrics.reduce((sum, m) => sum + (m.fi_received_link || 0), 0);
+  const totalFiGotTicket = metrics.reduce((sum, m) => sum + (m.fi_got_ticket || 0), 0);
+  const totalFiAttended = metrics.reduce((sum, m) => sum + (m.fi_attended || 0), 0);
+  const avgFiAttendanceRate = totalFiGotTicket > 0 ? (totalFiAttended / totalFiGotTicket) * 100 : 0;
 
   return {
     totalActivated,
@@ -83,7 +101,15 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
     totalAttended,
     avgAttendanceRate,
     totalSales,
+    totalRevenue,
+    totalEntries,
     avgConversionRate,
+    totalFiCalled,
+    totalFiAwaiting,
+    totalFiReceivedLink,
+    totalFiGotTicket,
+    totalFiAttended,
+    avgFiAttendanceRate,
   };
 }
 
@@ -290,12 +316,12 @@ export function SDRDetailPage({
                   <div className="flex items-center gap-2">
                     <h1 className="text-2xl font-bold text-foreground">{sdr.name}</h1>
                     {(isAdmin || isManager) && (
-                      <SDRFunnelManager sdrId={sdrId} sdrName={sdr.name} />
+                      <SDRFunnelManager sdrId={sdrId} sdrName={sdr.name} sdrType={sdr.type} />
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-muted-foreground capitalize">
-                      {sdr.type === 'sdr' ? 'SDR' : 'Social Selling'}
+                      {sdr.type === 'sdr' ? 'SDR' : sdr.type === 'funil_intensivo' ? 'Funil Intensivo' : 'Social Selling'}
                     </p>
                     {totalItems > 1 && (
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
@@ -399,10 +425,55 @@ export function SDRDetailPage({
         {/* Metrics - Hierarchical Grid */}
         {isLoadingMetrics ? (
           <MetricCardSkeletonGrid count={7} />
+        ) : sdr?.type === 'funil_intensivo' ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <SDRMetricCard
+                title="Chamou"
+                value={aggregatedMetrics?.totalFiCalled || 0}
+                icon={Phone}
+                size="large"
+              />
+              <SDRMetricCard
+                title="Aguardando"
+                value={aggregatedMetrics?.totalFiAwaiting || 0}
+                icon={Clock}
+                size="large"
+              />
+              <SDRMetricCard
+                title="Receberam Link"
+                value={aggregatedMetrics?.totalFiReceivedLink || 0}
+                icon={Link}
+                size="large"
+              />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <SDRMetricCard
+                title="Retiraram Ingresso"
+                value={aggregatedMetrics?.totalFiGotTicket || 0}
+                icon={Ticket}
+                size="large"
+              />
+              <SDRMetricCard
+                title="Compareceram"
+                value={aggregatedMetrics?.totalFiAttended || 0}
+                icon={CheckCircle}
+                size="large"
+              />
+              <SDRMetricCard
+                title="% Comparecimento"
+                value={aggregatedMetrics?.avgFiAttendanceRate || 0}
+                isPercentage
+                showProgress
+                icon={TrendingUp}
+                variant={(aggregatedMetrics?.avgFiAttendanceRate || 0) >= 50 ? 'success' : 'warning'}
+              />
+            </div>
+          </div>
         ) : (
           <div className="space-y-4">
             {/* Primary Metrics Row - Large Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               <SDRMetricCard
                 title="Ativados"
                 value={aggregatedMetrics?.totalActivated || 0}
@@ -426,6 +497,8 @@ export function SDRDetailPage({
                 size="large"
                 variant={aggregatedMetrics?.avgScheduledRate && aggregatedMetrics.avgScheduledRate >= 25 ? 'success' : 'warning'}
               />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               <SDRMetricCard
                 title="Vendas"
                 value={aggregatedMetrics?.totalSales || 0}
@@ -434,8 +507,23 @@ export function SDRDetailPage({
                 size="featured"
                 goalTarget={getGoalTarget(goals, 'sales')}
               />
+              <SDRMetricCard
+                title="Faturamento"
+                value={aggregatedMetrics?.totalRevenue || 0}
+                icon={DollarSign}
+                isCurrency
+                variant="success"
+                size="large"
+              />
+              <SDRMetricCard
+                title="Entradas"
+                value={aggregatedMetrics?.totalEntries || 0}
+                icon={CreditCard}
+                isCurrency
+                size="large"
+              />
             </div>
-            
+
             {/* Secondary Metrics Row - Regular Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <SDRMetricCard
@@ -477,6 +565,7 @@ export function SDRDetailPage({
             onDeleteMetric={canAddMetrics ? handleDeleteMetric : undefined}
             onUpdateField={handleUpdateField}
             canInlineEdit={canAddMetrics}
+            sdrType={sdr?.type || 'sdr'}
           />
         )}
 
@@ -484,12 +573,12 @@ export function SDRDetailPage({
         {isLoadingMetrics ? (
           <ChartSkeleton height={350} />
         ) : (
-          <SDRWeeklyComparisonChart metrics={displayMetrics || []} activeWeekKey={selectedWeek} />
+          <SDRWeeklyComparisonChart metrics={displayMetrics || []} activeWeekKey={selectedWeek} sdrType={sdr?.type || 'sdr'} />
         )}
 
         {/* Funnel Comparison Chart - shows when SDR has multiple funnels */}
         {!isLoadingMetrics && !selectedFunnel && hasFunnels && rawMetrics && (
-          <SDRFunnelComparisonChart metrics={rawMetrics.filter(m => m.funnel !== '')} />
+          <SDRFunnelComparisonChart metrics={rawMetrics.filter(m => m.funnel !== '')} sdrType={sdr?.type || 'sdr'} />
         )}
 
         {/* Notifications Section (admin only) */}
