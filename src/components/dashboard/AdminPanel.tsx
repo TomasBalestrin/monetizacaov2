@@ -127,8 +127,8 @@ export function AdminPanel() {
                                 <SelectContent>
                                   <SelectItem value="admin">Admin</SelectItem>
                                   <SelectItem value="manager">Gerente</SelectItem>
-                                  <SelectItem value="viewer">Visualizador</SelectItem>
-                                  <SelectItem value="user">Usuário</SelectItem>
+                                  <SelectItem value="viewer">SDR</SelectItem>
+                                  <SelectItem value="user">Closer</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -174,21 +174,26 @@ export function AdminPanel() {
                         <p className="text-foreground text-sm mb-2 font-medium">Permissões de Acesso:</p>
                         <div className="flex flex-wrap gap-2">
                           {MODULES.map((module) => {
-                            const hasPermission = user.permissions.includes(module) || user.role === 'admin';
+                            const SDR_PERMISSIONS = ['dashboard', 'sdrs', 'reports'];
+                            const CLOSER_PERMISSIONS = ['dashboard', 'closers', 'eagles', 'sharks', 'reports'];
+                            const isSDRRole = user.role === 'viewer';
+                            const isCloserRole = user.role === 'user';
+                            const hasPermission = user.permissions.includes(module) || user.role === 'admin' || (isSDRRole && SDR_PERMISSIONS.includes(module)) || (isCloserRole && CLOSER_PERMISSIONS.includes(module));
+                            const isFixed = user.role === 'admin' || (isSDRRole && SDR_PERMISSIONS.includes(module)) || (isCloserRole && CLOSER_PERMISSIONS.includes(module));
                             return (
                               <button
                                 key={module}
-                                onClick={() => !isCurrentUser && togglePermission.mutate({ 
-                                  userId: user.id, 
-                                  module, 
-                                  hasPermission: user.permissions.includes(module) 
+                                onClick={() => !isCurrentUser && !isFixed && togglePermission.mutate({
+                                  userId: user.id,
+                                  module,
+                                  hasPermission: user.permissions.includes(module)
                                 })}
-                                disabled={isCurrentUser || user.role === 'admin'}
+                                disabled={isCurrentUser || isFixed}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                                   hasPermission
                                     ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                } ${(isCurrentUser || user.role === 'admin') ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+                                } ${(isCurrentUser || isFixed) ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                               >
                                 {module}
                               </button>

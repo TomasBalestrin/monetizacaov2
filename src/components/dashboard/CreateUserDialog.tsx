@@ -131,8 +131,8 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                     <SelectContent>
                       <SelectItem value="admin">Administrador</SelectItem>
                       <SelectItem value="manager">Gerente</SelectItem>
-                      <SelectItem value="viewer">Visualizador</SelectItem>
-                      <SelectItem value="user">Usuário</SelectItem>
+                      <SelectItem value="viewer">SDR</SelectItem>
+                      <SelectItem value="user">Closer</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

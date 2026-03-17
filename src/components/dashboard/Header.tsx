@@ -72,9 +72,9 @@ export function Header({ onMenuClick }: HeaderProps) {
       case 'manager':
         return 'Gerente';
       case 'viewer':
-        return 'Visualizador';
+        return 'SDR';
       default:
-        return 'Usuário';
+        return 'Closer';
     }
   };
 

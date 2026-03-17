@@ -121,7 +121,7 @@ export function SDRDetailPage({
   onBack,
 }: SDRDetailPageProps) {
   const queryClient = useQueryClient();
-  const { isAdmin, isManager, selectedEntity } = useAuth();
+  const { isAdmin, isManager, selectedEntity, role } = useAuth();
   const [, setSearchParams] = useSearchParams();
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
@@ -138,7 +138,8 @@ export function SDRDetailPage({
 
   // Check if the logged-in user is the owner of this SDR profile
   const isOwner = selectedEntity?.entity_id === sdrId;
-  const canAddMetrics = isOwner || isAdmin || isManager;
+  const isSDRRole = role === 'viewer';
+  const canAddMetrics = isOwner || isAdmin || isManager || isSDRRole;
 
   const deleteMetric = useDeleteSDRMetric();
   const updateMetric = useUpdateSDRMetric();

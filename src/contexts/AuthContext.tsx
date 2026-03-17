@@ -182,8 +182,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const isSDR = role === 'viewer';
+  const SDR_PERMISSIONS = ['dashboard', 'sdrs', 'reports'];
+  const isCloser = isUser;
+  const CLOSER_PERMISSIONS = ['dashboard', 'closers', 'eagles', 'sharks', 'reports'];
+
   const hasPermission = (module: string): boolean => {
     if (isAdmin) return true;
+    if (isSDR) return SDR_PERMISSIONS.includes(module) || permissions.includes(module);
+    if (isCloser) return CLOSER_PERMISSIONS.includes(module) || permissions.includes(module);
     return permissions.includes(module);
   };
 
