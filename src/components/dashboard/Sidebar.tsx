@@ -42,7 +42,7 @@ const mainItems: MenuItem[] = [
   { id: 'closers', label: 'Closers', icon: UserCheck, permission: 'closers', expandable: true },
   { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs', expandable: true },
   { id: 'social_selling', label: 'Social Selling', icon: Users, permission: 'sdrs', expandable: true },
-  { id: 'funil_intensivo', label: 'Funil Intensivo', icon: Phone, permission: 'sdrs', expandable: true },
+  { id: 'funil_intensivo', label: 'Funil Intensivo', icon: Phone, permission: 'funil_intensivo', expandable: true },
   { id: 'meetings', label: 'Reuniões', icon: CalendarDays, permission: 'meetings' },
   { id: 'goals', label: 'Metas', icon: Target, permission: 'goals' },
   { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'reports' },

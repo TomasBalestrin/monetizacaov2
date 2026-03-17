@@ -16,7 +16,7 @@ import { FunnelManagerAdmin } from './FunnelManagerAdmin';
 import { ProductManagerAdmin } from './ProductManagerAdmin';
 import { ActivityLog } from './ActivityLog';
 
-const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'reports', 'admin'];
+const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'funil_intensivo', 'reports', 'admin'];
 
 export function AdminPanel() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
