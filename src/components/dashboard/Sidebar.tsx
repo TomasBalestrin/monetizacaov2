@@ -55,11 +55,13 @@ const adminItems: MenuItem[] = [
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isExpanded: boolean;
+  onExpandChange: (expanded: boolean) => void;
   activeModule: ModuleId;
   onModuleChange: (module: ModuleId) => void;
 }
 
-export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeModule, onModuleChange }: SidebarProps) {
   const { signOut, hasPermission, isAdmin, isManager } = useAuth();
   const [, setSearchParams] = useSearchParams();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
@@ -105,10 +107,46 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
   const filteredSquadItems = filterItems(squadItems);
   const filteredAdminItems = filterItems(adminItems);
 
-  const renderMenuItem = (item: MenuItem) => {
+  const renderMenuItem = (item: MenuItem, sidebarExpanded: boolean) => {
     const isActive = activeModule === item.id;
-    const isExpanded = expandedItems[item.id] || false;
+    const isItemExpanded = expandedItems[item.id] || false;
     const profiles = item.expandable ? getExpandableProfiles(item.id) : [];
+
+    // Collapsed desktop: icon-only button
+    if (!sidebarExpanded && item.expandable) {
+      return (
+        <div key={item.id}>
+          <button
+            onClick={() => {
+              setSearchParams({ module: item.id });
+              onModuleChange(item.id);
+              if (window.innerWidth < 768) onClose();
+            }}
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
+              'group relative',
+              isActive
+                ? 'bg-sidebar-primary/15 text-sidebar-primary font-semibold'
+                : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+              !sidebarExpanded && 'md:justify-center md:px-0'
+            )}
+            title={!sidebarExpanded ? item.label : undefined}
+          >
+            {isActive && (
+              <div className="absolute left-0 inset-y-1.5 w-[3px] rounded-r-full bg-sidebar-primary" />
+            )}
+            <item.icon
+              size={18}
+              className={cn(
+                'transition-colors shrink-0',
+                isActive ? 'text-sidebar-primary' : item.color || 'text-sidebar-foreground/50'
+              )}
+            />
+            <span className={cn('text-sm', !sidebarExpanded && 'md:hidden')}>{item.label}</span>
+          </button>
+        </div>
+      );
+    }
 
     if (item.expandable) {
       return (
@@ -153,7 +191,7 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
                 size={14}
                 className={cn(
                   'transition-transform duration-200',
-                  isExpanded && 'rotate-90'
+                  isItemExpanded && 'rotate-90'
                 )}
               />
             </button>
@@ -161,7 +199,7 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
           <div
             className={cn(
               'overflow-hidden transition-all duration-200',
-              isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+              isItemExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
             )}
           >
             <div className="mt-1 space-y-0.5">
@@ -204,8 +242,10 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
           'group relative',
           isActive
             ? 'bg-sidebar-primary/15 text-sidebar-primary font-semibold'
-            : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+            : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+          !sidebarExpanded && 'md:justify-center md:px-0'
         )}
+        title={!sidebarExpanded ? item.label : undefined}
       >
         {isActive && (
           <div className="absolute left-0 inset-y-1.5 w-[3px] rounded-r-full bg-sidebar-primary" />
@@ -217,7 +257,7 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
             isActive ? 'text-sidebar-primary' : item.color || 'text-sidebar-foreground/50'
           )}
         />
-        <span className="text-sm">{item.label}</span>
+        <span className={cn('text-sm', !sidebarExpanded && 'md:hidden')}>{item.label}</span>
       </button>
     );
   };
@@ -234,21 +274,26 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
 
       {/* Sidebar */}
       <aside
+        onClick={() => {
+          if (!isExpanded && window.innerWidth >= 768) onExpandChange(true);
+        }}
         className={cn(
-          'fixed left-0 top-0 h-full z-50 transition-all duration-300',
+          'fixed left-0 top-0 h-full z-50 transition-all duration-300 overflow-hidden',
           'bg-sidebar border-r border-sidebar-border',
-          'md:w-64 md:translate-x-0',
-          isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:translate-x-0',
+          isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full',
+          // Desktop: collapsed (w-16) or expanded (w-64), always visible
+          isExpanded ? 'md:w-64 md:translate-x-0' : 'md:w-16 md:translate-x-0',
+          !isExpanded && 'md:cursor-pointer',
         )}
       >
-        <div className="px-4 py-6 h-full flex flex-col">
+        <div className={cn('py-6 h-full flex flex-col transition-all duration-300', isExpanded ? 'px-4' : 'md:px-1.5 px-4')}>
           {/* Header */}
-          <div className="flex items-center justify-between mb-8 px-2">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center">
+          <div className={cn('flex items-center justify-between mb-8', isExpanded ? 'px-2' : 'md:px-0 md:justify-center px-2')}>
+            <div className={cn('flex items-center gap-3', !isExpanded && 'md:justify-center md:gap-0')}>
+              <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center shrink-0">
                 <TrendingUp size={18} className="text-white" />
               </div>
-              <div>
+              <div className={cn(!isExpanded && 'md:hidden')}>
                 <h2 className="text-[15px] font-bold text-sidebar-foreground">Monetização</h2>
                 <p className="text-[11px] text-sidebar-foreground/50">Dashboard de Vendas</p>
               </div>
@@ -265,19 +310,19 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
           <nav className="space-y-6 flex-1 overflow-y-auto">
             {/* Main section */}
             <div className="space-y-0.5">
-              <p className="px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2">
+              <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2', !isExpanded && 'md:hidden')}>
                 Principal
               </p>
-              {filteredMainItems.map(renderMenuItem)}
+              {filteredMainItems.map((item) => renderMenuItem(item, isExpanded))}
             </div>
 
             {/* Squads section */}
             {filteredSquadItems.length > 0 && (
               <div className="space-y-0.5">
-                <p className="px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2">
+                <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2', !isExpanded && 'md:hidden')}>
                   Squads
                 </p>
-                {filteredSquadItems.map(renderMenuItem)}
+                {filteredSquadItems.map((item) => renderMenuItem(item, isExpanded))}
               </div>
             )}
 
@@ -286,10 +331,10 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
               <>
                 <div className="mx-3 h-px bg-sidebar-border" />
                 <div className="space-y-0.5">
-                  <p className="px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2">
+                  <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2', !isExpanded && 'md:hidden')}>
                     Administração
                   </p>
-                  {filteredAdminItems.map(renderMenuItem)}
+                  {filteredAdminItems.map((item) => renderMenuItem(item, isExpanded))}
                 </div>
               </>
             )}
@@ -299,10 +344,14 @@ export function Sidebar({ isOpen, onClose, activeModule, onModuleChange }: Sideb
           <div className="mx-3 h-px bg-sidebar-border my-3" />
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200',
+              !isExpanded && 'md:justify-center md:px-0'
+            )}
+            title={!isExpanded ? 'Sair' : undefined}
           >
             <LogOut size={18} />
-            <span>Sair</span>
+            <span className={cn(!isExpanded && 'md:hidden')}>Sair</span>
           </button>
         </div>
       </aside>

@@ -5,6 +5,7 @@ import { Sidebar, ModuleId } from '@/components/dashboard/Sidebar';
 import { Header } from '@/components/dashboard/Header';
 import { BottomNavigation } from '@/components/dashboard/BottomNavigation';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { cn } from '@/lib/utils';
 import { SaleCelebrationOverlay } from '@/components/dashboard/SaleCelebrationOverlay';
 import { Loader2 } from 'lucide-react';
 
@@ -32,6 +33,7 @@ const Index = () => {
   const [searchParams] = useSearchParams();
   const { user, loading, isUser, needsEntitySelection } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleId>('dashboard');
 
   // Handle URL module parameter
@@ -96,11 +98,21 @@ const Index = () => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        isExpanded={sidebarExpanded}
+        onExpandChange={setSidebarExpanded}
         activeModule={activeModule}
         onModuleChange={setActiveModule}
       />
-      
-      <div className="md:pl-64 min-h-screen flex flex-col">
+
+      {/* Overlay to close expanded sidebar on desktop */}
+      {sidebarExpanded && (
+        <div
+          className="hidden md:block fixed inset-0 z-40"
+          onClick={() => setSidebarExpanded(false)}
+        />
+      )}
+
+      <div className={cn('min-h-screen flex flex-col transition-all duration-300', sidebarExpanded ? 'md:pl-64' : 'md:pl-16')}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
         
         <main className="flex-1 p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
