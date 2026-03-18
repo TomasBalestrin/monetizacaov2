@@ -171,5 +171,30 @@ export function useCreateCloser() {
   });
 }
 
+export function useUpdateCloser() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, ...updates }: { id: string; squad_id?: string; name?: string }) =>
+      closerRepo.updateCloser(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['closers'] });
+      queryClient.invalidateQueries({ queryKey: ['closers-for-linking'] });
+      toast({
+        title: 'Closer atualizado',
+        description: 'O closer foi atualizado com sucesso.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao atualizar closer',
+        description: String(error),
+      });
+    },
+  });
+}
+
 // Re-export types
 export type { Squad, Closer, Metric, CloserMetricRecord, SquadMetrics, CreateMetricPayload } from '@/model/entities/closer';

@@ -60,6 +60,51 @@ export async function fetchUserFunnels(userId: string): Promise<Funnel[]> {
     .filter((f: Funnel | null) => f && f.is_active);
 }
 
+export async function assignUserFunnel(closerId: string, funnelId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('user_funnels')
+    .insert({ user_id: closerId, funnel_id: funnelId, assigned_by: user?.id });
+  if (error) throw error;
+}
+
+export async function removeUserFunnel(closerId: string, funnelId: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_funnels')
+    .delete()
+    .eq('user_id', closerId)
+    .eq('funnel_id', funnelId);
+  if (error) throw error;
+}
+
+export async function fetchUserProducts(closerId: string): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from('user_products')
+    .select('product_id, products(id, name, is_active)')
+    .eq('user_id', closerId);
+  if (error) throw error;
+  return (data || [])
+    .map((up: any) => up.products as Product)
+    .filter((p: Product | null) => p && p.is_active);
+}
+
+export async function assignUserProduct(closerId: string, productId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('user_products')
+    .insert({ user_id: closerId, product_id: productId, assigned_by: user?.id });
+  if (error) throw error;
+}
+
+export async function removeUserProduct(closerId: string, productId: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_products')
+    .delete()
+    .eq('user_id', closerId)
+    .eq('product_id', productId);
+  if (error) throw error;
+}
+
 export async function fetchAllFunnelsSummary(
   periodStart?: string,
   periodEnd?: string

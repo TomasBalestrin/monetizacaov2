@@ -128,6 +128,17 @@ export async function deleteMetric(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateCloser(id: string, updates: { squad_id?: string; name?: string }): Promise<Closer> {
+  const { data, error } = await supabase
+    .from('closers')
+    .update(updates)
+    .eq('id', id)
+    .select('*, squad:squads(*)')
+    .single();
+  if (error) throw error;
+  return data as Closer;
+}
+
 export async function createCloser(name: string, squadId: string): Promise<Closer> {
   const { data, error } = await supabase
     .from('closers')

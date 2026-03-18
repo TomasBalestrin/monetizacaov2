@@ -21,7 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useClosers } from '@/controllers/useCloserController';
 import { useSDRs } from '@/controllers/useSdrController';
 
-export type ModuleId = 'dashboard' | 'closers' | 'eagles' | 'sharks' | 'sdrs' | 'social_selling' | 'funil_intensivo' | 'reports' | 'admin' | 'goals' | 'meetings';
+export type ModuleId = 'dashboard' | 'closers' | 'eagles' | 'sharks' | 'sdrs' | 'social_selling' | 'funil_intensivo' | 'reports' | 'admin' | 'goals' | 'meetings' | 'liderados';
 
 interface MenuItem {
   id: ModuleId;
@@ -43,6 +43,7 @@ const mainItems: MenuItem[] = [
   { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs', expandable: true },
   { id: 'social_selling', label: 'Social Selling', icon: Users, permission: 'sdrs', expandable: true },
   { id: 'funil_intensivo', label: 'Funil Intensivo', icon: Phone, permission: 'funil_intensivo', expandable: true },
+  { id: 'liderados', label: 'Liderados', icon: Shield, permission: 'liderados' },
   { id: 'meetings', label: 'Reuniões', icon: CalendarDays, permission: 'meetings' },
   { id: 'goals', label: 'Metas', icon: Target, permission: 'goals' },
   { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'reports' },
@@ -98,7 +99,7 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
     return items.filter((item) => {
       if (isAdmin) return true;
       if (item.id === 'admin') return false;
-      if (item.id === 'goals' || item.id === 'meetings') return isManager;
+      if (item.id === 'goals' || item.id === 'meetings' || item.id === 'liderados') return isManager;
       return hasPermission(item.permission);
     });
   };
@@ -142,7 +143,7 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
                 isActive ? 'text-sidebar-primary' : item.color || 'text-sidebar-foreground/50'
               )}
             />
-            <span className={cn('text-sm', !sidebarExpanded && 'md:hidden')}>{item.label}</span>
+            <span className={cn('text-sm whitespace-nowrap overflow-hidden transition-[opacity,max-width] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', sidebarExpanded ? 'md:opacity-100 md:max-w-[200px]' : 'md:opacity-0 md:max-w-0')}>{item.label}</span>
           </button>
         </div>
       );
@@ -257,7 +258,7 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
             isActive ? 'text-sidebar-primary' : item.color || 'text-sidebar-foreground/50'
           )}
         />
-        <span className={cn('text-sm', !sidebarExpanded && 'md:hidden')}>{item.label}</span>
+        <span className={cn('text-sm whitespace-nowrap overflow-hidden transition-[opacity,max-width] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', sidebarExpanded ? 'md:opacity-100 md:max-w-[200px]' : 'md:opacity-0 md:max-w-0')}>{item.label}</span>
       </button>
     );
   };
@@ -278,22 +279,21 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
           if (!isExpanded && window.innerWidth >= 768) onExpandChange(true);
         }}
         className={cn(
-          'fixed left-0 top-0 h-full z-50 transition-all duration-300 overflow-hidden',
+          'fixed left-0 top-0 h-full z-50 overflow-hidden',
           'bg-sidebar border-r border-sidebar-border',
+          'transition-[width,transform] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
           isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full',
           // Desktop: collapsed (w-16) or expanded (w-64), always visible
           isExpanded ? 'md:w-64 md:translate-x-0' : 'md:w-16 md:translate-x-0',
           !isExpanded && 'md:cursor-pointer',
         )}
       >
-        <div className={cn('py-6 h-full flex flex-col transition-all duration-300', isExpanded ? 'px-4' : 'md:px-1.5 px-4')}>
+        <div className={cn('py-6 h-full flex flex-col transition-[padding] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'px-4' : 'md:px-1.5 px-4')}>
           {/* Header */}
-          <div className={cn('flex items-center justify-between mb-8', isExpanded ? 'px-2' : 'md:px-0 md:justify-center px-2')}>
-            <div className={cn('flex items-center gap-3', !isExpanded && 'md:justify-center md:gap-0')}>
-              <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center shrink-0">
-                <TrendingUp size={18} className="text-white" />
-              </div>
-              <div className={cn(!isExpanded && 'md:hidden')}>
+          <div className={cn('flex items-center justify-between mb-8 transition-[padding] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'px-2' : 'md:px-0 md:justify-center px-2')}>
+            <div className={cn('flex items-center transition-[gap] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'gap-3' : 'md:gap-0 md:justify-center gap-3')}>
+              <img src="/logo.png" alt="Monetização" className="w-9 h-9 rounded-xl shrink-0 object-cover" />
+              <div className={cn('whitespace-nowrap overflow-hidden transition-[opacity,max-width] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'md:opacity-100 md:max-w-[200px]' : 'md:opacity-0 md:max-w-0')}>
                 <h2 className="text-[15px] font-bold text-sidebar-foreground">Monetização</h2>
                 <p className="text-[11px] text-sidebar-foreground/50">Dashboard de Vendas</p>
               </div>
@@ -310,7 +310,7 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
           <nav className="space-y-6 flex-1 overflow-y-auto">
             {/* Main section */}
             <div className="space-y-0.5">
-              <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2', !isExpanded && 'md:hidden')}>
+              <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2 whitespace-nowrap overflow-hidden transition-[opacity,max-height] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'md:opacity-100 md:max-h-6' : 'md:opacity-0 md:max-h-0 md:mb-0')}>
                 Principal
               </p>
               {filteredMainItems.map((item) => renderMenuItem(item, isExpanded))}
@@ -319,7 +319,7 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
             {/* Squads section */}
             {filteredSquadItems.length > 0 && (
               <div className="space-y-0.5">
-                <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2', !isExpanded && 'md:hidden')}>
+                <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2 whitespace-nowrap overflow-hidden transition-[opacity,max-height] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'md:opacity-100 md:max-h-6' : 'md:opacity-0 md:max-h-0 md:mb-0')}>
                   Squads
                 </p>
                 {filteredSquadItems.map((item) => renderMenuItem(item, isExpanded))}
@@ -331,7 +331,7 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
               <>
                 <div className="mx-3 h-px bg-sidebar-border" />
                 <div className="space-y-0.5">
-                  <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2', !isExpanded && 'md:hidden')}>
+                  <p className={cn('px-3 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.15em] mb-2 whitespace-nowrap overflow-hidden transition-[opacity,max-height] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'md:opacity-100 md:max-h-6' : 'md:opacity-0 md:max-h-0 md:mb-0')}>
                     Administração
                   </p>
                   {filteredAdminItems.map((item) => renderMenuItem(item, isExpanded))}
@@ -351,7 +351,7 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
             title={!isExpanded ? 'Sair' : undefined}
           >
             <LogOut size={18} />
-            <span className={cn(!isExpanded && 'md:hidden')}>Sair</span>
+            <span className={cn('whitespace-nowrap overflow-hidden transition-[opacity,max-width] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'md:opacity-100 md:max-w-[200px]' : 'md:opacity-0 md:max-w-0')}>Sair</span>
           </button>
         </div>
       </aside>

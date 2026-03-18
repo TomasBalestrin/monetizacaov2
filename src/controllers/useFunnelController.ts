@@ -231,5 +231,69 @@ export function useProductSummary(periodStart?: string, periodEnd?: string) {
   });
 }
 
+// Delegation hooks
+export function useAssignUserFunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ closerId, funnelId }: { closerId: string; funnelId: string }) =>
+      funnelRepo.assignUserFunnel(closerId, funnelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-funnels'] });
+      toast.success('Funil atribuído!');
+    },
+    onError: () => toast.error('Erro ao atribuir funil'),
+  });
+}
+
+export function useRemoveUserFunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ closerId, funnelId }: { closerId: string; funnelId: string }) =>
+      funnelRepo.removeUserFunnel(closerId, funnelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-funnels'] });
+      toast.success('Funil removido!');
+    },
+    onError: () => toast.error('Erro ao remover funil'),
+  });
+}
+
+export function useUserProducts(closerId?: string) {
+  return useQuery({
+    queryKey: ['user-products', closerId],
+    queryFn: async () => {
+      if (!closerId) return [];
+      return funnelRepo.fetchUserProducts(closerId);
+    },
+    enabled: !!closerId,
+  });
+}
+
+export function useAssignUserProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ closerId, productId }: { closerId: string; productId: string }) =>
+      funnelRepo.assignUserProduct(closerId, productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-products'] });
+      toast.success('Produto atribuído!');
+    },
+    onError: () => toast.error('Erro ao atribuir produto'),
+  });
+}
+
+export function useRemoveUserProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ closerId, productId }: { closerId: string; productId: string }) =>
+      funnelRepo.removeUserProduct(closerId, productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-products'] });
+      toast.success('Produto removido!');
+    },
+    onError: () => toast.error('Erro ao remover produto'),
+  });
+}
+
 // Re-export types
 export type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales, Product, ProductSummary } from '@/model/entities/funnel';

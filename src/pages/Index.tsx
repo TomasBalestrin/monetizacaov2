@@ -20,6 +20,7 @@ const EntitySelectionScreen = lazy(() => import('@/components/dashboard/EntitySe
 const GoalsConfig = lazy(() => import('@/components/dashboard/GoalsConfig').then(m => ({ default: m.GoalsConfig })));
 const MeetingsPage = lazy(() => import('@/components/dashboard/meetings').then(m => ({ default: m.MeetingsPage })));
 const ReportsPage = lazy(() => import('@/components/dashboard/reports').then(m => ({ default: m.ReportsPage })));
+const LideradosPanel = lazy(() => import('@/components/dashboard/LideradosPanel').then(m => ({ default: m.LideradosPanel })));
 
 function PageLoader() {
   return (
@@ -39,7 +40,7 @@ const Index = () => {
   // Handle URL module parameter
   useEffect(() => {
     const moduleParam = searchParams.get('module');
-    if (moduleParam && ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'social_selling', 'funil_intensivo', 'reports', 'admin', 'goals', 'meetings'].includes(moduleParam)) {
+    if (moduleParam && ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'social_selling', 'funil_intensivo', 'reports', 'admin', 'goals', 'meetings', 'liderados'].includes(moduleParam)) {
       setActiveModule(moduleParam as ModuleId);
     }
   }, [searchParams]);
@@ -88,6 +89,8 @@ const Index = () => {
         return <SDRDashboard sdrType="funil_intensivo" />;
       case 'reports':
         return <ReportsPage />;
+      case 'liderados':
+        return <LideradosPanel />;
       default:
         return <DashboardOverview />;
     }
@@ -112,7 +115,7 @@ const Index = () => {
         />
       )}
 
-      <div className={cn('min-h-screen flex flex-col transition-all duration-300', sidebarExpanded ? 'md:pl-64' : 'md:pl-16')}>
+      <div className={cn('min-h-screen flex flex-col transition-[padding] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', sidebarExpanded ? 'md:pl-64' : 'md:pl-16')}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
         
         <main className="flex-1 p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
