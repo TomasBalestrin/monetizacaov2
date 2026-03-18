@@ -146,5 +146,30 @@ export function useDeleteMetric() {
   });
 }
 
+export function useCreateCloser() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ name, squadId }: { name: string; squadId: string }) =>
+      closerRepo.createCloser(name, squadId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['closers'] });
+      queryClient.invalidateQueries({ queryKey: ['closers-for-linking'] });
+      toast({
+        title: 'Closer criado',
+        description: 'O closer foi criado com sucesso.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao criar closer',
+        description: String(error),
+      });
+    },
+  });
+}
+
 // Re-export types
 export type { Squad, Closer, Metric, CloserMetricRecord, SquadMetrics, CreateMetricPayload } from '@/model/entities/closer';

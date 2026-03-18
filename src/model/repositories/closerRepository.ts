@@ -127,3 +127,14 @@ export async function deleteMetric(id: string): Promise<void> {
 
   if (error) throw error;
 }
+
+export async function createCloser(name: string, squadId: string): Promise<Closer> {
+  const { data, error } = await supabase
+    .from('closers')
+    .insert({ name, squad_id: squadId })
+    .select('*, squad:squads(*)')
+    .single();
+
+  if (error) throw error;
+  return data as Closer;
+}

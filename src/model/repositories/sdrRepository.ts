@@ -365,3 +365,14 @@ export async function deleteSDRMetric(id: string): Promise<void> {
 
   if (error) throw error;
 }
+
+export async function createSDR(name: string, type: 'sdr' | 'social_selling' | 'funil_intensivo'): Promise<SDR> {
+  const { data, error } = await supabase
+    .from('sdrs')
+    .insert({ name, type })
+    .select('id, name, type, created_at, updated_at')
+    .single();
+
+  if (error) throw error;
+  return data as SDR;
+}

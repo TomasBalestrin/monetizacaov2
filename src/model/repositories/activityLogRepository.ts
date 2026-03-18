@@ -33,7 +33,6 @@ async function fetchCloserMetricLogs(periodStart?: string, periodEnd?: string): 
   let query = supabase
     .from('metrics')
     .select('id, calls, sales, revenue, entries, created_at, created_by, closer:closers(name), funnel:funnels(name), product:products(name)')
-    .not('created_by', 'is', null)
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -65,7 +64,7 @@ async function fetchCloserMetricLogs(periodStart?: string, periodEnd?: string): 
     return {
       id: `metric-${d.id}`,
       type: 'closer_metric' as const,
-      user_email: emailMap.get(d.created_by!) || d.created_by!,
+      user_email: d.created_by ? (emailMap.get(d.created_by) || d.created_by) : 'Sistema',
       description: `Adicionou métrica de ${closerName}: ${details}${context ? ` (${context})` : ''}`,
       created_at: d.created_at,
     };
@@ -76,7 +75,6 @@ async function fetchSdrMetricLogs(periodStart?: string, periodEnd?: string): Pro
   let query = supabase
     .from('sdr_metrics')
     .select('id, activated, scheduled, attended, sales, funnel, created_at, created_by, sdr:sdrs(name, type)')
-    .not('created_by', 'is', null)
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -104,7 +102,7 @@ async function fetchSdrMetricLogs(periodStart?: string, periodEnd?: string): Pro
     return {
       id: `sdr-metric-${d.id}`,
       type: 'sdr_metric' as const,
-      user_email: emailMap.get(d.created_by!) || d.created_by!,
+      user_email: d.created_by ? (emailMap.get(d.created_by) || d.created_by) : 'Sistema',
       description: `Adicionou métrica ${sdrType} de ${sdrName}: ${details}${d.funnel ? ` (${d.funnel})` : ''}`,
       created_at: d.created_at,
     };
@@ -114,8 +112,7 @@ async function fetchSdrMetricLogs(periodStart?: string, periodEnd?: string): Pro
 async function fetchGoalLogs(periodStart?: string, periodEnd?: string): Promise<ActivityLogEntry[]> {
   let query = supabase
     .from('goals')
-    .select('id, entity_type, target_value, metric_type, created_at, created_by')
-    .not('created_by', 'is', null)
+    .select('id, entity_type, target_value, metric_key, created_at, created_by')
     .order('created_at', { ascending: false })
     .limit(100);
 
@@ -132,8 +129,8 @@ async function fetchGoalLogs(periodStart?: string, periodEnd?: string): Promise<
   return data.map(d => ({
     id: `goal-${d.id}`,
     type: 'goal' as const,
-    user_email: emailMap.get(d.created_by!) || d.created_by!,
-    description: `Definiu meta ${d.metric_type || ''} para ${d.entity_type || 'entidade'}: ${d.target_value}`,
+    user_email: d.created_by ? (emailMap.get(d.created_by) || d.created_by) : 'Sistema',
+    description: `Definiu meta ${d.metric_key || ''} para ${d.entity_type || 'entidade'}: ${d.target_value}`,
     created_at: d.created_at,
   }));
 }

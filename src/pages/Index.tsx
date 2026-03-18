@@ -62,18 +62,6 @@ const Index = () => {
     );
   }
 
-  // Role "user" gets a dedicated layout without sidebar
-  if (isUser) {
-    return (
-      <>
-        <Suspense fallback={<PageLoader />}>
-          <UserDashboard />
-        </Suspense>
-        <SaleCelebrationOverlay />
-      </>
-    );
-  }
-
   const renderContent = () => {
     switch (activeModule) {
       case 'dashboard':

@@ -10,7 +10,7 @@ import {
 import { SquadMetricsForm, type SquadMetricsFormValues } from './SquadMetricsForm';
 import { useCreateMetric, useUpdateMetric, useSquads, type CloserMetricRecord } from '@/controllers/useCloserController';
 import { useFunnels } from '@/controllers/useFunnelController';
-import { incrementSdrSales } from '@/model/repositories/sdrRepository';
+import { incrementSdrSales, decrementSdrSales } from '@/model/repositories/sdrRepository';
 
 interface SquadMetricsDialogProps {
   open: boolean;
@@ -52,6 +52,10 @@ export function SquadMetricsDialog({
 
     if (isEditing) {
       // Edição: atualizar registro existente
+      const oldSdrId = metric.sdr_id || null;
+      const newSdrId = values.sdr_id || null;
+      const sdrChanged = oldSdrId !== newSdrId;
+
       await updateMetric.mutateAsync({
         id: metric.id,
         closer_id: values.closer_id,
@@ -68,10 +72,30 @@ export function SquadMetricsDialog({
         cancellation_entries: values.cancellation_entries ?? 0,
         source: 'manual',
         funnel_id: values.funnel_id || null,
-        sdr_id: values.sdr_id || null,
+        sdr_id: newSdrId,
         product_id: values.product_id || null,
       });
-      // Skip SDR increment on edit to avoid double-counting
+
+      // Sync SDR metrics when sdr_id changes on edit
+      if (sdrChanged) {
+        try {
+          // Decrement old SDR
+          if (oldSdrId && (metric.sales > 0 || Number(metric.revenue) > 0 || Number(metric.entries) > 0)) {
+            const oldFunnelName = metric.sdr?.name ? (metric.funnel?.name || '') : (metric.funnel?.name || '');
+            await decrementSdrSales(oldSdrId, metric.period_start, oldFunnelName, metric.sales || 0, Number(metric.revenue) || 0, Number(metric.entries) || 0);
+          }
+          // Increment new SDR
+          const newSales = values.sales ?? 0;
+          const newRevenue = values.revenue || 0;
+          const newEntries = values.entries || 0;
+          if (newSdrId && (newSales > 0 || newRevenue > 0 || newEntries > 0)) {
+            const funnelName = values.funnel_id ? (funnels?.find(f => f.id === values.funnel_id)?.name || '') : '';
+            await incrementSdrSales(newSdrId, periodStart, funnelName, newSales, newRevenue, newEntries);
+          }
+        } catch (err) {
+          console.error('Error syncing SDR sales on edit:', err);
+        }
+      }
     } else if (values.call_entries && values.call_entries.length > 0 && values.calls > 1) {
       // Múltiplas calls: criar um registro por call
       const cleanFunnelId = values.funnel_id || null;

@@ -241,6 +241,25 @@ export function useDeleteSDRMetric() {
   });
 }
 
+export function useCreateSDR() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ name, type }: { name: string; type: 'sdr' | 'social_selling' | 'funil_intensivo' }) =>
+      sdrRepo.createSDR(name, type),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sdrs'] });
+      queryClient.invalidateQueries({ queryKey: ['sdrs-for-linking'] });
+      queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics'] });
+      toast.success('Perfil criado com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Error creating SDR:', error);
+      toast.error('Erro ao criar perfil');
+    },
+  });
+}
+
 // Re-export types and service
 export type { SDR, SDRMetric, SDRAggregatedMetrics, SDRWithMetrics, SDRFunnelWithDate } from '@/model/entities/sdr';
 export { calculateAggregatedMetrics } from '@/model/services/sdrService';

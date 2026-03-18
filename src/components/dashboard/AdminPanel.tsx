@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { MetricsTable } from './MetricsTable';
 import { CreateUserDialog } from './CreateUserDialog';
+import { CreateEntityDialog } from './CreateEntityDialog';
 import { EditUserLinksDialog } from './EditUserLinksDialog';
 import { GoalsConfig } from './GoalsConfig';
 import { FunnelManagerAdmin } from './FunnelManagerAdmin';
@@ -20,6 +21,7 @@ const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'funil_inte
 
 export function AdminPanel() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreateEntityDialogOpen, setIsCreateEntityDialogOpen] = useState(false);
   const [editLinksUser, setEditLinksUser] = useState<{ id: string; email: string } | null>(null);
   const [deleteUserTarget, setDeleteUserTarget] = useState<{ id: string; email: string } | null>(null);
   const { user: currentUser } = useAuth();
@@ -98,10 +100,16 @@ export function AdminPanel() {
                     {users?.length || 0} usuários no sistema
                   </p>
                 </div>
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Novo Usuário
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setIsCreateEntityDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Novo Perfil
+                  </Button>
+                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Novo Usuário
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -237,9 +245,14 @@ export function AdminPanel() {
         </TabsContent>
       </Tabs>
 
-      <CreateUserDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={setIsCreateDialogOpen} 
+      <CreateUserDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+
+      <CreateEntityDialog
+        open={isCreateEntityDialogOpen}
+        onOpenChange={setIsCreateEntityDialogOpen}
       />
 
       {editLinksUser && (
