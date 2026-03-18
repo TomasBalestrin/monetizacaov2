@@ -14,8 +14,11 @@ import {
   CalendarDays,
   UserCheck,
   ChevronRight,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClosers } from '@/controllers/useCloserController';
@@ -64,6 +67,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeModule, onModuleChange }: SidebarProps) {
   const { signOut, hasPermission, isAdmin, isManager } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [, setSearchParams] = useSearchParams();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
@@ -340,8 +344,26 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
             )}
           </nav>
 
-          {/* Logout */}
+          {/* Theme Toggle */}
           <div className="mx-3 h-px bg-sidebar-border my-3" />
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-200',
+              !isExpanded && 'md:justify-center md:px-0'
+            )}
+            title={!isExpanded ? (theme === 'dark' ? 'Modo Claro' : 'Modo Escuro') : undefined}
+          >
+            <div className="relative w-[18px] h-[18px] shrink-0">
+              <Sun size={18} className={cn('absolute inset-0 transition-all duration-300', theme === 'dark' ? 'rotate-0 scale-100 opacity-100' : 'rotate-90 scale-0 opacity-0')} />
+              <Moon size={18} className={cn('absolute inset-0 transition-all duration-300', theme === 'dark' ? '-rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100')} />
+            </div>
+            <span className={cn('whitespace-nowrap overflow-hidden transition-[opacity,max-width] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]', isExpanded ? 'md:opacity-100 md:max-w-[200px]' : 'md:opacity-0 md:max-w-0')}>
+              {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
+            </span>
+          </button>
+
+          {/* Logout */}
           <button
             onClick={handleLogout}
             className={cn(
