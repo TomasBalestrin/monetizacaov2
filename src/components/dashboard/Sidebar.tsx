@@ -44,7 +44,7 @@ const mainItems: MenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard' },
   { id: 'closers', label: 'Closers', icon: UserCheck, permission: 'closers', expandable: true },
   { id: 'sdrs', label: 'SDRs', icon: Phone, permission: 'sdrs', expandable: true },
-  { id: 'social_selling', label: 'Social Selling', icon: Users, permission: 'sdrs', expandable: true },
+  { id: 'social_selling', label: 'Social Selling', icon: Users, permission: 'social_selling', expandable: true },
   { id: 'funil_intensivo', label: 'Funil Intensivo', icon: Phone, permission: 'funil_intensivo', expandable: true },
   { id: 'liderados', label: 'Liderados', icon: Shield, permission: 'liderados' },
   { id: 'meetings', label: 'Reuniões', icon: CalendarDays, permission: 'meetings' },
@@ -66,7 +66,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeModule, onModuleChange }: SidebarProps) {
-  const { signOut, hasPermission, isAdmin, isManager } = useAuth();
+  const { signOut, hasPermission, isAdmin, isManager, role, entityLinks } = useAuth();
   const { theme, setTheme } = useTheme();
   const [, setSearchParams] = useSearchParams();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
@@ -84,16 +84,31 @@ export function Sidebar({ isOpen, onClose, isExpanded, onExpandChange, activeMod
     setExpandedItems((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const linkedCloserIds = role === 'user'
+    ? entityLinks.filter(l => l.entity_type === 'closer').map(l => l.entity_id)
+    : null;
+  const linkedSdrIds = role === 'viewer'
+    ? entityLinks.filter(l => l.entity_type === 'sdr').map(l => l.entity_id)
+    : null;
+
   const getExpandableProfiles = (itemId: ModuleId) => {
     switch (itemId) {
-      case 'closers':
-        return closers?.map((c) => ({ id: c.id, name: c.name })) || [];
-      case 'sdrs':
-        return sdrs?.map((s) => ({ id: s.id, name: s.name })) || [];
-      case 'social_selling':
-        return socialSellers?.map((s) => ({ id: s.id, name: s.name })) || [];
-      case 'funil_intensivo':
-        return funilIntensivo?.map((s) => ({ id: s.id, name: s.name })) || [];
+      case 'closers': {
+        const all = closers?.map((c) => ({ id: c.id, name: c.name })) || [];
+        return linkedCloserIds ? all.filter(c => linkedCloserIds.includes(c.id)) : all;
+      }
+      case 'sdrs': {
+        const all = sdrs?.map((s) => ({ id: s.id, name: s.name })) || [];
+        return linkedSdrIds ? all.filter(s => linkedSdrIds.includes(s.id)) : all;
+      }
+      case 'social_selling': {
+        const all = socialSellers?.map((s) => ({ id: s.id, name: s.name })) || [];
+        return linkedSdrIds ? all.filter(s => linkedSdrIds.includes(s.id)) : all;
+      }
+      case 'funil_intensivo': {
+        const all = funilIntensivo?.map((s) => ({ id: s.id, name: s.name })) || [];
+        return linkedSdrIds ? all.filter(s => linkedSdrIds.includes(s.id)) : all;
+      }
       default:
         return [];
     }

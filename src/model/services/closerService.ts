@@ -33,22 +33,19 @@ function aggregateCloserRawTotals(metrics: Metric[]): RawCloserTotals {
  * Calcula as métricas finais de um closer (com net values e trends)
  */
 function calculateCloserMetrics(rawTotals: RawCloserTotals, referenceDate: Date): CloserMetricTotals {
-  const netRevenue = rawTotals.revenue - rawTotals.cancellationValue;
-  const netEntries = rawTotals.entries - rawTotals.cancellationEntries;
-  const netSales = rawTotals.sales - rawTotals.cancellations;
-
-  const revenueTrend = calculateTrend(netRevenue, referenceDate);
-  const entriesTrend = calculateTrend(netEntries, referenceDate);
+  // Valores brutos (cancelamentos são exibidos separadamente)
+  const revenueTrend = calculateTrend(rawTotals.revenue, referenceDate);
+  const entriesTrend = calculateTrend(rawTotals.entries, referenceDate);
   const cancellationRate = rawTotals.sales > 0 ? (rawTotals.cancellations / rawTotals.sales) * 100 : 0;
 
   return {
     calls: rawTotals.calls,
-    sales: netSales,
-    revenue: netRevenue,
-    entries: netEntries,
+    sales: rawTotals.sales,
+    revenue: rawTotals.revenue,
+    entries: rawTotals.entries,
     revenueTrend,
     entriesTrend,
-    conversion: rawTotals.calls > 0 ? (netSales / rawTotals.calls) * 100 : 0,
+    conversion: rawTotals.calls > 0 ? (rawTotals.sales / rawTotals.calls) * 100 : 0,
     cancellations: rawTotals.cancellations,
     cancellationValue: rawTotals.cancellationValue,
     cancellationEntries: rawTotals.cancellationEntries,
@@ -102,8 +99,8 @@ export function aggregateSquadMetrics(
 
     const squadRevenueTrend = calculateTrend(totals.revenue, referenceDate);
     const squadEntriesTrend = calculateTrend(totals.entries, referenceDate);
-    const grossSales = totals.sales + totals.cancellations;
-    const squadCancellationRate = grossSales > 0 ? (totals.cancellations / grossSales) * 100 : 0;
+    // sales já é bruto, não precisa somar cancellations
+    const squadCancellationRate = totals.sales > 0 ? (totals.cancellations / totals.sales) * 100 : 0;
 
     return {
       squad,
@@ -142,8 +139,8 @@ export function calculateTotalMetrics(
   const revenueTrendResult = calculateTrendDetailed(totals.revenue, referenceDate);
   const entriesTrendResult = calculateTrendDetailed(totals.entries, referenceDate);
 
-  const grossSales = totals.sales + totals.cancellations;
-  const cancellationRate = grossSales > 0 ? (totals.cancellations / grossSales) * 100 : 0;
+  // sales já é bruto, não precisa somar cancellations
+  const cancellationRate = totals.sales > 0 ? (totals.cancellations / totals.sales) * 100 : 0;
 
   return {
     ...totals,

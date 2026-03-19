@@ -183,9 +183,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const isSDR = role === 'viewer';
-  const SDR_PERMISSIONS = ['dashboard', 'sdrs', 'reports'];
+  const SDR_PERMISSIONS = ['sdrs'];
   const isCloser = isUser;
-  const CLOSER_PERMISSIONS = ['dashboard', 'closers', 'eagles', 'sharks', 'reports'];
+  const CLOSER_PERMISSIONS = ['closers'];
 
   const hasPermission = (module: string): boolean => {
     if (isAdmin) return true;

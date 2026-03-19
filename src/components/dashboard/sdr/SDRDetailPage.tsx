@@ -341,10 +341,9 @@ export function SDRDetailPage({
             <Button
               onClick={() => setShowMetricsDialog(true)}
               size="sm"
-              variant="outline"
-              className="rounded-xl h-8 text-xs gap-1.5"
+              className="rounded-xl h-9 text-sm gap-2 font-semibold shadow-sm"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               Metrica
             </Button>
           </div>

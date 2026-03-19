@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Phone, Users, UserCheck, Calendar, TrendingUp, ShoppingCart, CalendarPlus, Filter, ChevronRight, MessageSquare, Clock, Link, Ticket, CheckCircle, Settings, DollarSign, CreditCard } from 'lucide-react';
@@ -34,7 +34,7 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
 
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, role, entityLinks } = useAuth();
 
   // Enable realtime subscriptions for automatic updates
   useRealtimeSDRMetrics();
@@ -58,7 +58,24 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
 
   // Check if viewing a specific SDR
   const selectedSdrId = searchParams.get('sdr');
-  
+
+  // Guard: SDRs (role "viewer") só podem ver seus próprios SDRs
+  const linkedSdrIds = useMemo(() => {
+    if (role !== 'viewer') return null;
+    return entityLinks.filter(l => l.entity_type === 'sdr').map(l => l.entity_id);
+  }, [role, entityLinks]);
+
+  // Guard: redirecionar para perfil próprio (sem visão geral) ou bloquear acesso a outro SDR
+  const needsRedirect = linkedSdrIds && (!selectedSdrId || !linkedSdrIds.includes(selectedSdrId));
+  useEffect(() => {
+    if (needsRedirect && linkedSdrIds) {
+      const firstLinked = linkedSdrIds[0];
+      if (firstLinked) {
+        setSearchParams(prev => { prev.set('sdr', firstLinked); return prev; });
+      }
+    }
+  }, [needsRedirect, linkedSdrIds, setSearchParams]);
+
   const { periodStart, periodEnd } = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
 
   const { data: totalMetricsRpc, isLoading: isLoadingTotal } = useSDRTotalMetrics(
@@ -133,6 +150,9 @@ export function SDRDashboard({ sdrType }: SDRDashboardProps) {
     await queryClient.invalidateQueries({ queryKey: ['sdr-total-metrics'] });
     await queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics-raw'] });
   }, [queryClient]);
+
+  // Wait for redirect to complete
+  if (needsRedirect) return null;
 
   // If a specific SDR is selected, render the detail page
   if (selectedSdrId) {

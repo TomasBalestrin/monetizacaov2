@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserCheck, Plus, Filter, Package } from 'lucide-react';
@@ -16,10 +16,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { aggregateSquadMetrics } from '@/model/services/closerService';
 import { parseDateString } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function ClosersDashboard() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { role, entityLinks } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(() => new Date());
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
@@ -29,6 +31,23 @@ export function ClosersDashboard() {
   useRealtimeMetrics();
 
   const selectedCloserId = searchParams.get('closer');
+
+  // Guard: closers (role "user") só podem ver seus próprios closers
+  const linkedCloserIds = useMemo(() => {
+    if (role !== 'user') return null;
+    return entityLinks.filter(l => l.entity_type === 'closer').map(l => l.entity_id);
+  }, [role, entityLinks]);
+
+  // Guard: redirecionar para perfil próprio (sem visão geral) ou bloquear acesso a outro closer
+  const needsRedirect = linkedCloserIds && (!selectedCloserId || !linkedCloserIds.includes(selectedCloserId));
+  useEffect(() => {
+    if (needsRedirect && linkedCloserIds) {
+      const firstLinked = linkedCloserIds[0];
+      if (firstLinked) {
+        setSearchParams(prev => { prev.set('closer', firstLinked); return prev; });
+      }
+    }
+  }, [needsRedirect, linkedCloserIds, setSearchParams]);
   const { periodStart, periodEnd } = useMemo(() => getMonthPeriod(selectedMonth), [selectedMonth]);
   const { squadMetrics, isLoading } = useSquadMetrics(periodStart, periodEnd);
   const { data: rawMetrics } = useMetrics(periodStart, periodEnd);
@@ -92,6 +111,9 @@ export function ClosersDashboard() {
     await queryClient.invalidateQueries({ queryKey: ['metrics'] });
     await queryClient.invalidateQueries({ queryKey: ['squads'] });
   }, [queryClient]);
+
+  // Wait for redirect to complete
+  if (needsRedirect) return null;
 
   // If a specific closer is selected, render the detail page
   if (selectedCloserId) {

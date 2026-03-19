@@ -78,10 +78,10 @@ function calculateAggregatedMetrics(metrics: CloserMetricRecord[], squadSlug: st
   const totalCancellationValue = metrics.reduce((sum, m) => sum + (m.cancellation_value || 0), 0);
   const totalCancellationEntries = metrics.reduce((sum, m) => sum + (m.cancellation_entries || 0), 0);
 
-  // Net Sales
-  const totalSales = grossSales - totalCancellations;
-  const totalRevenue = grossRevenue - totalCancellationValue;
-  const totalEntries = grossEntries - totalCancellationEntries;
+  // Valores brutos (cancelamentos são exibidos separadamente)
+  const totalSales = grossSales;
+  const totalRevenue = grossRevenue;
+  const totalEntries = grossEntries;
 
   // Tendências baseadas nos valores brutos da planilha
   const revenueTrend = metrics.reduce((sum, m) => sum + (m.revenue_trend || 0), 0);
@@ -370,12 +370,11 @@ export function CloserDetailPage({
               )}
             </div>
             <Button
-              variant="outline"
               size="sm"
               onClick={() => setIsMetricsDialogOpen(true)}
-              className="rounded-xl h-8 text-xs gap-1.5"
+              className="rounded-xl h-9 text-sm gap-2 font-semibold shadow-sm"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               Metrica
             </Button>
           </div>

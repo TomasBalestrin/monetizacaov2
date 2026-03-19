@@ -17,7 +17,7 @@ import { FunnelManagerAdmin } from './FunnelManagerAdmin';
 import { ProductManagerAdmin } from './ProductManagerAdmin';
 import { ActivityLog } from './ActivityLog';
 
-const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'funil_intensivo', 'reports', 'admin'];
+const MODULES = ['dashboard', 'closers', 'eagles', 'sharks', 'sdrs', 'social_selling', 'funil_intensivo', 'reports', 'admin'];
 
 export function AdminPanel() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -182,8 +182,8 @@ export function AdminPanel() {
                         <p className="text-foreground text-sm mb-2 font-medium">Permissões de Acesso:</p>
                         <div className="flex flex-wrap gap-2">
                           {MODULES.map((module) => {
-                            const SDR_PERMISSIONS = ['dashboard', 'sdrs', 'reports'];
-                            const CLOSER_PERMISSIONS = ['dashboard', 'closers', 'eagles', 'sharks', 'reports'];
+                            const SDR_PERMISSIONS = ['sdrs'];
+                            const CLOSER_PERMISSIONS = ['closers'];
                             const isSDRRole = user.role === 'viewer';
                             const isCloserRole = user.role === 'user';
                             const hasPermission = user.permissions.includes(module) || user.role === 'admin' || (isSDRRole && SDR_PERMISSIONS.includes(module)) || (isCloserRole && CLOSER_PERMISSIONS.includes(module));

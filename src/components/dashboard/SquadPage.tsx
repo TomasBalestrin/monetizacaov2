@@ -79,13 +79,12 @@ export function SquadPage({ squadSlug }: SquadPageProps) {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Squad {squad.name}</h1>
           <Button
-            variant="outline"
             size="sm"
             onClick={() => setIsMetricsDialogOpen(true)}
-            className="gap-2 rounded-xl"
+            className="rounded-xl h-9 text-sm gap-2 font-semibold shadow-sm"
           >
-            <Plus size={16} />
-            Adicionar Metrica
+            <Plus className="h-4 w-4" />
+            Metrica
           </Button>
         </div>
         <MonthSelector

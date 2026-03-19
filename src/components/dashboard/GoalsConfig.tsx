@@ -47,15 +47,9 @@ export function GoalsConfig() {
     const vals: Record<string, number> = {};
     if (entityType === 'closer' && closerMetrics) {
       vals.calls = closerMetrics.reduce((sum, m) => sum + (m.calls || 0), 0);
-      const grossSales = closerMetrics.reduce((sum, m) => sum + (m.sales || 0), 0);
-      const cancellations = closerMetrics.reduce((sum, m) => sum + (m.cancellations || 0), 0);
-      vals.sales = grossSales - cancellations;
-      const grossRevenue = closerMetrics.reduce((sum, m) => sum + (m.revenue || 0), 0);
-      const cancelValue = closerMetrics.reduce((sum, m) => sum + (m.cancellation_value || 0), 0);
-      vals.revenue = grossRevenue - cancelValue;
-      const grossEntries = closerMetrics.reduce((sum, m) => sum + (m.entries || 0), 0);
-      const cancelEntries = closerMetrics.reduce((sum, m) => sum + (m.cancellation_entries || 0), 0);
-      vals.entries = grossEntries - cancelEntries;
+      vals.sales = closerMetrics.reduce((sum, m) => sum + (m.sales || 0), 0);
+      vals.revenue = closerMetrics.reduce((sum, m) => sum + (m.revenue || 0), 0);
+      vals.entries = closerMetrics.reduce((sum, m) => sum + (m.entries || 0), 0);
     } else if (entityType === 'sdr' && sdrMetrics) {
       vals.activated = sdrMetrics.reduce((sum, m) => sum + (m.activated || 0), 0);
       vals.scheduled = sdrMetrics.reduce((sum, m) => sum + (m.scheduled || 0), 0);

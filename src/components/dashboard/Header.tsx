@@ -3,6 +3,7 @@ import { Menu, User, Timer } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { NotificationPanel } from './NotificationPanel';
+import { ProfileDialog } from './ProfileDialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -64,6 +65,7 @@ function FICountdown() {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, role, signOut, isAdmin, isManager } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const getRoleLabel = (role: string | null) => {
     switch (role) {
@@ -95,6 +97,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
+  <>
     <header
       className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl"
       style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
@@ -151,7 +154,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setProfileOpen(true)}>
                 <User className="mr-2 h-4 w-4" />
                 Meu Perfil
               </DropdownMenuItem>
@@ -167,5 +170,8 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
     </header>
+
+    <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
+  </>
   );
 }
