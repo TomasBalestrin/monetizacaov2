@@ -53,7 +53,8 @@ interface FunnelEntry {
 export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: CloserFunnelFormProps) {
   const [date, setDate] = useState<Date>(new Date());
   const { data: funnels, isLoading: loadingFunnels } = useUserFunnels(closerId);
-  const { data: sdrs } = useSDRs();
+  const { data: allSdrs } = useSDRs();
+  const sdrs = allSdrs?.filter(s => s.type !== 'funil_intensivo');
   const { data: products } = useProducts();
   const createData = useCreateFunnelDailyData();
 

@@ -155,7 +155,8 @@ export function SquadMetricsForm({
   const { data: closers } = useClosers(squadId);
   const { data: allProducts } = useProducts();
   const { data: allFunnels } = useFunnels();
-  const { data: allSDRs } = useSDRs();
+  const { data: rawSDRs } = useSDRs();
+  const allSDRs = rawSDRs?.filter(s => s.type !== 'funil_intensivo');
 
   const form = useForm<SquadMetricsFormValues>({
     resolver: zodResolver(squadMetricsSchema),

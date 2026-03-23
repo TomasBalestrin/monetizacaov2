@@ -62,7 +62,8 @@ interface MetricsFormProps {
 export function MetricsForm({ defaultValues, onSubmit, isLoading }: MetricsFormProps) {
   const { data: squads } = useSquads();
   const { data: closers } = useClosers();
-  const { data: sdrs } = useSDRs();
+  const { data: allSdrs } = useSDRs();
+  const sdrs = allSdrs?.filter(s => s.type !== 'funil_intensivo');
 
   const form = useForm<MetricsFormValues>({
     resolver: zodResolver(metricsFormSchema),
