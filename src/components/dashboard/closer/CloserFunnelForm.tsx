@@ -101,6 +101,7 @@ export function CloserFunnelForm({ open, onOpenChange, closerId, closerName }: C
       nonEmpty.map((e) => ({
         user_id: closerId,
         funnel_id: e.funnel_id,
+        funnel_name: e.funnel_name,
         date: dateStr,
         calls_scheduled: e.calls_scheduled,
         calls_done: e.calls_done,

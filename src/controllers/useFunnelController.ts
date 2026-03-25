@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as funnelRepo from '@/model/repositories/funnelRepository';
+import * as sdrRepo from '@/model/repositories/sdrRepository';
 import type { Funnel, FunnelSummary, FunnelReport, FunnelDailyData, PersonProductSales, Product, ProductSummary } from '@/model/entities/funnel';
 
 export function useFunnels() {
@@ -57,21 +58,43 @@ export function useCreateFunnelDailyData() {
     mutationFn: async (records: {
       user_id: string;
       funnel_id: string;
+      funnel_name?: string;
       date: string;
       calls_scheduled?: number;
       calls_done?: number;
       sales_count?: number;
       sales_value?: number;
+      entries_value?: number;
       sdr_id?: string | null;
       leads_count?: number;
       qualified_count?: number;
     }[]) => {
-      return funnelRepo.createFunnelDailyData(records);
+      const result = await funnelRepo.createFunnelDailyData(records);
+
+      // Increment SDR metrics for records that have an SDR and sales
+      const sdrRecords = records.filter(
+        (r) => r.sdr_id && r.sales_count && r.sales_count > 0 && r.funnel_name
+      );
+      for (const r of sdrRecords) {
+        await sdrRepo.incrementSdrSales(
+          r.sdr_id!,
+          r.date,
+          r.funnel_name!,
+          r.sales_count!,
+          r.sales_value || 0,
+          r.entries_value || 0
+        );
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['closer-funnel-data'] });
       queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
       queryClient.invalidateQueries({ queryKey: ['funnel-report'] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-total-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics'] });
       toast.success('Dados salvos com sucesso!');
     },
     onError: (error: any) => {

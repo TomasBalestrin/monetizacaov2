@@ -216,11 +216,14 @@ export function useFinishCall() {
         sdr_id: call.sdr_id || null,
       });
 
-      // 2b. Increment SDR attended count
+      // 2b. Increment SDR attended count + sales/revenue/entries
       try {
         const funnelName = call.funnel?.name || '';
         if (funnelName) {
           await sdrRepo.incrementSdrAttended(call.sdr_id, today, funnelName, hasSale ? 1 : 0);
+          if (hasSale && (revenue > 0 || entryValue > 0)) {
+            await sdrRepo.incrementSdrSales(call.sdr_id, today, funnelName, 0, revenue, entryValue);
+          }
         }
       } catch (err) {
         console.error('Error incrementing SDR attended:', err);
