@@ -10,7 +10,7 @@ import {
 import { MetricsForm, MetricsFormValues } from './MetricsForm';
 import { useCreateMetric, useUpdateMetric, Metric } from '@/controllers/useCloserController';
 import { useFunnels } from '@/controllers/useFunnelController';
-import { incrementSdrSales, decrementSdrSales } from '@/model/repositories/sdrRepository';
+import { recalculateSdrSales } from '@/model/repositories/sdrRepository';
 
 interface MetricsDialogProps {
   open: boolean;
@@ -47,33 +47,34 @@ export function MetricsDialog({ open, onOpenChange, metric }: MetricsDialogProps
 
       await updateMetric.mutateAsync({ id: metric.id, ...payload });
 
-      // Sync SDR metrics when sdr_id changes on edit
-      if (sdrChanged) {
-        try {
-          // Decrement old SDR
-          if (oldSdrId && (metric.sales > 0 || metric.revenue > 0 || metric.entries > 0)) {
-            const oldFunnelName = metric.funnel?.name || '';
-            await decrementSdrSales(oldSdrId, metric.period_start, oldFunnelName, metric.sales || 0, Number(metric.revenue) || 0, Number(metric.entries) || 0);
-          }
-          // Increment new SDR
-          if (newSdrId && (payload.sales > 0 || Number(payload.revenue) > 0 || Number(payload.entries) > 0)) {
-            const funnelName = payload.funnel_id ? (funnels?.find(f => f.id === payload.funnel_id)?.name || '') : '';
-            await incrementSdrSales(newSdrId, payload.period_start, funnelName, payload.sales || 0, Number(payload.revenue) || 0, Number(payload.entries) || 0);
-          }
-        } catch (err) {
-          console.error('Error syncing SDR sales on edit:', err);
+      // Recalculate SDR metrics for affected SDRs
+      try {
+        const oldFunnelName = metric.funnel?.name || '';
+        const oldFunnelId = metric.funnel_id || null;
+        const newFunnelName = payload.funnel_id ? (funnels?.find(f => f.id === payload.funnel_id)?.name || '') : '';
+        const newFunnelId = payload.funnel_id || null;
+
+        if (oldSdrId && oldFunnelName) {
+          await recalculateSdrSales(oldSdrId, metric.period_start, oldFunnelName, oldFunnelId);
         }
+        if (newSdrId && newFunnelName && (newSdrId !== oldSdrId || newFunnelName !== oldFunnelName || payload.period_start !== metric.period_start)) {
+          await recalculateSdrSales(newSdrId, payload.period_start, newFunnelName, newFunnelId);
+        }
+      } catch (err) {
+        console.error('Error recalculating SDR sales on edit:', err);
       }
     } else {
       await createMetric.mutateAsync(payload);
 
-      // Increment SDR on create
-      if (payload.sdr_id && (payload.sales > 0 || Number(payload.revenue) > 0 || Number(payload.entries) > 0)) {
+      // Recalculate SDR metrics from source data
+      if (payload.sdr_id) {
         const funnelName = payload.funnel_id ? (funnels?.find(f => f.id === payload.funnel_id)?.name || '') : '';
         try {
-          await incrementSdrSales(payload.sdr_id, payload.period_start, funnelName, payload.sales || 0, Number(payload.revenue) || 0, Number(payload.entries) || 0);
+          if (funnelName) {
+            await recalculateSdrSales(payload.sdr_id, payload.period_start, funnelName, payload.funnel_id);
+          }
         } catch (err) {
-          console.error('Error incrementing SDR sales:', err);
+          console.error('Error recalculating SDR sales:', err);
         }
       }
     }

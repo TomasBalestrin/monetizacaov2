@@ -188,6 +188,26 @@ export async function fetchSalesByPersonAndProduct(
   return (data as unknown as PersonProductSales[]) || [];
 }
 
+export async function fetchFunnelDailyDataById(id: string): Promise<FunnelDailyData | null> {
+  const { data, error } = await supabase
+    .from('funnel_daily_data')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as FunnelDailyData | null;
+}
+
+export async function fetchFunnelById(id: string): Promise<Funnel | null> {
+  const { data, error } = await supabase
+    .from('funnels')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Funnel | null;
+}
+
 export async function deleteFunnelDailyData(id: string): Promise<void> {
   const { error } = await supabase
     .from('funnel_daily_data')

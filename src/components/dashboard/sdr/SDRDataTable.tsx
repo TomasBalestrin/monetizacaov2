@@ -30,6 +30,7 @@ interface SDRDataTableProps {
   onUpdateField?: (metricId: string, field: EditableField, value: number) => void;
   canInlineEdit?: boolean;
   sdrType?: 'sdr' | 'social_selling' | 'funil_intensivo';
+  closerNamesMap?: Record<string, string[]>;
 }
 
 interface DateGroup {
@@ -186,6 +187,7 @@ export function SDRDataTable({
   onUpdateField,
   canInlineEdit = false,
   sdrType = 'sdr',
+  closerNamesMap,
 }: SDRDataTableProps) {
   const hasActions = onEditMetric || onDeleteMetric;
   const editable = canInlineEdit && !!onUpdateField;
@@ -249,6 +251,11 @@ export function SDRDataTable({
 
   const isFI = sdrType === 'funil_intensivo';
 
+  const getCloserNames = (date: string, funnel: string): string[] => {
+    if (!closerNamesMap) return [];
+    return closerNamesMap[`${date}|${funnel}`] || [];
+  };
+
   const renderMetricRow = (metric: SDRMetric, index: number, isSubRow: boolean) => {
     const canEditRow = editable && !!metric.id;
 
@@ -279,6 +286,11 @@ export function SDRDataTable({
           </TableCell>
           {showFunnelColumn && (
             <TableCell className="text-muted-foreground text-sm">{metric.funnel || '-'}</TableCell>
+          )}
+          {closerNamesMap && (
+            <TableCell className="text-sm text-foreground">
+              {getCloserNames(metric.date, metric.funnel || '').join(', ') || '—'}
+            </TableCell>
           )}
           <TableCell>
             <EditableCell value={metric.fi_called || 0} metricId={metric.id} field="fi_called" onSave={onUpdateField!} canEdit={canEditRow} />
@@ -364,6 +376,11 @@ export function SDRDataTable({
         {showFunnelColumn && (
           <TableCell className="text-muted-foreground text-sm">
             {metric.funnel || '-'}
+          </TableCell>
+        )}
+        {closerNamesMap && (
+          <TableCell className="text-sm text-foreground">
+            {getCloserNames(metric.date, metric.funnel || '').join(', ') || '—'}
           </TableCell>
         )}
 
@@ -491,6 +508,11 @@ export function SDRDataTable({
         >
           {dateCell}
           {showFunnelColumn && <TableCell className="text-muted-foreground text-sm">{summarizeFunnels(group.metrics)}</TableCell>}
+          {closerNamesMap && (
+            <TableCell className="text-sm text-muted-foreground">
+              {[...new Set(group.metrics.flatMap(m => getCloserNames(m.date, m.funnel || '')))].join(', ') || '—'}
+            </TableCell>
+          )}
           <TableCell className="text-right font-medium">{t.fi_called}</TableCell>
           <TableCell className="text-right font-medium">{t.fi_awaiting}</TableCell>
           <TableCell className="text-right font-medium">{t.fi_received_link}</TableCell>
@@ -528,6 +550,11 @@ export function SDRDataTable({
         {showFunnelColumn && (
           <TableCell className="text-muted-foreground text-sm">
             {summarizeFunnels(group.metrics)}
+          </TableCell>
+        )}
+        {closerNamesMap && (
+          <TableCell className="text-sm text-muted-foreground">
+            {[...new Set(group.metrics.flatMap(m => getCloserNames(m.date, m.funnel || '')))].join(', ') || '—'}
           </TableCell>
         )}
         <TableCell className="text-right font-medium">{t.activated}</TableCell>
@@ -600,6 +627,9 @@ export function SDRDataTable({
               <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Data</TableHead>
               {showFunnelColumn && (
                 <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funil</TableHead>
+              )}
+              {closerNamesMap && (
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Closer Origem</TableHead>
               )}
               {isFI ? (
                 <>

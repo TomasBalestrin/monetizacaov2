@@ -218,13 +218,11 @@ export async function updateSDRMetric(
 export async function incrementSdrAttended(
   sdrId: string,
   date: string,
-  funnelName: string,
-  addSales: number
+  funnelName: string
 ): Promise<void> {
-  // Check if a record already exists for this sdr/date/funnel
   const { data: existing, error: fetchError } = await supabase
     .from('sdr_metrics')
-    .select('id, attended, sales')
+    .select('id, attended')
     .eq('sdr_id', sdrId)
     .eq('date', date)
     .eq('funnel', funnelName)
@@ -233,18 +231,15 @@ export async function incrementSdrAttended(
   if (fetchError) throw fetchError;
 
   if (existing) {
-    // Increment attended and sales on existing record
     const { error } = await supabase
       .from('sdr_metrics')
       .update({
         attended: (existing.attended || 0) + 1,
-        sales: (existing.sales || 0) + addSales,
       })
       .eq('id', existing.id);
 
     if (error) throw error;
   } else {
-    // Create minimal record — SDR will fill in activated/scheduled later
     const { error } = await supabase
       .from('sdr_metrics')
       .insert({
@@ -256,7 +251,7 @@ export async function incrementSdrAttended(
         scheduled_follow_up: 0,
         scheduled_same_day: 0,
         attended: 1,
-        sales: addSales,
+        sales: 0,
         source: 'scheduled_call',
         scheduled_rate: 0,
         attendance_rate: 0,
@@ -355,6 +350,177 @@ export async function decrementSdrSales(
     })
     .eq('id', existing.id);
   if (error) throw error;
+}
+
+/**
+ * Recalcula sales/revenue/entries no sdr_metrics a partir dos dados reais
+ * nas tabelas metrics e funnel_daily_data. Substitui o padrão frágil de
+ * increment/decrement que falhava quando um increment era perdido.
+ */
+export async function recalculateSdrSales(
+  sdrId: string,
+  date: string,
+  funnelName: string,
+  funnelId?: string | null
+): Promise<void> {
+  // Look up funnelId from name if not provided
+  if (!funnelId && funnelName) {
+    const { data: funnel } = await supabase
+      .from('funnels')
+      .select('id')
+      .eq('name', funnelName)
+      .maybeSingle();
+    funnelId = funnel?.id ?? null;
+  }
+
+  let totalSales = 0;
+  let totalRevenue = 0;
+  let totalEntries = 0;
+
+  if (funnelId) {
+    // Sum from metrics table (SquadMetricsDialog, MetricsDialog, FinishCallDialog)
+    const { data: metricsData } = await supabase
+      .from('metrics')
+      .select('sales, revenue, entries')
+      .eq('sdr_id', sdrId)
+      .eq('period_start', date)
+      .eq('funnel_id', funnelId);
+
+    if (metricsData) {
+      for (const m of metricsData) {
+        totalSales += m.sales || 0;
+        totalRevenue += Number(m.revenue) || 0;
+        totalEntries += Number(m.entries) || 0;
+      }
+    }
+
+    // Sum from funnel_daily_data table (CloserFunnelForm)
+    const { data: funnelData } = await supabase
+      .from('funnel_daily_data')
+      .select('sales_count, sales_value, entries_value')
+      .eq('sdr_id', sdrId)
+      .eq('date', date)
+      .eq('funnel_id', funnelId);
+
+    if (funnelData) {
+      for (const f of funnelData) {
+        totalSales += f.sales_count || 0;
+        totalRevenue += Number(f.sales_value) || 0;
+        totalEntries += Number(f.entries_value) || 0;
+      }
+    }
+  }
+
+  // Upsert sdr_metrics (only sales/revenue/entries — never touch attended, activated, etc.)
+  const { data: existing } = await supabase
+    .from('sdr_metrics')
+    .select('id')
+    .eq('sdr_id', sdrId)
+    .eq('date', date)
+    .eq('funnel', funnelName)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('sdr_metrics')
+      .update({
+        sales: totalSales,
+        revenue: totalRevenue,
+        entries: totalEntries,
+      })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else if (totalSales > 0 || totalRevenue > 0 || totalEntries > 0) {
+    const { error } = await supabase
+      .from('sdr_metrics')
+      .insert({
+        sdr_id: sdrId,
+        date,
+        funnel: funnelName,
+        activated: 0,
+        scheduled: 0,
+        scheduled_follow_up: 0,
+        scheduled_same_day: 0,
+        attended: 0,
+        sales: totalSales,
+        revenue: totalRevenue,
+        entries: totalEntries,
+        source: 'manual',
+        scheduled_rate: 0,
+        attendance_rate: 0,
+        conversion_rate: 0,
+      });
+    if (error) throw error;
+  }
+}
+
+/**
+ * Retorna um mapa de closers por (date|funnel) para um SDR.
+ * Usado para exibir a coluna "Closer Origem" na tabela do SDR.
+ */
+export async function fetchCloserNamesForSDR(
+  sdrId: string,
+  periodStart?: string,
+  periodEnd?: string
+): Promise<Record<string, string[]>> {
+  const closersByKey: Record<string, Set<string>> = {};
+
+  // From metrics table (has closer_id with FK to closers)
+  let metricsQuery = supabase
+    .from('metrics')
+    .select('period_start, sales, closer:closers(name), funnel:funnels(name)')
+    .eq('sdr_id', sdrId)
+    .gt('sales', 0);
+  if (periodStart) metricsQuery = metricsQuery.gte('period_start', periodStart);
+  if (periodEnd) metricsQuery = metricsQuery.lte('period_start', periodEnd);
+
+  const { data: metricsData } = await metricsQuery;
+  for (const m of metricsData || []) {
+    const closerName = (m.closer as any)?.name;
+    const funnelName = (m.funnel as any)?.name || '';
+    if (closerName) {
+      const key = `${m.period_start}|${funnelName}`;
+      if (!closersByKey[key]) closersByKey[key] = new Set();
+      closersByKey[key].add(closerName);
+    }
+  }
+
+  // From funnel_daily_data (user_id → closers, no direct FK hint available)
+  let fddQuery = supabase
+    .from('funnel_daily_data')
+    .select('date, user_id, sales_count, funnel:funnels(name)')
+    .eq('sdr_id', sdrId)
+    .gt('sales_count', 0);
+  if (periodStart) fddQuery = fddQuery.gte('date', periodStart);
+  if (periodEnd) fddQuery = fddQuery.lte('date', periodEnd);
+
+  const { data: fddData } = await fddQuery;
+  if (fddData && fddData.length > 0) {
+    const userIds = [...new Set(fddData.map(f => f.user_id))];
+    const { data: closers } = await supabase
+      .from('closers')
+      .select('id, name')
+      .in('id', userIds);
+    const closerMap: Record<string, string> = {};
+    for (const c of closers || []) closerMap[c.id] = c.name;
+
+    for (const f of fddData) {
+      const closerName = closerMap[f.user_id];
+      const funnelName = (f.funnel as any)?.name || '';
+      if (closerName) {
+        const key = `${f.date}|${funnelName}`;
+        if (!closersByKey[key]) closersByKey[key] = new Set();
+        closersByKey[key].add(closerName);
+      }
+    }
+  }
+
+  // Convert Sets to arrays
+  const result: Record<string, string[]> = {};
+  for (const [key, names] of Object.entries(closersByKey)) {
+    result[key] = [...names];
+  }
+  return result;
 }
 
 export async function deleteSDRMetric(id: string): Promise<void> {

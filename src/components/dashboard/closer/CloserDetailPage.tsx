@@ -26,7 +26,7 @@ import { SquadMetricsDialog } from '@/components/dashboard/SquadMetricsDialog';
 import { CloserFunnelForm } from './CloserFunnelForm';
 import { ActiveCallBanner } from './ActiveCallBanner';
 import { useClosers, useCloserMetrics, useCloserMetricsByFunnel, useDeleteMetric, type CloserMetricRecord } from '@/controllers/useCloserController';
-import { decrementSdrSales } from '@/model/repositories/sdrRepository';
+import { recalculateSdrSales } from '@/model/repositories/sdrRepository';
 import { useCloserFunnelData, useUserFunnels, useFunnels, type FunnelDailyData } from '@/controllers/useFunnelController';
 import { calculateTrendDetailed } from '@/model/services/trendService';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -295,24 +295,23 @@ export function CloserDetailPage({
 
   const confirmDelete = useCallback(async () => {
     if (deletingMetricId) {
-      // Find the metric to decrement SDR sales/revenue/entries before deleting
+      // Capture metric info before deleting
       const metricToDelete = metrics?.find(m => m.id === deletingMetricId);
-      if (metricToDelete?.sdr_id && (metricToDelete.sales > 0 || metricToDelete.revenue > 0 || metricToDelete.entries > 0)) {
-        const funnelName = metricToDelete.funnel?.name || '';
+      const sdrId = metricToDelete?.sdr_id;
+      const funnelName = metricToDelete?.funnel?.name || '';
+      const funnelId = metricToDelete?.funnel_id || null;
+      const periodStart = metricToDelete?.period_start;
+
+      // Delete first, then recalculate from remaining source data
+      await deleteMetric.mutateAsync(deletingMetricId);
+
+      if (sdrId && funnelName && periodStart) {
         try {
-          await decrementSdrSales(
-            metricToDelete.sdr_id,
-            metricToDelete.period_start,
-            funnelName,
-            metricToDelete.sales || 0,
-            Number(metricToDelete.revenue) || 0,
-            Number(metricToDelete.entries) || 0
-          );
+          await recalculateSdrSales(sdrId, periodStart, funnelName, funnelId);
         } catch (err) {
-          console.error('Error decrementing SDR sales:', err);
+          console.error('Error recalculating SDR sales:', err);
         }
       }
-      await deleteMetric.mutateAsync(deletingMetricId);
       setDeletingMetricId(null);
     }
   }, [deletingMetricId, deleteMetric, metrics]);

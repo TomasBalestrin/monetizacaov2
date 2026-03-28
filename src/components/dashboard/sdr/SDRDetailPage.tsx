@@ -30,7 +30,7 @@ import { ScheduledCallsTable } from './ScheduledCallsTable';
 import { EditScheduledCallDialog } from './EditScheduledCallDialog';
 import { useScheduledCalls, useDeleteScheduledCall, useSendCallReminder } from '@/controllers/useScheduledCallController';
 import type { ScheduledCall } from '@/model/entities/scheduledCall';
-import { useSDRs, useSDRMetrics, useSDRFunnels, useDeleteSDRMetric, useUpdateSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/controllers/useSdrController';
+import { useSDRs, useSDRMetrics, useSDRFunnels, useCloserNamesForSDR, useDeleteSDRMetric, useUpdateSDRMetric, type SDRAggregatedMetrics, type SDRMetric } from '@/controllers/useSdrController';
 import { useAuth } from '@/contexts/AuthContext';
 import { SDRFunnelManager } from './SDRFunnelManager';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -164,6 +164,7 @@ export function SDRDetailPage({
     hasFunnels || false
   );
   const { data: goals } = useGoals('sdr', sdrId, monthStr);
+  const { data: closerNamesMap } = useCloserNamesForSDR(sdrId, periodStart, periodEnd);
   const { data: scheduledCalls, isLoading: isLoadingCalls } = useScheduledCalls(sdrId, periodStart, periodEnd);
 
   const sdr = sdrs?.find((s) => s.id === sdrId);
@@ -566,6 +567,7 @@ export function SDRDetailPage({
             onUpdateField={handleUpdateField}
             canInlineEdit={canAddMetrics}
             sdrType={sdr?.type || 'sdr'}
+            closerNamesMap={closerNamesMap}
           />
         )}
 

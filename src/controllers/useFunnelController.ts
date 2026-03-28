@@ -71,19 +71,14 @@ export function useCreateFunnelDailyData() {
     }[]) => {
       const result = await funnelRepo.createFunnelDailyData(records);
 
-      // Increment SDR metrics for records that have an SDR and sales
-      const sdrRecords = records.filter(
-        (r) => r.sdr_id && r.sales_count && r.sales_count > 0 && r.funnel_name
-      );
+      // Recalculate SDR metrics from source data for affected SDR/date/funnel combos
+      const sdrRecords = records.filter((r) => r.sdr_id && r.funnel_name);
+      const seen = new Set<string>();
       for (const r of sdrRecords) {
-        await sdrRepo.incrementSdrSales(
-          r.sdr_id!,
-          r.date,
-          r.funnel_name!,
-          r.sales_count!,
-          r.sales_value || 0,
-          r.entries_value || 0
-        );
+        const key = `${r.sdr_id}|${r.date}|${r.funnel_name}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        await sdrRepo.recalculateSdrSales(r.sdr_id!, r.date, r.funnel_name!, r.funnel_id);
       }
 
       return result;
@@ -172,11 +167,27 @@ export function useDeleteFunnelDailyData() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: funnelRepo.deleteFunnelDailyData,
+    mutationFn: async (id: string) => {
+      // Fetch record before deleting to get SDR/funnel info for recalculation
+      const record = await funnelRepo.fetchFunnelDailyDataById(id);
+
+      await funnelRepo.deleteFunnelDailyData(id);
+
+      // Recalculate SDR metrics after deletion
+      if (record?.sdr_id && record.funnel_id) {
+        const funnel = await funnelRepo.fetchFunnelById(record.funnel_id);
+        if (funnel?.name) {
+          await sdrRepo.recalculateSdrSales(record.sdr_id, record.date, funnel.name, record.funnel_id);
+        }
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['closer-funnel-data'] });
       queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
       queryClient.invalidateQueries({ queryKey: ['funnel-report'] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-total-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics'] });
       toast.success('Registro removido!');
     },
     onError: () => {

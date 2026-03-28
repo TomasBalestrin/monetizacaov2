@@ -10,7 +10,7 @@ import {
 import { SquadMetricsForm, type SquadMetricsFormValues } from './SquadMetricsForm';
 import { useCreateMetric, useUpdateMetric, useSquads, type CloserMetricRecord } from '@/controllers/useCloserController';
 import { useFunnels } from '@/controllers/useFunnelController';
-import { incrementSdrSales, decrementSdrSales } from '@/model/repositories/sdrRepository';
+import { recalculateSdrSales } from '@/model/repositories/sdrRepository';
 
 interface SquadMetricsDialogProps {
   open: boolean;
@@ -76,25 +76,21 @@ export function SquadMetricsDialog({
         product_id: values.product_id || null,
       });
 
-      // Sync SDR metrics when sdr_id changes on edit
-      if (sdrChanged) {
-        try {
-          // Decrement old SDR
-          if (oldSdrId && (metric.sales > 0 || Number(metric.revenue) > 0 || Number(metric.entries) > 0)) {
-            const oldFunnelName = metric.sdr?.name ? (metric.funnel?.name || '') : (metric.funnel?.name || '');
-            await decrementSdrSales(oldSdrId, metric.period_start, oldFunnelName, metric.sales || 0, Number(metric.revenue) || 0, Number(metric.entries) || 0);
-          }
-          // Increment new SDR
-          const newSales = values.sales ?? 0;
-          const newRevenue = values.revenue || 0;
-          const newEntries = values.entries || 0;
-          if (newSdrId && (newSales > 0 || newRevenue > 0 || newEntries > 0)) {
-            const funnelName = values.funnel_id ? (funnels?.find(f => f.id === values.funnel_id)?.name || '') : '';
-            await incrementSdrSales(newSdrId, periodStart, funnelName, newSales, newRevenue, newEntries);
-          }
-        } catch (err) {
-          console.error('Error syncing SDR sales on edit:', err);
+      // Recalculate SDR metrics for affected SDRs
+      try {
+        const oldFunnelName = metric.funnel?.name || '';
+        const oldFunnelId = metric.funnel_id || null;
+        const newFunnelName = values.funnel_id ? (funnels?.find(f => f.id === values.funnel_id)?.name || '') : '';
+        const newFunnelId = values.funnel_id || null;
+
+        if (oldSdrId && oldFunnelName) {
+          await recalculateSdrSales(oldSdrId, metric.period_start, oldFunnelName, oldFunnelId);
         }
+        if (newSdrId && newFunnelName && (newSdrId !== oldSdrId || newFunnelName !== oldFunnelName || periodStart !== metric.period_start)) {
+          await recalculateSdrSales(newSdrId, periodStart, newFunnelName, newFunnelId);
+        }
+      } catch (err) {
+        console.error('Error recalculating SDR sales on edit:', err);
       }
     } else if (values.call_entries && values.call_entries.length > 0 && values.calls > 1) {
       // Múltiplas calls: criar um registro por call
@@ -151,18 +147,18 @@ export function SquadMetricsDialog({
       totalEntriesForSDR = values.entries || 0;
     }
 
-    // Increment SDR sales, revenue and entries
+    // Recalculate SDR metrics from source data
     const cleanSdrId = values.sdr_id || null;
-    if (cleanSdrId && !isEditing && (totalSalesForSDR > 0 || totalRevenueForSDR > 0 || totalEntriesForSDR > 0)) {
+    if (cleanSdrId && !isEditing) {
       try {
         const funnelName = values.funnel_id
           ? funnels?.find(f => f.id === values.funnel_id)?.name || ''
           : '';
         if (funnelName) {
-          await incrementSdrSales(cleanSdrId, periodStart, funnelName, totalSalesForSDR, totalRevenueForSDR, totalEntriesForSDR);
+          await recalculateSdrSales(cleanSdrId, periodStart, funnelName, values.funnel_id);
         }
       } catch (err) {
-        console.error('Error incrementing SDR sales:', err);
+        console.error('Error recalculating SDR sales:', err);
       }
     }
 

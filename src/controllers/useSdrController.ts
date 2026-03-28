@@ -11,6 +11,14 @@ export function useSDRs(type?: 'sdr' | 'social_selling' | 'funil_intensivo') {
   });
 }
 
+export function useCloserNamesForSDR(sdrId?: string, periodStart?: string, periodEnd?: string) {
+  return useQuery({
+    queryKey: ['closer-names-for-sdr', sdrId, periodStart, periodEnd],
+    queryFn: () => sdrRepo.fetchCloserNamesForSDR(sdrId!, periodStart, periodEnd),
+    enabled: !!sdrId,
+  });
+}
+
 export function useSDRMetrics(
   sdrId?: string,
   periodStart?: string,

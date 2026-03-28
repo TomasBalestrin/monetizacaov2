@@ -216,22 +216,45 @@ export function useSalesByPersonAndProduct(periodStart?: string, periodEnd?: str
   });
 }
 
-// Delete funnel daily data
+// Delete funnel daily data with SDR metrics recalculation
 export function useDeleteFunnelDailyData() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Fetch record before deleting to get SDR/funnel info
+      const { data: record } = await supabase
+        .from('funnel_daily_data')
+        .select('sdr_id, funnel_id, date')
+        .eq('id', id)
+        .maybeSingle();
+
       const { error } = await supabase
         .from('funnel_daily_data')
         .delete()
         .eq('id', id);
       if (error) throw error;
+
+      // Recalculate SDR metrics after deletion
+      if (record?.sdr_id && record.funnel_id) {
+        const { data: funnel } = await supabase
+          .from('funnels')
+          .select('name')
+          .eq('id', record.funnel_id)
+          .maybeSingle();
+        if (funnel?.name) {
+          const { recalculateSdrSales } = await import('@/model/repositories/sdrRepository');
+          await recalculateSdrSales(record.sdr_id, record.date, funnel.name, record.funnel_id);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['closer-funnel-data'] });
       queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
       queryClient.invalidateQueries({ queryKey: ['funnel-report'] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-total-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics'] });
       toast.success('Registro removido!');
     },
     onError: () => {

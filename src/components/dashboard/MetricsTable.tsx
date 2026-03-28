@@ -40,7 +40,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMetrics, useDeleteMetric, useSquads, Metric } from '@/controllers/useCloserController';
-import { decrementSdrSales } from '@/model/repositories/sdrRepository';
+import { recalculateSdrSales } from '@/model/repositories/sdrRepository';
 import { MetricsDialog } from './MetricsDialog';
 
 export function MetricsTable() {
@@ -66,24 +66,23 @@ export function MetricsTable() {
 
   const handleDelete = async () => {
     if (deletingMetricId) {
-      // Decrement SDR sales/revenue/entries before deleting
+      // Capture metric info before deleting
       const metricToDelete = metrics?.find(m => m.id === deletingMetricId);
-      if (metricToDelete?.sdr_id && (metricToDelete.sales > 0 || metricToDelete.revenue > 0 || metricToDelete.entries > 0)) {
-        const funnelName = metricToDelete.funnel?.name || '';
+      const sdrId = metricToDelete?.sdr_id;
+      const funnelName = metricToDelete?.funnel?.name || '';
+      const funnelId = metricToDelete?.funnel_id || null;
+      const periodStart = metricToDelete?.period_start;
+
+      // Delete first, then recalculate from remaining source data
+      await deleteMetric.mutateAsync(deletingMetricId);
+
+      if (sdrId && funnelName && periodStart) {
         try {
-          await decrementSdrSales(
-            metricToDelete.sdr_id,
-            metricToDelete.period_start,
-            funnelName,
-            metricToDelete.sales || 0,
-            Number(metricToDelete.revenue) || 0,
-            Number(metricToDelete.entries) || 0
-          );
+          await recalculateSdrSales(sdrId, periodStart, funnelName, funnelId);
         } catch (err) {
-          console.error('Error decrementing SDR sales:', err);
+          console.error('Error recalculating SDR sales:', err);
         }
       }
-      await deleteMetric.mutateAsync(deletingMetricId);
       setDeletingMetricId(null);
     }
   };

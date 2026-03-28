@@ -220,10 +220,8 @@ export function useFinishCall() {
       try {
         const funnelName = call.funnel?.name || '';
         if (funnelName) {
-          await sdrRepo.incrementSdrAttended(call.sdr_id, today, funnelName, hasSale ? 1 : 0);
-          if (hasSale && (revenue > 0 || entryValue > 0)) {
-            await sdrRepo.incrementSdrSales(call.sdr_id, today, funnelName, 0, revenue, entryValue);
-          }
+          await sdrRepo.incrementSdrAttended(call.sdr_id, today, funnelName);
+          await sdrRepo.recalculateSdrSales(call.sdr_id, today, funnelName, call.funnel_id);
         }
       } catch (err) {
         console.error('Error incrementing SDR attended:', err);
