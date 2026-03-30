@@ -202,7 +202,7 @@ export function CloserDataTable({ metrics, onEditMetric, onDeleteMetric }: Close
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {onEditMetric && (
+                {onEditMetric && metric.source !== 'funnel' && (
                   <DropdownMenuItem onClick={() => onEditMetric(metric)}>
                     <Edit className="mr-2 h-4 w-4" />
                     Editar

@@ -139,7 +139,7 @@ export async function fetchCloserFunnelData(
 ): Promise<FunnelDailyData[]> {
   let query = supabase
     .from('funnel_daily_data')
-    .select('*, funnel:funnels(id, name), sdr:sdrs(id, name, type)')
+    .select('*, funnel:funnels(id, name), sdr:sdrs(id, name, type), product:products(id, name)')
     .eq('user_id', closerId)
     .order('date', { ascending: false });
 

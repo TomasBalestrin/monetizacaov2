@@ -90,6 +90,8 @@ export function useCreateFunnelDailyData() {
       queryClient.invalidateQueries({ queryKey: ['sdr-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['sdr-total-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['closer-metrics'] });
       toast.success('Dados salvos com sucesso!');
     },
     onError: (error: any) => {
@@ -188,6 +190,8 @@ export function useDeleteFunnelDailyData() {
       queryClient.invalidateQueries({ queryKey: ['sdr-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['sdr-total-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['sdrs-with-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['closer-metrics'] });
       toast.success('Registro removido!');
     },
     onError: () => {

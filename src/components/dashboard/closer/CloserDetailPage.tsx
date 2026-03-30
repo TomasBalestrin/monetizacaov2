@@ -27,7 +27,7 @@ import { CloserFunnelForm } from './CloserFunnelForm';
 import { ActiveCallBanner } from './ActiveCallBanner';
 import { useClosers, useCloserMetrics, useCloserMetricsByFunnel, useDeleteMetric, type CloserMetricRecord } from '@/controllers/useCloserController';
 import { recalculateSdrSales } from '@/model/repositories/sdrRepository';
-import { useCloserFunnelData, useUserFunnels, useFunnels, type FunnelDailyData } from '@/controllers/useFunnelController';
+import { useCloserFunnelData, useDeleteFunnelDailyData, useUserFunnels, useFunnels, type FunnelDailyData } from '@/controllers/useFunnelController';
 import { calculateTrendDetailed } from '@/model/services/trendService';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useRealtimeMetrics } from '@/hooks/useRealtimeMetrics';
@@ -125,7 +125,8 @@ export function CloserDetailPage({
   const [selectedFunnel, setSelectedFunnel] = useState<string | null>(null);
   
   const deleteMetric = useDeleteMetric();
-  
+  const deleteFunnelData = useDeleteFunnelDailyData();
+
   // Enable realtime subscriptions for automatic data refresh
   useRealtimeMetrics();
   
@@ -184,38 +185,46 @@ export function CloserDetailPage({
   const mappedFunnelMetrics: CloserMetricRecord[] = useMemo(() => {
     if (!selectedFunnel) return [];
 
-    // Map funnel_daily_data records
-    const fromFunnelData = (funnelData || []).map((fd: FunnelDailyData) => ({
-      id: fd.id,
-      closer_id: fd.user_id,
-      period_start: fd.date,
-      period_end: fd.date,
-      calls: fd.calls_done,
-      sales: fd.sales_count,
-      revenue: fd.sales_value,
-      entries: fd.entries_value || 0,
-      revenue_trend: 0,
-      entries_trend: 0,
-      cancellations: 0,
-      cancellation_value: 0,
-      cancellation_entries: 0,
-      created_at: fd.created_at,
-      updated_at: fd.created_at,
-      created_by: fd.created_by,
-      source: 'funnel',
-      funnel_id: fd.funnel_id,
-      sdr_id: fd.sdr_id,
-      funnel: fd.funnel || null,
-      sdr: fd.sdr || null,
-    }));
-
-    // Include metrics records that have this funnel_id
+    // Metrics com este funnel_id (dados mais completos: revenue, trends, cancelamentos)
     const fromMetrics = (funnelMetricsData || []).map((m) => ({
       ...m,
-      source: 'metrics',
+      source: 'metrics' as string,
     }));
 
-    return [...fromFunnelData, ...fromMetrics];
+    // Chaves dos metrics para dedup (priorizar metrics sobre funnel_daily_data)
+    const metricsKeys = new Set<string>();
+    fromMetrics.forEach(m => {
+      metricsKeys.add(`${m.period_start}|${m.sdr_id || ''}`);
+    });
+
+    // Só incluir funnel_daily_data que NÃO tenham um metrics correspondente
+    const fromFunnelData = (funnelData || [])
+      .filter((fd: FunnelDailyData) => !metricsKeys.has(`${fd.date}|${fd.sdr_id || ''}`))
+      .map((fd: FunnelDailyData) => ({
+        id: fd.id,
+        closer_id: fd.user_id,
+        period_start: fd.date,
+        period_end: fd.date,
+        calls: fd.calls_done,
+        sales: fd.sales_count,
+        revenue: fd.sales_value,
+        entries: fd.entries_value || 0,
+        revenue_trend: 0,
+        entries_trend: 0,
+        cancellations: 0,
+        cancellation_value: 0,
+        cancellation_entries: 0,
+        created_at: fd.created_at,
+        updated_at: fd.created_at,
+        created_by: fd.created_by,
+        source: 'funnel' as string,
+        funnel_id: fd.funnel_id,
+        sdr_id: fd.sdr_id,
+        funnel: fd.funnel || null,
+        sdr: fd.sdr || null,
+      }));
+
+    return [...fromMetrics, ...fromFunnelData];
   }, [funnelData, funnelMetricsData, selectedFunnel]);
 
   // Filter closers by current squad
@@ -295,26 +304,30 @@ export function CloserDetailPage({
 
   const confirmDelete = useCallback(async () => {
     if (deletingMetricId) {
-      // Capture metric info before deleting
-      const metricToDelete = metrics?.find(m => m.id === deletingMetricId);
+      // Search in both regular metrics and funnel-mapped metrics
+      const metricToDelete = activeMetrics.find(m => m.id === deletingMetricId);
       const sdrId = metricToDelete?.sdr_id;
       const funnelName = metricToDelete?.funnel?.name || '';
       const funnelId = metricToDelete?.funnel_id || null;
-      const periodStart = metricToDelete?.period_start;
+      const metricPeriodStart = metricToDelete?.period_start;
 
-      // Delete first, then recalculate from remaining source data
-      await deleteMetric.mutateAsync(deletingMetricId);
+      // Route to correct delete based on source
+      if (metricToDelete?.source === 'funnel') {
+        await deleteFunnelData.mutateAsync(deletingMetricId);
+      } else {
+        await deleteMetric.mutateAsync(deletingMetricId);
+      }
 
-      if (sdrId && funnelName && periodStart) {
+      if (sdrId && funnelName && metricPeriodStart) {
         try {
-          await recalculateSdrSales(sdrId, periodStart, funnelName, funnelId);
+          await recalculateSdrSales(sdrId, metricPeriodStart, funnelName, funnelId);
         } catch (err) {
           console.error('Error recalculating SDR sales:', err);
         }
       }
       setDeletingMetricId(null);
     }
-  }, [deletingMetricId, deleteMetric, metrics]);
+  }, [deletingMetricId, deleteMetric, deleteFunnelData, activeMetrics]);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
