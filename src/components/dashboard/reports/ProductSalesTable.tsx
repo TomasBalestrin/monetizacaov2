@@ -10,27 +10,19 @@ import {
 } from '@/components/ui/select';
 import { type PersonProductSales } from '@/controllers/useFunnelController';
 import { MetricCardSkeletonGrid } from '@/components/dashboard/skeletons';
-import { EditableCell } from './EditableCell';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 interface ProductSalesTableProps {
   data: PersonProductSales[];
   isLoading: boolean;
-  periodStart: string;
-  periodEnd: string;
-  canEdit: boolean;
 }
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
 
-export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, canEdit }: ProductSalesTableProps) {
+export function ProductSalesTable({ data, isLoading }: ProductSalesTableProps) {
   const [selectedFunnel, setSelectedFunnel] = useState<string>('all');
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
-  const queryClient = useQueryClient();
 
   const funnelNames = useMemo(() => {
     if (!data) return [];
@@ -95,58 +87,6 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
     revenue: closerPersonTotals.reduce((s, p) => s + p.total_revenue, 0),
     entries: closerPersonTotals.reduce((s, p) => s + p.total_entries, 0),
   }), [closerPersonTotals]);
-
-  const invalidateQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['sales-by-person-product'] });
-    queryClient.invalidateQueries({ queryKey: ['funnels-summary'] });
-  };
-
-  const handleCloserSave = async (
-    personId: string,
-    field: 'sales' | 'entries' | 'revenue',
-    currentValue: number,
-    newValue: number,
-    funnelId?: string | null,
-  ) => {
-    const delta = newValue - currentValue;
-    if (delta === 0) return;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
-
-      if (funnelId && (field === 'sales' || field === 'revenue')) {
-        const insertData: Record<string, unknown> = {
-          user_id: personId,
-          funnel_id: funnelId,
-          date: periodEnd,
-          created_by: userId,
-        };
-        if (field === 'sales') insertData.sales_count = delta;
-        if (field === 'revenue') insertData.sales_value = delta;
-        const { error } = await supabase.from('funnel_daily_data').insert(insertData as any);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('metrics').insert({
-          closer_id: personId,
-          period_start: periodStart,
-          period_end: periodEnd,
-          source: 'manual' as const,
-          sales: field === 'sales' ? delta : 0,
-          calls: 0,
-          revenue: field === 'revenue' ? delta : 0,
-          entries: field === 'entries' ? delta : 0,
-          created_by: userId,
-        });
-        if (error) throw error;
-      }
-
-      invalidateQueries();
-      toast.success('Valor atualizado!');
-    } catch (err) {
-      console.error(err);
-      toast.error('Erro ao salvar valor');
-    }
-  };
 
   if (isLoading) return <MetricCardSkeletonGrid count={4} />;
 
@@ -286,29 +226,9 @@ export function ProductSalesTable({ data, isLoading, periodStart, periodEnd, can
                     <TableRow key={i}>
                       <TableCell className="font-medium">{p.person_name}</TableCell>
                       <TableCell className="text-right">{p.total_done}</TableCell>
-                      <TableCell className="text-right">
-                        <EditableCell
-                          value={p.total_sales}
-                          onSave={(v) => handleCloserSave(p.person_id, 'sales', p.total_sales, v)}
-                          disabled={!canEdit}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <EditableCell
-                          value={p.total_revenue}
-                          onSave={(v) => handleCloserSave(p.person_id, 'revenue', p.total_revenue, v)}
-                          disabled={!canEdit}
-                          isCurrency
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <EditableCell
-                          value={p.total_entries}
-                          onSave={(v) => handleCloserSave(p.person_id, 'entries', p.total_entries, v)}
-                          disabled={!canEdit}
-                          isCurrency
-                        />
-                      </TableCell>
+                      <TableCell className="text-right">{p.total_sales}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.total_revenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.total_entries)}</TableCell>
                       <TableCell className="text-right font-semibold">
                         {conversionRate.toFixed(1)}%
                       </TableCell>
