@@ -423,17 +423,20 @@ export async function recalculateSdrSales(
     .eq('funnel', funnelName)
     .maybeSingle();
 
+  // Ensure sales is always an integer (sdr_metrics.sales is type integer)
+  const safeSales = Math.round(totalSales);
+
   if (existing) {
     const { error } = await supabase
       .from('sdr_metrics')
       .update({
-        sales: totalSales,
+        sales: safeSales,
         revenue: totalRevenue,
         entries: totalEntries,
       })
       .eq('id', existing.id);
     if (error) throw error;
-  } else if (totalSales > 0 || totalRevenue > 0 || totalEntries > 0) {
+  } else if (safeSales > 0 || totalRevenue > 0 || totalEntries > 0) {
     const { error } = await supabase
       .from('sdr_metrics')
       .insert({
@@ -445,7 +448,7 @@ export async function recalculateSdrSales(
         scheduled_follow_up: 0,
         scheduled_same_day: 0,
         attended: 0,
-        sales: totalSales,
+        sales: safeSales,
         revenue: totalRevenue,
         entries: totalEntries,
         source: 'manual',
