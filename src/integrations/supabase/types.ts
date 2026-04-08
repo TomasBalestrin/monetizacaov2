@@ -522,6 +522,9 @@ export type Database = {
           activated: number
           attendance_rate: number
           attended: number
+          cancellations: number
+          cancellation_value: number
+          cancellation_entries: number
           conversion_rate: number
           created_at: string
           created_by: string | null
@@ -541,6 +544,9 @@ export type Database = {
           activated?: number
           attendance_rate?: number
           attended?: number
+          cancellations?: number
+          cancellation_value?: number
+          cancellation_entries?: number
           conversion_rate?: number
           created_at?: string
           created_by?: string | null
@@ -560,6 +566,9 @@ export type Database = {
           activated?: number
           attendance_rate?: number
           attended?: number
+          cancellations?: number
+          cancellation_value?: number
+          cancellation_entries?: number
           conversion_rate?: number
           created_at?: string
           created_by?: string | null

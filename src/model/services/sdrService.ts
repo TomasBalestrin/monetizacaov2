@@ -17,6 +17,10 @@ export function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedM
       totalRevenue: 0,
       totalEntries: 0,
       avgConversionRate: 0,
+      totalCancellations: 0,
+      totalCancellationValue: 0,
+      totalCancellationEntries: 0,
+      cancellationRate: 0,
       totalFiCalled: 0,
       totalFiAwaiting: 0,
       totalFiReceivedLink: 0,
@@ -39,6 +43,12 @@ export function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedM
   const avgAttendanceRate = totalScheduledSameDay > 0 ? (totalAttended / totalScheduledSameDay) * 100 : 0;
   const avgConversionRate = totalAttended > 0 ? (totalSales / totalAttended) * 100 : 0;
 
+  // Cancellation aggregation
+  const totalCancellations = metrics.reduce((sum, m) => sum + (m.cancellations || 0), 0);
+  const totalCancellationValue = metrics.reduce((sum, m) => sum + (Number(m.cancellation_value) || 0), 0);
+  const totalCancellationEntries = metrics.reduce((sum, m) => sum + (Number(m.cancellation_entries) || 0), 0);
+  const cancellationRate = totalSales > 0 ? (totalCancellations / totalSales) * 100 : 0;
+
   // Funil Intensivo aggregation
   const totalFiCalled = metrics.reduce((sum, m) => sum + (m.fi_called || 0), 0);
   const totalFiAwaiting = metrics.reduce((sum, m) => sum + (m.fi_awaiting || 0), 0);
@@ -59,6 +69,10 @@ export function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedM
     totalRevenue,
     totalEntries,
     avgConversionRate,
+    totalCancellations,
+    totalCancellationValue,
+    totalCancellationEntries,
+    cancellationRate,
     totalFiCalled,
     totalFiAwaiting,
     totalFiReceivedLink,

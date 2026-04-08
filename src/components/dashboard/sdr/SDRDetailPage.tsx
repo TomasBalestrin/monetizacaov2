@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus, CalendarPlus, Clock, Link, Ticket, CheckCircle, DollarSign, CreditCard } from 'lucide-react';
+import { ArrowLeft, Phone, Users, Calendar, TrendingUp, UserCheck, ShoppingCart, ChevronLeft, ChevronRight, Plus, CalendarPlus, Clock, Link, Ticket, CheckCircle, DollarSign, CreditCard, XCircle } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -62,6 +62,10 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
       totalRevenue: 0,
       totalEntries: 0,
       avgConversionRate: 0,
+      totalCancellations: 0,
+      totalCancellationValue: 0,
+      totalCancellationEntries: 0,
+      cancellationRate: 0,
       totalFiCalled: 0,
       totalFiAwaiting: 0,
       totalFiReceivedLink: 0,
@@ -84,6 +88,12 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
   const avgAttendanceRate = totalScheduledSameDay > 0 ? (totalAttended / totalScheduledSameDay) * 100 : 0;
   const avgConversionRate = totalAttended > 0 ? (totalSales / totalAttended) * 100 : 0;
 
+  // Cancellations
+  const totalCancellations = metrics.reduce((sum, m) => sum + (m.cancellations || 0), 0);
+  const totalCancellationValue = metrics.reduce((sum, m) => sum + (Number(m.cancellation_value) || 0), 0);
+  const totalCancellationEntries = metrics.reduce((sum, m) => sum + (Number(m.cancellation_entries) || 0), 0);
+  const cancellationRate = totalSales > 0 ? (totalCancellations / totalSales) * 100 : 0;
+
   // Funil Intensivo
   const totalFiCalled = metrics.reduce((sum, m) => sum + (m.fi_called || 0), 0);
   const totalFiAwaiting = metrics.reduce((sum, m) => sum + (m.fi_awaiting || 0), 0);
@@ -104,6 +114,10 @@ function calculateAggregatedMetrics(metrics: SDRMetric[]): SDRAggregatedMetrics 
     totalRevenue,
     totalEntries,
     avgConversionRate,
+    totalCancellations,
+    totalCancellationValue,
+    totalCancellationEntries,
+    cancellationRate,
     totalFiCalled,
     totalFiAwaiting,
     totalFiReceivedLink,
@@ -552,6 +566,40 @@ export function SDRDetailPage({
                 variant={aggregatedMetrics?.avgAttendanceRate && aggregatedMetrics.avgAttendanceRate >= 50 ? 'success' : 'warning'}
               />
             </div>
+
+            {/* Cancellation Metrics Row */}
+            {(aggregatedMetrics?.totalCancellations || 0) > 0 && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <SDRMetricCard
+                  title="Cancelamentos"
+                  value={aggregatedMetrics?.totalCancellations || 0}
+                  icon={XCircle}
+                  variant="warning"
+                />
+                <SDRMetricCard
+                  title="% Cancelamento"
+                  value={aggregatedMetrics?.cancellationRate || 0}
+                  isPercentage
+                  showProgress
+                  icon={TrendingUp}
+                  variant="warning"
+                />
+                <SDRMetricCard
+                  title="Valor Venda Cancel."
+                  value={aggregatedMetrics?.totalCancellationValue || 0}
+                  icon={DollarSign}
+                  isCurrency
+                  variant="warning"
+                />
+                <SDRMetricCard
+                  title="Valor Entrada Cancel."
+                  value={aggregatedMetrics?.totalCancellationEntries || 0}
+                  icon={CreditCard}
+                  isCurrency
+                  variant="warning"
+                />
+              </div>
+            )}
           </div>
         )}
 

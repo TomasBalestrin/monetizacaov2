@@ -45,6 +45,9 @@ interface DateGroup {
     sales: number;
     revenue: number;
     entries: number;
+    cancellations: number;
+    cancellation_value: number;
+    cancellation_entries: number;
     fi_called: number;
     fi_awaiting: number;
     fi_received_link: number;
@@ -217,6 +220,9 @@ export function SDRDataTable({
           sales: items.reduce((s, m) => s + m.sales, 0),
           revenue: items.reduce((s, m) => s + (Number(m.revenue) || 0), 0),
           entries: items.reduce((s, m) => s + (Number(m.entries) || 0), 0),
+          cancellations: items.reduce((s, m) => s + (m.cancellations || 0), 0),
+          cancellation_value: items.reduce((s, m) => s + (Number(m.cancellation_value) || 0), 0),
+          cancellation_entries: items.reduce((s, m) => s + (Number(m.cancellation_entries) || 0), 0),
           fi_called: items.reduce((s, m) => s + (m.fi_called || 0), 0),
           fi_awaiting: items.reduce((s, m) => s + (m.fi_awaiting || 0), 0),
           fi_received_link: items.reduce((s, m) => s + (m.fi_received_link || 0), 0),
@@ -442,6 +448,22 @@ export function SDRDataTable({
           {(Number(metric.entries) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </TableCell>
 
+        <TableCell className="text-right">
+          {(metric.cancellations || 0) > 0 ? (
+            <span className="px-2 py-0.5 rounded-md text-xs font-bold text-destructive bg-destructive/10">
+              {metric.cancellations}
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-sm">0</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right text-destructive text-sm font-medium">
+          {(Number(metric.cancellation_value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </TableCell>
+        <TableCell className="text-right text-destructive text-sm font-medium">
+          {(Number(metric.cancellation_entries) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </TableCell>
+
         {hasActions && (
           <TableCell>
             <DropdownMenu>
@@ -602,6 +624,21 @@ export function SDRDataTable({
         <TableCell className="text-right font-medium text-emerald-600">
           {t.entries.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </TableCell>
+        <TableCell className="text-right">
+          {t.cancellations > 0 ? (
+            <span className="px-2 py-0.5 rounded-md text-xs font-bold text-destructive bg-destructive/10">
+              {t.cancellations}
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-sm">0</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right text-destructive text-sm font-medium">
+          {t.cancellation_value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </TableCell>
+        <TableCell className="text-right text-destructive text-sm font-medium">
+          {t.cancellation_entries.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </TableCell>
         {hasActions && <TableCell />}
       </TableRow>
     );
@@ -653,6 +690,9 @@ export function SDRDataTable({
                   <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">% Conv.</TableHead>
                   <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Faturamento</TableHead>
                   <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Entradas</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-destructive/70 text-right">Cancel.</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-destructive/70 text-right">Vlr Cancel.</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider text-destructive/70 text-right">Ent. Cancel.</TableHead>
                 </>
               )}
               {hasActions && (

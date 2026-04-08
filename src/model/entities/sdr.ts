@@ -22,6 +22,10 @@ export interface SDRMetric {
   revenue: number;
   entries: number; // valor de entrada (R$)
   conversion_rate: number;
+  // Cancellation fields
+  cancellations: number;
+  cancellation_value: number;
+  cancellation_entries: number;
   source: string | null;
   created_at: string;
   updated_at: string;
@@ -46,6 +50,11 @@ export interface SDRAggregatedMetrics {
   totalRevenue: number;
   totalEntries: number;
   avgConversionRate: number;
+  // Cancellation aggregated fields
+  totalCancellations: number;
+  totalCancellationValue: number;
+  totalCancellationEntries: number;
+  cancellationRate: number;
   // Funil Intensivo aggregated fields
   totalFiCalled?: number;
   totalFiAwaiting?: number;
@@ -75,6 +84,10 @@ export interface CreateSDRMetricPayload {
   attended: number;
   sales: number;
   source: string;
+  // Cancellation fields
+  cancellations?: number;
+  cancellation_value?: number;
+  cancellation_entries?: number;
   // Funil Intensivo fields
   fi_called?: number;
   fi_awaiting?: number;

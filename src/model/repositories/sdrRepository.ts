@@ -25,7 +25,7 @@ export async function fetchSDRMetrics(
 ): Promise<SDRMetric[]> {
   let query = supabase
     .from('sdr_metrics')
-    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, revenue, entries, conversion_rate, source, created_at, updated_at, fi_called, fi_awaiting, fi_received_link, fi_got_ticket, fi_attended, fi_attendance_rate')
+    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, revenue, entries, conversion_rate, cancellations, cancellation_value, cancellation_entries, source, created_at, updated_at, fi_called, fi_awaiting, fi_received_link, fi_got_ticket, fi_attended, fi_attendance_rate')
     .eq('sdr_id', sdrId)
     .order('date', { ascending: true });
 
@@ -148,7 +148,7 @@ export async function fetchSDRsWithMetricsRaw(
   const sdrIds = sdrs.map((s) => s.id);
   let query = supabase
     .from('sdr_metrics')
-    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, revenue, entries, conversion_rate, source, created_at, updated_at, fi_called, fi_awaiting, fi_received_link, fi_got_ticket, fi_attended, fi_attendance_rate')
+    .select('id, sdr_id, date, funnel, activated, scheduled, scheduled_follow_up, scheduled_rate, scheduled_same_day, attended, attendance_rate, sales, revenue, entries, conversion_rate, cancellations, cancellation_value, cancellation_entries, source, created_at, updated_at, fi_called, fi_awaiting, fi_received_link, fi_got_ticket, fi_attended, fi_attendance_rate')
     .in('sdr_id', sdrIds)
     .neq('funnel', '');
 
@@ -183,6 +183,9 @@ export async function createSDRMetric(metric: {
   attendance_rate: number;
   conversion_rate: number;
   created_by?: string;
+  cancellations?: number;
+  cancellation_value?: number;
+  cancellation_entries?: number;
   fi_called?: number;
   fi_awaiting?: number;
   fi_received_link?: number;

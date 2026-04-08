@@ -44,6 +44,13 @@ export function SDRMetricsDialog({
         ? ((values.fi_attended || 0) / (values.fi_got_ticket || 1)) * 100
         : 0;
 
+      // Cancellation data (only for SDR/Social Selling)
+      const cancellationData = !isFI ? {
+        cancellations: values.cancellations || 0,
+        cancellation_value: values.cancellation_value || 0,
+        cancellation_entries: values.cancellation_entries || 0,
+      } : {};
+
       if (isEditing && editingMetric) {
         // Update existing metric
         await updateMetric.mutateAsync({
@@ -56,6 +63,7 @@ export function SDRMetricsDialog({
           scheduled_same_day: values.scheduled_same_day,
           attended: values.attended,
           sales: values.sales,
+          ...cancellationData,
           ...(isFI && {
             fi_called: values.fi_called || 0,
             fi_awaiting: values.fi_awaiting || 0,
@@ -79,6 +87,7 @@ export function SDRMetricsDialog({
           attended: values.attended,
           sales: values.sales,
           source: 'manual',
+          ...cancellationData,
           ...(isFI && {
             fi_called: values.fi_called || 0,
             fi_awaiting: values.fi_awaiting || 0,

@@ -17,7 +17,10 @@ import {
   Phone,
   Link,
   Ticket,
-  CheckCircle
+  CheckCircle,
+  XCircle,
+  DollarSign,
+  CreditCard,
 } from 'lucide-react';
 import { cn, parseDateString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -57,6 +60,10 @@ const sdrMetricsSchema = z.object({
   scheduled_same_day: z.coerce.number().int().min(0),
   attended: z.coerce.number().int().min(0),
   sales: z.coerce.number().int().min(0),
+  // Cancellation fields
+  cancellations: z.coerce.number().int().min(0).optional(),
+  cancellation_value: z.coerce.number().min(0).optional(),
+  cancellation_entries: z.coerce.number().min(0).optional(),
   // Funil Intensivo fields
   fi_called: z.coerce.number().int().min(0).optional(),
   fi_awaiting: z.coerce.number().int().min(0).optional(),
@@ -126,6 +133,9 @@ export function SDRMetricsForm({
       scheduled_same_day: defaultMetric?.scheduled_same_day ?? 0,
       attended: defaultMetric?.attended ?? 0,
       sales: defaultMetric?.sales ?? 0,
+      cancellations: defaultMetric?.cancellations ?? 0,
+      cancellation_value: defaultMetric?.cancellation_value ?? 0,
+      cancellation_entries: defaultMetric?.cancellation_entries ?? 0,
       fi_called: defaultMetric?.fi_called ?? 0,
       fi_awaiting: defaultMetric?.fi_awaiting ?? 0,
       fi_received_link: defaultMetric?.fi_received_link ?? 0,
@@ -598,6 +608,80 @@ export function SDRMetricsForm({
             </div>
           )}
         </div>
+
+        {/* Cancellation Section - only for SDR/Social Selling */}
+        {!isFI && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-destructive/30">
+              <XCircle className="h-4 w-4 text-destructive" />
+              <h4 className="text-sm font-semibold text-destructive">Cancelamentos</h4>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <FormField
+                control={form.control}
+                name="cancellations"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={XCircle} label="Qtd" iconColor="text-destructive">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-10 bg-card border-destructive/30 text-center font-medium hover:border-destructive/50 focus:border-destructive transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cancellation_value"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={DollarSign} label="Valor Venda" iconColor="text-destructive">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="h-10 bg-card border-destructive/30 text-center font-medium hover:border-destructive/50 focus:border-destructive transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cancellation_entries"
+                render={({ field }) => (
+                  <FormItem>
+                    <MetricInput icon={CreditCard} label="Valor Entrada" iconColor="text-destructive">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="h-10 bg-card border-destructive/30 text-center font-medium hover:border-destructive/50 focus:border-destructive transition-colors"
+                          {...field}
+                        />
+                      </FormControl>
+                    </MetricInput>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Submit Button */}
         <Button 

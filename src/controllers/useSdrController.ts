@@ -154,6 +154,9 @@ export function useCreateSDRMetric() {
       attended: number;
       sales: number;
       source: string;
+      cancellations?: number;
+      cancellation_value?: number;
+      cancellation_entries?: number;
       fi_called?: number;
       fi_awaiting?: number;
       fi_received_link?: number;
@@ -197,6 +200,9 @@ export function useUpdateSDRMetric() {
       scheduled_same_day?: number;
       attended?: number;
       sales?: number;
+      cancellations?: number;
+      cancellation_value?: number;
+      cancellation_entries?: number;
       fi_called?: number;
       fi_awaiting?: number;
       fi_received_link?: number;
