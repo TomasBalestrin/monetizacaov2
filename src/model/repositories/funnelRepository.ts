@@ -55,9 +55,10 @@ export async function fetchUserFunnels(userId: string): Promise<Funnel[]> {
     .select('funnel_id, funnels(id, name, category, is_active)')
     .eq('user_id', userId);
   if (error) throw error;
+  // Supabase embed: dependendo da relação detectada, retorna objeto ou array. Trata os dois.
   return (data || [])
-    .map((uf: any) => uf.funnels as Funnel)
-    .filter((f: Funnel | null) => f && f.is_active);
+    .map((uf: any) => (Array.isArray(uf.funnels) ? uf.funnels[0] : uf.funnels) as Funnel | null)
+    .filter((f: Funnel | null): f is Funnel => !!f && f.is_active);
 }
 
 export async function assignUserFunnel(closerId: string, funnelId: string): Promise<void> {
@@ -84,9 +85,10 @@ export async function fetchUserProducts(closerId: string): Promise<Product[]> {
     .select('product_id, products(id, name, is_active)')
     .eq('user_id', closerId);
   if (error) throw error;
+  // Supabase embed: dependendo da relação detectada, retorna objeto ou array. Trata os dois.
   return (data || [])
-    .map((up: any) => up.products as Product)
-    .filter((p: Product | null) => p && p.is_active);
+    .map((up: any) => (Array.isArray(up.products) ? up.products[0] : up.products) as Product | null)
+    .filter((p: Product | null): p is Product => !!p && p.is_active);
 }
 
 export async function assignUserProduct(closerId: string, productId: string): Promise<void> {
