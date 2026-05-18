@@ -1,0 +1,15 @@
+{
+  "userIgnoreFilters": [
+    "node_modules/",
+    "dist/",
+    "dist-ssr/",
+    "build/",
+    ".vercel/",
+    ".vscode/",
+    ".claude/",
+    ".specs/",
+    "public/",
+    "bun.lockb",
+    "package-lock.json"
+  ]
+}

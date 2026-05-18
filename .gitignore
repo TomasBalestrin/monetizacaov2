@@ -23,3 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Claude Code — config local pessoal (permissions sandbox)
+.claude/settings.local.json
+
+# Obsidian — estado pessoal e plugins (chaves/certs)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/graph.json
+.obsidian/plugins/
+
+# Daily notes — pessoais
+journal/*.md
