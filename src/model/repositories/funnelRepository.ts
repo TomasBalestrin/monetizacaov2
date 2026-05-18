@@ -65,7 +65,8 @@ export async function assignUserFunnel(closerId: string, funnelId: string): Prom
   const { error } = await supabase
     .from('user_funnels')
     .insert({ user_id: closerId, funnel_id: funnelId, assigned_by: user?.id });
-  if (error) throw error;
+  // 23505 = unique_violation. Vínculo já existe — idempotente, ignora.
+  if (error && (error as any).code !== '23505') throw error;
 }
 
 export async function removeUserFunnel(closerId: string, funnelId: string): Promise<void> {
@@ -93,7 +94,8 @@ export async function assignUserProduct(closerId: string, productId: string): Pr
   const { error } = await supabase
     .from('user_products')
     .insert({ user_id: closerId, product_id: productId, assigned_by: user?.id });
-  if (error) throw error;
+  // 23505 = unique_violation. Vínculo já existe — idempotente, ignora.
+  if (error && (error as any).code !== '23505') throw error;
 }
 
 export async function removeUserProduct(closerId: string, productId: string): Promise<void> {
